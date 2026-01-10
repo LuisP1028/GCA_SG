@@ -197,15 +197,23 @@ Loop through target:
             </div>
         </section>
 
-                <div class="subsection">
-                    <span class="subsection-title">Minimum Window Subarray (Unordered)</span>
-                    <p><strong>Flow:</strong> Expand Right, Shrink Left.</p>
-                    <ol>
-                        <li><strong>Expand:</strong> Move right. Decrement counts in hash map. If count hits 0, decrement <code>remaining_to_cover</code>.</li>
-                        <li><strong>Valid State:</strong> When <code>remaining_to_cover == 0</code>, the window is valid.</li>
-                        <li><strong>Shrink:</strong> Move left to minimize. If a required keyword leaves, increment its count; if count > 0, increment <code>remaining_to_cover</code> (window becomes invalid, resume expansion).</li>
-                    </ol>
-                </div>
+        <div class="subsection">
+            <span class="subsection-title">
+                Minimum Window Subarray (Unordered)
+                <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Hash/slidingwindow.html'; v.classList.add('active');">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </span>
+            <p><strong>Flow:</strong> Expand Right, Shrink Left.</p>
+            <ol>
+                <li><strong>Expand:</strong> Move right. Decrement counts in hash map. If count hits 0, decrement <code>remaining_to_cover</code>.</li>
+                <li><strong>Valid State:</strong> When <code>remaining_to_cover == 0</code>, the window is valid.</li>
+                <li><strong>Shrink:</strong> Move left to minimize. If a required keyword leaves, increment its count; if count > 0, increment <code>remaining_to_cover</code> (window becomes invalid, resume expansion).</li>
+            </ol>
+        </div>
 
             </div>
         </details>
