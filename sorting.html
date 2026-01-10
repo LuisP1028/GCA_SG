@@ -157,18 +157,33 @@
                 <div class="subsection">
                     <span class="subsection-title">
                         Partitioning with Many Duplicates
-                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/del_dupes_sorted_array.html'; v.classList.add('active');">
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/partition_sort_dupes.html'; v.classList.add('active');">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
                     </span>
-                    <p>Rearrange the list so that all items sharing the same key sit next to each other using <strong>Cyclic Sort / Routing</strong>.</p>
+                    <p><strong>Goal:</strong> Rearrange the list so that all items sharing the same key sit next to each other (PARTITIONING AND SORTING ARRAYS WITH MANY DUPLICATES).</p>
+                    <p><strong>Key Definitions:</strong></p>
+                    <ul>
+                        <li><strong>Frequency Map:</strong> A data structure mapping a Key to the count of its occurrences.</li>
+                        <li><strong>Offset Map:</strong> A map tracking the current write index for each Key group.</li>
+                        <li><strong>In-Place Permutation:</strong> Rearranging elements within the original memory allocation, minimizing auxiliary space.</li>
+                        <li><strong>Cyclic Sort / Routing:</strong> The logic of identifying where an element belongs, swapping it there, and dealing with the element that was displaced.</li>
+                    </ul>
                     <ol>
-                        <li><strong>Frequency Pass:</strong> Build a map (Key → Count) to virtually "reserve" blocks.</li>
-                        <li><strong>Offset Map:</strong> Convert counts into absolute Start Indices (Write Heads).</li>
-                        <li><strong>Routing Loop:</strong> Pick a group. Inspect the intruder at the Write Head. Swap the intruder to its correct home. When correct, advance the Write Head pointer.</li>
+                        <li><strong>Step 1: The Frequency Pass (Virtual Sectioning).</strong> Iterate through the array once to build the Frequency Map. Calculate the exact size of every group to virtually "reserve" a block of indices.</li>
+                        <li><strong>Step 2: The Offset Initialization (Write Heads).</strong> Convert counts into absolute Start Indices to create the Offset Map. This transforms abstract counts into concrete memory addresses (Write Heads).</li>
+                        <li><strong>Step 3: The Routing Loop.</strong> Iterate while the Offset Map is not empty.
+                            <ul>
+                                <li><strong>Select a Source:</strong> Pick a group from the map and look at its current Write Head index.</li>
+                                <li><strong>Inspect the Intruder:</strong> Check the item currently sitting at that index.</li>
+                                <li><strong>Match:</strong> If the item belongs there, it is correctly placed. Advance the Pointer immediately.</li>
+                                <li><strong>Intruder:</strong> If the item is an intruder, consult the map for its correct home. Swap the intruder to that slot. The item displaced moves to your current index to be processed next.</li>
+                                <li><strong>Advancing:</strong> Incrementing a group's index in the Offset Map effectively closes that slot. When a group's subarray is full, remove it from the map.</li>
+                            </ul>
+                        </li>
                     </ol>
                 </div>
 
@@ -202,7 +217,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Union of Intervals (Sort & Sweep)</span>
+                    <span class="subsection-title">
+                        Union of Intervals (Sort & Sweep)
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/interval_union.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Convert a complex comparison problem into a linear stream of events.</p>
                     <ul>
                         <li><strong>Sort:</strong> By Left Endpoint. If equal, put <em>Closed</em> start before <em>Open</em> start.</li>
@@ -213,14 +236,30 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Merging Intervals (Event Based)</span>
-                    <p><strong>Phase 1 (Left):</strong> Skip non-overlapping. Right < New Left.</p>
+                    <span class="subsection-title">
+                        Merging Intervals (Event Based)
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/interval_merge.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
+                    <p><strong>Phase 1 (Left):</strong> Skip non-overlapping. Right &lt; New Left.</p>
                     <p><strong>Phase 2 (Merge):</strong> Overlap zone. <code>New Left = min</code>, <code>New Right = max</code>. Mutate the temporary new_interval.</p>
                     <p><strong>Phase 3 (Flush):</strong> Append the merged interval, then append the remainder.</p>
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Interval Overlap / Concurrency</span>
+                    <span class="subsection-title">
+                        Interval Overlap / Concurrency
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/max_concurrency.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find the peak number of events active at a single moment.</p>
                     <p><strong>The How:</strong> Create a timeline of markers (Start/End) and sort them. <strong>Tie Breaker:</strong> Process START before END to count overlaps correctly.</p>
                     <p><strong>Sweep:</strong> +1 for Start, -1 for End. Track the highest value reached.</p>
@@ -237,13 +276,29 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Merge Two Sorted Arrays</span>
+                    <span class="subsection-title">
+                        Merge Two Sorted Arrays
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'merge_sorted_arr.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p><strong>Strategy:</strong> Three Pointers (Tail A, Tail B, Write).</p>
                     <p><strong>The Trick:</strong> Start filling from the <strong>back</strong> (end of the buffer) to avoid shifting. Compare <code>A[tail]</code> vs <code>B[tail]</code>, place the larger one at <code>A[write]</code>, and decrement pointers.</p>
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Set Intersection</span>
+                    <span class="subsection-title">
+                        Set Intersection
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/intersection.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find common elements of two sorted arrays.</p>
                     <p><strong>Simultaneous Traversal:</strong></p>
                     <ul>
@@ -253,7 +308,15 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Smallest Nonconstructible Value</span>
+                    <span class="subsection-title">
+                        Smallest Nonconstructible Value
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/smallest_impossible_val.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find the smallest positive integer that cannot be formed as the sum of a subset.</p>
                     <ol>
                         <li><strong>Sort:</strong> Ascending order.</li>
