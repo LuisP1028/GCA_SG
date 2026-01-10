@@ -155,7 +155,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Decomposition (Multiset Matching)</span>
+                    <span class="subsection-title">
+                        Decomposition (Multiset Matching)
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Hash/decomposition.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Check if chunks of a sentence match a required multiset of words, regardless of sequence.</p>
                     <p><strong>The Core Pattern:</strong> Fixed unit size → target multiset (frequency map) → sliding window of exact total size → partition into uniform units → compute observed multiset → check exact equality.</p>
                     <ol>
@@ -167,7 +175,15 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Ordered Sequential Covering</span>
+                    <span class="subsection-title">
+                        Ordered Sequential Covering
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Hash/ordered_seq.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find the shortest contiguous subarray containing keywords in <strong>exact order</strong>.</p>
                     <p><strong>Logic:</strong> Use <code>latest_index[k]</code> to track the most recent position of keyword <em>k</em>, and <code>chainlength_upto_k[k]</code> to track valid chains.</p>
                     <div class="code-block">
@@ -178,6 +194,8 @@ Loop through target:
 - If k is the last keyword and chain is finite, compare to global min.
                     </div>
                 </div>
+            </div>
+        </section>
 
                 <div class="subsection">
                     <span class="subsection-title">Minimum Window Subarray (Unordered)</span>
