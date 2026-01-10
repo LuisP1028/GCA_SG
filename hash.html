@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part II: Hash Operations // Study Guide</title>
+<style>
+    /* 
+       --- STYLE CONFIGURATION --- 
+       (Identical to Main Shell)
+    */
+    :root {
+        --bg-color: #000000;
+        --text-color: #00ff41;
+        --accent-color: #00ff41;
+        --dim-color: #003b00;
+        --border-color: #00ff41;
+        --font-main: 'Courier New', Courier, monospace;
+        --font-header: 'Arial Black', Impact, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: var(--font-main);
+        line-height: 1.5;
+        overflow-x: hidden;
+    }
+
+    .dither-layer {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background-image: radial-gradient(circle, #003b00 1px, transparent 1px);
+        background-size: 4px 4px;
+        opacity: 0.4;
+    }
+
+    .scanlines {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(to bottom, rgba(0, 255, 65, 0), rgba(0, 255, 65, 0) 50%, rgba(0, 20, 0, 0.2) 50%, rgba(0, 20, 0, 0.2));
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 9999;
+    }
+
+    .container {
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 40px 20px;
+        border-left: 2px dashed var(--dim-color);
+        border-right: 2px dashed var(--dim-color);
+        background-color: rgba(0, 10, 0, 0.9);
+        min-height: 100vh;
+    }
+
+    h1 {
+        font-family: var(--font-header);
+        text-transform: uppercase;
+        font-size: 2.5rem;
+        border-bottom: 5px solid var(--accent-color);
+        margin-bottom: 40px;
+        color: var(--accent-color);
+        text-align: center;
+    }
+
+    strong { color: var(--accent-color); text-decoration: underline; }
+    em { font-style: normal; color: #50c878; border-bottom: 1px dotted var(--dim-color); }
+
+    /* ACCORDION STYLES */
+    details.section {
+        margin-bottom: 15px;
+        border: 1px solid var(--dim-color);
+        background: #050505;
+    }
+
+    details.section > summary {
+        font-family: var(--font-main);
+        font-weight: bold;
+        padding: 12px;
+        background: #0a0a0a;
+        color: var(--text-color);
+        cursor: pointer;
+        list-style: none;
+        border-bottom: 1px solid transparent;
+        text-transform: uppercase;
+        font-size: 1.1rem;
+    }
+
+    details.section > summary:hover { background: var(--dim-color); color: var(--accent-color); }
+    details.section[open] > summary {
+        border-bottom: 1px solid var(--dim-color);
+        background: #0f0f0f;
+        color: var(--accent-color);
+        text-shadow: 0px 0px 5px var(--accent-color);
+    }
+
+    .section-content { padding: 20px; }
+
+    .subsection {
+        margin-bottom: 25px;
+        border-left: 4px solid var(--dim-color);
+        padding-left: 15px;
+    }
+
+    .subsection-title {
+        background: var(--dim-color);
+        color: var(--accent-color);
+        padding: 2px 6px;
+        font-weight: bold;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+
+    p { margin-bottom: 12px; margin-top: 0; text-align: justify; }
+    ul { padding-left: 20px; margin-bottom: 15px; }
+    li { margin-bottom: 5px; }
+
+    .code-block {
+        background: #020a02;
+        border: 1px dashed var(--dim-color);
+        padding: 10px;
+        margin: 10px 0;
+        font-family: 'Courier New', monospace;
+        color: var(--accent-color);
+        overflow-x: auto;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div class="dither-layer"></div>
+<div class="scanlines"></div>
+
+<div class="container">
+    <h1>Part II: Hash Operations</h1>
+
+    <!-- MAIN CONTENT BUCKET -->
+    <div class="part-content">
+        
+        <!-- ============================================== -->
+        <!-- SECTION 1: SLIDING WINDOW & COVERING -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>1. Sliding Window Patterns</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Decomposition (Multiset Matching)</span>
+                    <p>Check if chunks of a sentence match a required multiset of words, regardless of sequence.</p>
+                    <p><strong>The Core Pattern:</strong> Fixed unit size → target multiset (frequency map) → sliding window of exact total size → partition into uniform units → compute observed multiset → check exact equality.</p>
+                    <ol>
+                        <li>Determine fixed unit size (e.g., word length).</li>
+                        <li>Build target frequency map.</li>
+                        <li>Slide window: Divide window into pieces, compare observed frequencies to target.</li>
+                        <li>Store: If exact match, add starting index to results.</li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Ordered Sequential Covering</span>
+                    <p>Find the shortest contiguous subarray containing keywords in <strong>exact order</strong>.</p>
+                    <p><strong>Logic:</strong> Use <code>latest_index[k]</code> to track the most recent position of keyword <em>k</em>, and <code>chainlength_upto_k[k]</code> to track valid chains.</p>
+                    <div class="code-block">
+Loop through target:
+- If chain to previous keyword (k-1) is valid:
+  Extend chain: new_chain = chain_prev + (current_i - latest_index_prev)
+- Update latest_index for k.
+- If k is the last keyword and chain is finite, compare to global min.
+                    </div>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Minimum Window Subarray (Unordered)</span>
+                    <p><strong>Flow:</strong> Expand Right, Shrink Left.</p>
+                    <ol>
+                        <li><strong>Expand:</strong> Move right. Decrement counts in hash map. If count hits 0, decrement <code>remaining_to_cover</code>.</li>
+                        <li><strong>Valid State:</strong> When <code>remaining_to_cover == 0</code>, the window is valid.</li>
+                        <li><strong>Shrink:</strong> Move left to minimize. If a required keyword leaves, increment its count; if count > 0, increment <code>remaining_to_cover</code> (window becomes invalid, resume expansion).</li>
+                    </ol>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 2: SET & FREQUENCY ANALYSIS -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>2. Set & Frequency Analysis</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Maximal Consecutive Integers</span>
+                    <p>Find the longest consecutive range in a set (e.g., [100, 4, 200, 1, 3, 2] -> [1, 2, 3, 4]).</p>
+                    <p><strong>Efficient Solution:</strong> While set is not empty, pop a number <em>a</em>. Look Left (a-1, a-2...) and Right (a+1, a+2...) in the set, removing them as you find them. Calculate length (upper - lower - 1).</p>
+                    <p><em>Use Case:</em> Aerospace telemetry (finding longest consecutive valid readings during anomalies).</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Min Distance Between Duplicates</span>
+                    <p>Find the smallest position gap between any two identical elements.</p>
+                    <p><strong>Logic:</strong> Use a hash table to store the <strong>most recent position</strong> of each element. As you iterate:</p>
+                    <ul>
+                        <li>If element exists in map: <code>gap = current_i - stored_i</code>.</li>
+                        <li>Update global minimum if gap is smaller.</li>
+                        <li>Update map with <code>current_i</code>.</li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Resource Availability Checks</span>
+                    <p><strong>Inventory Management:</strong> Create a frequency map of "Target Needs". Stream over inventory.</p>
+                    <ul>
+                        <li>If item matches Need, decrement count.</li>
+                        <li>If count hits 0, remove entry from map.</li>
+                        <li><strong>Early Exit:</strong> Return True as soon as map is empty.</li>
+                    </ul>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 3: CACHING & TREES -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>3. Caching & Trees</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">LCA (Least Common Ancestor)</span>
+                    <p>The "Close Ancestor" Optimization. Instead of tracing all the way to the root, we use <strong>Interleaved Traversal</strong>.</p>
+                    <p><strong>Logic:</strong>
+                    1. Node A takes one step up. Mark parent as "Visited" (Hash Set).
+                    2. Node B takes one step up. Check: "Has A been here?"
+                    3. Repeat. The moment one node steps onto a visited node, that is the LCA.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">LRU Caching (DLL + Hash)</span>
+                    <p><strong>Goal:</strong> Fast retrieval + Smart eviction.</p>
+                    <ul>
+                        <li><strong>Hash Map:</strong> Stores <code>[Key, Node_Pointer]</code>. Provides O(1) random access.</li>
+                        <li><strong>Doubly Linked List:</strong> Stores actual Values. Maintains temporal order (Head=MRU, Tail=LRU).</li>
+                    </ul>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 4: THEORY & DESIGN -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>4. Theory & Design</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Hashable Class Design</span>
+                    <p><strong>Equivalence Relation:</strong> The rule you invent to decide if two things are "the same" (e.g., Logical Identity vs Physical Identity).</p>
+                    <p><strong>The Contract:</strong> If <code>A equals B</code>, then <code>Hash(A)</code> MUST equal <code>Hash(B)</code>. If this is broken, the computer files them in different buckets and duplicates cannot be detected.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Hash Tables Theory</span>
+                    <p>Hash tables store data in an array (for physical speed) by converting keys to indices.</p>
+                    <ul>
+                        <li><strong>Hard Rule (Consistency):</strong> Same input must always equal same output.</li>
+                        <li><strong>Soft Rule (Distribution):</strong> Keys should be spread out to avoid collisions.</li>
+                        <li><strong>Speed Rule (Efficiency):</strong> Calculation must be fast. Avoid cryptographic hashes (SHA256) for standard maps.</li>
+                    </ul>
+                </div>
+
+            </div>
+        </details>
+
+    </div>
+</div>
+
+</body>
+</html>

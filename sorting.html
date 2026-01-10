@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part III: Sorting // Study Guide</title>
+<style>
+    /* 
+       --- STYLE CONFIGURATION --- 
+       (Identical to Main Shell)
+    */
+    :root {
+        --bg-color: #000000;
+        --text-color: #00ff41;
+        --accent-color: #00ff41;
+        --dim-color: #003b00;
+        --border-color: #00ff41;
+        --font-main: 'Courier New', Courier, monospace;
+        --font-header: 'Arial Black', Impact, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: var(--font-main);
+        line-height: 1.5;
+        overflow-x: hidden;
+    }
+
+    .dither-layer {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background-image: radial-gradient(circle, #003b00 1px, transparent 1px);
+        background-size: 4px 4px;
+        opacity: 0.4;
+    }
+
+    .scanlines {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(to bottom, rgba(0, 255, 65, 0), rgba(0, 255, 65, 0) 50%, rgba(0, 20, 0, 0.2) 50%, rgba(0, 20, 0, 0.2));
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 9999;
+    }
+
+    .container {
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 40px 20px;
+        border-left: 2px dashed var(--dim-color);
+        border-right: 2px dashed var(--dim-color);
+        background-color: rgba(0, 10, 0, 0.9);
+        min-height: 100vh;
+    }
+
+    h1 {
+        font-family: var(--font-header);
+        text-transform: uppercase;
+        font-size: 2.5rem;
+        border-bottom: 5px solid var(--accent-color);
+        margin-bottom: 40px;
+        color: var(--accent-color);
+        text-align: center;
+    }
+
+    strong { color: var(--accent-color); text-decoration: underline; }
+    em { font-style: normal; color: #50c878; border-bottom: 1px dotted var(--dim-color); }
+
+    /* ACCORDION STYLES */
+    details.section {
+        margin-bottom: 15px;
+        border: 1px solid var(--dim-color);
+        background: #050505;
+    }
+
+    details.section > summary {
+        font-family: var(--font-main);
+        font-weight: bold;
+        padding: 12px;
+        background: #0a0a0a;
+        color: var(--text-color);
+        cursor: pointer;
+        list-style: none;
+        border-bottom: 1px solid transparent;
+        text-transform: uppercase;
+        font-size: 1.1rem;
+    }
+
+    details.section > summary:hover { background: var(--dim-color); color: var(--accent-color); }
+    details.section[open] > summary {
+        border-bottom: 1px solid var(--dim-color);
+        background: #0f0f0f;
+        color: var(--accent-color);
+        text-shadow: 0px 0px 5px var(--accent-color);
+    }
+
+    .section-content { padding: 20px; }
+
+    .subsection {
+        margin-bottom: 25px;
+        border-left: 4px solid var(--dim-color);
+        padding-left: 15px;
+    }
+
+    .subsection-title {
+        background: var(--dim-color);
+        color: var(--accent-color);
+        padding: 2px 6px;
+        font-weight: bold;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+
+    p { margin-bottom: 12px; margin-top: 0; text-align: justify; }
+    ul { padding-left: 20px; margin-bottom: 15px; }
+    li { margin-bottom: 5px; }
+
+    .code-block {
+        background: #020a02;
+        border: 1px dashed var(--dim-color);
+        padding: 10px;
+        margin: 10px 0;
+        font-family: 'Courier New', monospace;
+        color: var(--accent-color);
+        overflow-x: auto;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div class="dither-layer"></div>
+<div class="scanlines"></div>
+
+<div class="container">
+    <h1>Part III: Sorting</h1>
+
+    <!-- MAIN CONTENT BUCKET -->
+    <div class="part-content">
+        
+        <!-- ============================================== -->
+        <!-- SECTION 1: PARTITIONING & GROUPING -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>1. Partitioning & Grouping</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Partitioning with Many Duplicates</span>
+                    <p>Rearrange the list so that all items sharing the same key sit next to each other using <strong>Cyclic Sort / Routing</strong>.</p>
+                    <ol>
+                        <li><strong>Frequency Pass:</strong> Build a map (Key → Count) to virtually "reserve" blocks.</li>
+                        <li><strong>Offset Map:</strong> Convert counts into absolute Start Indices (Write Heads).</li>
+                        <li><strong>Routing Loop:</strong> Pick a group. Inspect the intruder at the Write Head. Swap the intruder to its correct home. When correct, advance the Write Head pointer.</li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Removing Duplicates In-Place</span>
+                    <p>Filter an array without allocating new memory using the <strong>Two Pointer Technique</strong>.</p>
+                    <ol>
+                        <li><strong>Lexicographical Grouping:</strong> Sort so duplicates are neighbors.</li>
+                        <li><strong>Write Pointer:</strong> Initialize at index 1.</li>
+                        <li><strong>Scan:</strong> If <code>A[read] != A[write-1]</code>, overwrite <code>A[write]</code> and increment write pointer.</li>
+                        <li><strong>Truncation:</strong> Delete the obsolete buffer at the end.</li>
+                    </ol>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 2: INTERVAL MANAGEMENT -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>2. Interval Management</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Union of Intervals (Sort & Sweep)</span>
+                    <p>Convert a complex comparison problem into a linear stream of events.</p>
+                    <ul>
+                        <li><strong>Sort:</strong> By Left Endpoint. If equal, put <em>Closed</em> start before <em>Open</em> start.</li>
+                        <li><strong>Sweep:</strong> Maintain one Active Interval.</li>
+                        <li><strong>Gap:</strong> If Next starts strictly after Active ends, save Active. Next becomes Active.</li>
+                        <li><strong>Merge:</strong> If overlap, absorb Next. New End = <code>max(Active.end, Next.end)</code>.</li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Merging Intervals (Event Based)</span>
+                    <p><strong>Phase 1 (Left):</strong> Skip non-overlapping. Right < New Left.</p>
+                    <p><strong>Phase 2 (Merge):</strong> Overlap zone. <code>New Left = min</code>, <code>New Right = max</code>. Mutate the temporary new_interval.</p>
+                    <p><strong>Phase 3 (Flush):</strong> Append the merged interval, then append the remainder.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Interval Overlap / Concurrency</span>
+                    <p>Find the peak number of events active at a single moment.</p>
+                    <p><strong>The How:</strong> Create a timeline of markers (Start/End) and sort them. <strong>Tie Breaker:</strong> Process START before END to count overlaps correctly.</p>
+                    <p><strong>Sweep:</strong> +1 for Start, -1 for End. Track the highest value reached.</p>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 3: MERGING & CONSTRUCTIVE -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>3. Merging & Constructive</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Merge Two Sorted Arrays</span>
+                    <p><strong>Strategy:</strong> Three Pointers (Tail A, Tail B, Write).</p>
+                    <p><strong>The Trick:</strong> Start filling from the <strong>back</strong> (end of the buffer) to avoid shifting. Compare <code>A[tail]</code> vs <code>B[tail]</code>, place the larger one at <code>A[write]</code>, and decrement pointers.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Set Intersection</span>
+                    <p>Find common elements of two sorted arrays.</p>
+                    <p><strong>Simultaneous Traversal:</strong></p>
+                    <ul>
+                        <li><strong>Match:</strong> Check for duplicates (is it same as last added?). If unique, add to result. Increment BOTH pointers.</li>
+                        <li><strong>Mismatch:</strong> Increment the pointer of the <em>smaller</em> value to catch up.</li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Smallest Nonconstructible Value</span>
+                    <p>Find the smallest positive integer that cannot be formed as the sum of a subset.</p>
+                    <ol>
+                        <li><strong>Sort:</strong> Ascending order.</li>
+                        <li><strong>Invariant:</strong> <code>max_constructible</code> (starts at 0).</li>
+                        <li><strong>Gapping:</strong> If <code>current_coin > max_constructible + 1</code>, we have gapped. The answer is <code>max_constructible + 1</code>.</li>
+                        <li><strong>Expanding:</strong> Otherwise, <code>max_constructible += current_coin</code>.</li>
+                    </ol>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 4: SORTING THEORY -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>4. Sorting Theory</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Concepts</span>
+                    <p><strong>Stable Sorting:</strong> Preserves the relative order of elements with equal keys.</p>
+                    <p><strong>Radix Sort:</strong> Sorts integers by processing individual digits into buckets. Often linear time.</p>
+                    <p><strong>Heap Basics:</strong> Max-heap gives O(log n) access to largest item. Useful for priority queues.</p>
+                </div>
+
+            </div>
+        </details>
+
+    </div>
+</div>
+
+</body>
+</html>

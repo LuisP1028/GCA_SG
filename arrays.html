@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part I: Arrays // Study Guide</title>
+<style>
+    /* 
+       --- STYLE CONFIGURATION --- 
+       (Identical to Main Shell)
+    */
+    :root {
+        --bg-color: #000000;
+        --text-color: #00ff41;
+        --accent-color: #00ff41;
+        --dim-color: #003b00;
+        --border-color: #00ff41;
+        --font-main: 'Courier New', Courier, monospace;
+        --font-header: 'Arial Black', Impact, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: var(--font-main);
+        line-height: 1.5;
+        overflow-x: hidden;
+    }
+
+    .dither-layer {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background-image: radial-gradient(circle, #003b00 1px, transparent 1px);
+        background-size: 4px 4px;
+        opacity: 0.4;
+    }
+
+    .scanlines {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(to bottom, rgba(0, 255, 65, 0), rgba(0, 255, 65, 0) 50%, rgba(0, 20, 0, 0.2) 50%, rgba(0, 20, 0, 0.2));
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 9999;
+    }
+
+    .container {
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 40px 20px;
+        border-left: 2px dashed var(--dim-color);
+        border-right: 2px dashed var(--dim-color);
+        background-color: rgba(0, 10, 0, 0.9);
+        min-height: 100vh;
+    }
+
+    h1 {
+        font-family: var(--font-header);
+        text-transform: uppercase;
+        font-size: 2.5rem;
+        border-bottom: 5px solid var(--accent-color);
+        margin-bottom: 40px;
+        color: var(--accent-color);
+        text-align: center;
+    }
+
+    strong { color: var(--accent-color); text-decoration: underline; }
+    em { font-style: normal; color: #50c878; border-bottom: 1px dotted var(--dim-color); }
+
+    /* ACCORDION STYLES */
+    details.section {
+        margin-bottom: 15px;
+        border: 1px solid var(--dim-color);
+        background: #050505;
+    }
+
+    details.section > summary {
+        font-family: var(--font-main);
+        font-weight: bold;
+        padding: 12px;
+        background: #0a0a0a;
+        color: var(--text-color);
+        cursor: pointer;
+        list-style: none;
+        border-bottom: 1px solid transparent;
+        text-transform: uppercase;
+        font-size: 1.1rem;
+    }
+
+    details.section > summary:hover { background: var(--dim-color); color: var(--accent-color); }
+    details.section[open] > summary {
+        border-bottom: 1px solid var(--dim-color);
+        background: #0f0f0f;
+        color: var(--accent-color);
+        text-shadow: 0px 0px 5px var(--accent-color);
+    }
+
+    .section-content { padding: 20px; }
+
+    .subsection {
+        margin-bottom: 25px;
+        border-left: 4px solid var(--dim-color);
+        padding-left: 15px;
+    }
+
+    .subsection-title {
+        background: var(--dim-color);
+        color: var(--accent-color);
+        padding: 2px 6px;
+        font-weight: bold;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+
+    p { margin-bottom: 12px; margin-top: 0; text-align: justify; }
+    ul { padding-left: 20px; margin-bottom: 15px; }
+    li { margin-bottom: 5px; }
+
+    .code-block {
+        background: #020a02;
+        border: 1px dashed var(--dim-color);
+        padding: 10px;
+        margin: 10px 0;
+        font-family: 'Courier New', monospace;
+        color: var(--accent-color);
+        overflow-x: auto;
+        white-space: pre-wrap;
+    }
+
+    /* EYE BUTTON (Visual Only) */
+    .eye-btn {
+        position: relative; width: 20px; height: 20px;
+        background: #000; border: 1px solid var(--accent-color);
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-left: 8px; vertical-align: middle; cursor: default;
+    }
+    .eye-btn svg { width: 100%; height: 100%; fill: var(--accent-color); }
+</style>
+</head>
+<body>
+
+<div class="dither-layer"></div>
+<div class="scanlines"></div>
+
+<div class="container">
+    <h1>Part I: Arrays</h1>
+
+    <!-- MAIN CONTENT BUCKET -->
+    <div class="part-content">
+        
+        <!-- ============================================== -->
+        <!-- SECTION 1: TRAVERSAL & LOGIC -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>1. Traversal & Matrix Logic</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Array Spiraling</span>
+                    <p><strong>Layer-by-Layer:</strong> Treats the matrix as concentric rectangular rings (shells). You iterate through the top row, right column, bottom row, and left column of the outermost ring, then shrink the boundary.</p>
+                    <p><strong>The How:</strong> Read the first row normally, transpose for columns. When reading bottom rows, traverse from <code>[-1]</code> to keep order. <em>Crucial Detail:</em> Stop one cell early when traversing columns/rows to ensure corners aren't counted twice.</p>
+                    <div class="code-block">
+Analogy: Reading a Map
+• East: Hold map normally.
+• South: Turn head sideways.
+• West: Straighten head back to normal.
+                    </div>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Advancing Through an Array (Jump Game)</span>
+                    <p>The problem asks if you can navigate from start to end where values = max jump length.</p>
+                    <p><strong>Naive Approach:</strong> Simulating every path. Fails because it creates a branching tree of possibilities that explodes exponentially.</p>
+                    <p><strong>Optimal Approach (Greedy Horizon):</strong> Track the boundary of where you <em>can</em> go.</p>
+                    <ul>
+                        <li><strong>Horizon:</strong> The maximum index reachable so far.</li>
+                        <li><strong>Gap:</strong> If <code>Current Position > Horizon</code>, you have hit a dead end (a gap in the bridge).</li>
+                    </ul>
+                    <p><em>Use Case:</em> Therapeutic Window Management (Insulin coverage gaps).</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Two Dimensional List Comprehension</span>
+                    <p>A "list of lists." The main list represents rows, and each inner list represents specific values within a single row.</p>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 2: SAMPLING & RANDOMIZATION -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>2. Sampling & Randomization</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Compute Random Subset (Hash Map)</span>
+                    <p>Selecting <strong>k</strong> unique numbers from a massive range (<strong>n</strong>). Creating an array of size n is impossible.</p>
+                    <p><strong>Solution:</strong> Use a hashmap to simulate a huge dataset by only tracking visited positions. If you land on a "visited" index (collision), map the new choice to the value sitting at the collision point.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Sample Online Data (Reservoir Sampling)</span>
+                    <p>Think of a VIP list with <strong>k</strong> spots. As the crowd (<strong>n</strong>) grows, entry becomes harder.</p>
+                    <ul>
+                        <li><strong>The Odds:</strong> For the n-th person, roll an n-sided die. If number ≤ k, they get in. (Chance = k/n).</li>
+                        <li><strong>The Swap:</strong> If they get in, randomly kick out a current VIP to maintain size k.</li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Sample Offline Data (Fisher Yates)</span>
+                    <p><strong>Logic:</strong> Partition the array into "Chosen" (Left) and "Pool" (Right).</p>
+                    <ol>
+                        <li>Place finger on index 0.</li>
+                        <li>Pick random index between finger and end.</li>
+                        <li>Swap the value at random index with finger.</li>
+                        <li>Advance finger. Repeat k times.</li>
+                    </ol>
+                    <p><em>Use Case:</em> Defense Ammunition Lot Acceptance (Testing without destroying inventory).</p>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 3: PERMUTATIONS & ORDERING -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>3. Permutations & Ordering</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Next Permutation</span>
+                    <p>Rearrange digits to form the <strong>smallest number that is larger</strong> than the current one (lexicographically larger).</p>
+                    <ul>
+                        <li><strong>Suffix:</strong> The tail end of the list.</li>
+                        <li><strong>Inversion Point:</strong> The first number (scanning right-to-left) smaller than its right neighbor.</li>
+                    </ul>
+                    <p><em>Use Case:</em> Cryptographic auditing (Brute-force key generation).</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">In-Place Permutations</span>
+                    <p>Shuffling a list according to instructions (P) without an in-memory buffer.</p>
+                    <p><strong>Cyclic Permutation:</strong> Disjoint cycles (e.g., 0->2->1->0).</p>
+                    <p><strong>Anchor (i):</strong> Main loop index acting as a "buffer."</p>
+                    <p><strong>Sentinel:</strong> Mark visited spots by subtracting array length from the index (since indices are non-negative).</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Alternations (Wiggle Sort)</span>
+                    <p>Pattern: Low, High, Low, High (A[0] ≤ A[1] ≥ A[2]...).</p>
+                    <p><strong>Local Optimality:</strong> Only look at pair (i, i+1). Fixing the current pair doesn't break the previous one because if index i is even (needs to be smaller) and we swap to make i+1 larger, it only helps satisfy the previous condition.</p>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 4: OPTIMIZATION & DP -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>4. Optimization & DP</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Bidirectional Dynamic Programming</span>
+                    <p>Optimizing two sequential, non-overlapping events (e.g., Stock Trading).</p>
+                    <ul>
+                        <li><strong>Phase 1 (Forward):</strong> Max profit from one trade ending by day i.</li>
+                        <li><strong>Phase 2 (Backward):</strong> Max profit from one trade starting on/after day i.</li>
+                        <li><strong>Phase 3 (Combine):</strong> Max(Left[i] + Right[i]).</li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Maximum Difference</span>
+                    <p>Global optimum of <code>A[j] - A[i]</code> where <code>j > i</code>.</p>
+                    <p><strong>Process:</strong> Single-pass greedy traversal. Track <code>min_seen</code> and <code>max_diff</code>. Update <code>min_seen</code> if current value is lower; update <code>max_diff</code> if (current - min_seen) is a new record.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">In-Place Deduplication</span>
+                    <p><strong>Ontology:</strong> Reader (scout) and Writer (cursor for unique data).</p>
+                    <p><strong>Logic:</strong> Maintain a "valid prefix." Reader iterates. If A[reader] differs from A[writer-1], it is unique. Copy to A[writer] and increment.</p>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Enumerate Primes (Sieve)</span>
+                    <p>Assume all numbers are prime and progressively eliminate multiples.</p>
+                    <p><strong>Why Faster?</strong> Computers find division/modulus expensive. The Sieve uses <strong>Jumping</strong> (Addition) to mark indices, which is much faster for a CPU.</p>
+                </div>
+
+            </div>
+        </details>
+
+        <!-- ============================================== -->
+        <!-- SECTION 5: THEORY & IMPLEMENTATION -->
+        <!-- ============================================== -->
+        <details class="section">
+            <summary>5. Theory & Implementation</summary>
+            <div class="section-content">
+                
+                <div class="subsection">
+                    <span class="subsection-title">Array Based Sequences: GameEntry</span>
+                    <p>A blueprint for objects storing records (Name + Score) in a single container, avoiding parallel lists.</p>
+                    <div class="code-block">
+class GameEntry:
+  def __init__(self, name, score):
+     self.name = name
+     self.score = score
+  def __str__(self):
+     return '({0}, {1})'.format(self.name, self.score)
+                    </div>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Searching & Lexicographic Comparisons</span>
+                    <p><strong>Lexicographic:</strong> "Sudden Death" comparison.</p>
+                    <ol>
+                        <li>Line lists up side-by-side.</li>
+                        <li>Compare pairs. If equal, continue.</li>
+                        <li>If different, the list with the smaller item is strictly smaller. Comparison ends immediately.</li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <span class="subsection-title">Array Theory</span>
+                    <p><strong>Referential Array:</strong> Stores memory addresses (pointers). Allows variable-length objects in fixed slots.</p>
+                    <p><strong>Compact Array:</strong> Stores bits/values directly in slots.</p>
+                    <p><strong>Deep vs Shallow Copy:</strong> Shallow references existing objects (aliasing); Deep recursively clones everything.</p>
+                </div>
+
+            </div>
+        </details>
+
+    </div>
+</div>
+
+</body>
+</html>
