@@ -155,7 +155,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Partitioning with Many Duplicates</span>
+                    <span class="subsection-title">
+                        Partitioning with Many Duplicates
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/del_dupes_sorted_array.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Rearrange the list so that all items sharing the same key sit next to each other using <strong>Cyclic Sort / Routing</strong>.</p>
                     <ol>
                         <li><strong>Frequency Pass:</strong> Build a map (Key → Count) to virtually "reserve" blocks.</li>
@@ -165,7 +173,15 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Removing Duplicates In-Place</span>
+                    <span class="subsection-title">
+                        Removing Duplicates In-Place
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/dupe_removal_inplace.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Filter an array without allocating new memory using the <strong>Two Pointer Technique</strong>.</p>
                     <ol>
                         <li><strong>Lexicographical Grouping:</strong> Sort so duplicates are neighbors.</li>
