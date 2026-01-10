@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smallest Non-Constructible Value // DITHERPUNK</title>
+    <style>
+        /* --- DITHERPUNK DESIGN SYSTEM --- */
+        :root {
+            --bg: #000000;
+            --fg: #33FF00;
+            --font-stack: 'Courier New', 'Fira Code', monospace;
+            --grid-size: 4px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-stack);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scanline Overlay for Retro Feel */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* --- TEXTURES (No colors allowed, patterns only) --- */
+        
+        /* 1. Solid Green: Safe Range */
+        .texture-solid {
+            background-color: var(--fg);
+            color: var(--bg);
+        }
+
+        /* 2. Dither Pattern: Inventory / Pending */
+        .texture-dither {
+            background-color: var(--bg);
+            background-image: radial-gradient(var(--fg) 15%, transparent 16%);
+            background-size: var(--grid-size) var(--grid-size);
+            border: 1px solid var(--fg);
+            color: var(--fg);
+        }
+
+        /* 3. Diagonal Hatching: Active Coin */
+        .texture-hatch {
+            background-color: var(--bg);
+            background: repeating-linear-gradient(
+                45deg,
+                var(--fg),
+                var(--fg) 2px,
+                var(--bg) 2px,
+                var(--bg) 6px
+            );
+            border: 2px solid var(--fg);
+            color: var(--bg);
+            text-shadow: 0 0 2px black;
+            font-weight: bold;
+        }
+
+        /* 4. Inverted: Target / Highlight */
+        .texture-inverted {
+            background-color: var(--fg);
+            color: var(--bg);
+            font-weight: bold;
+        }
+
+        /* --- LAYOUT SECTIONS --- */
+
+        /* SECTION A: INVENTORY (Top 20%) */
+        #inventory {
+            height: 20vh;
+            border-bottom: 2px solid var(--fg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .coin {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.5s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* SECTION B: MAIN STAGE (Middle 60%) */
+        #stage {
+            height: 60vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 5vw;
+        }
+
+        /* The horizontal axis container */
+        #axis-container {
+            width: 100%;
+            height: 60px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        /* The base line */
+        #axis-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--fg);
+            opacity: 0.3;
+        }
+
+        /* The Solid Green Bar (Accumulated Constructible Range) */
+        #bar-constructible {
+            height: 30px;
+            width: 0%; /* Grows via JS */
+            position: absolute;
+            left: 0;
+            transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* The Ghost Bar (Visualizes current coin addition) */
+        #bar-ghost {
+            height: 30px;
+            position: absolute;
+            opacity: 0; /* Hidden initially */
+            border: 1px dashed var(--fg);
+            /* Dither pattern for ghost */
+            background-image: radial-gradient(var(--fg) 10%, transparent 11%);
+            background-size: 3px 3px;
+            transition: opacity 0.3s;
+        }
+
+        /* The Target Marker (The Gap Cursor) */
+        #target-marker {
+            position: absolute;
+            top: -40px; 
+            width: 40px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            transition: left 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+            /* Initial positon at 1 (scaled via JS) */
+        }
+        
+        #target-marker::after {
+            content: "▼";
+            position: absolute;
+            bottom: -15px;
+            color: var(--fg);
+        }
+
+        /* SECTION C: STATUS LOG (Bottom 20%) */
+        #status-panel {
+            height: 20vh;
+            border-top: 2px solid var(--fg);
+            padding: 1rem;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column-reverse; /* New logs at bottom visually, keeping scoll locked */
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        .log-entry::before {
+            content: "> ";
+        }
+
+        /* --- ANIMATION HELPERS --- */
+        
+        /* For the flying coin animation */
+        .flying-coin {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
+            transition: transform 1s ease-in-out;
+        }
+
+        /* Overlay for Final Result */
+        #result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+
+        #result-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        h1 {
+            font-size: 4rem;
+            text-align: center;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .blink {
+            animation: blinker 0.2s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
+
+        /* Utility classes for text highlighting */
+        .highlight {
+            background-color: var(--fg);
+            color: var(--bg);
+            padding: 0 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- SECTION A: INVENTORY -->
+    <div id="inventory">
+        <!-- Coins injected here via JS -->
+    </div>
+
+    <!-- SECTION B: MAIN STAGE -->
+    <div id="stage">
+        <div id="axis-container">
+            <!-- Background Line -->
+            <div id="axis-line"></div>
+            
+            <!-- Solid Success Bar -->
+            <div id="bar-constructible" class="texture-solid"></div>
+            
+            <!-- Ghost Pending Bar -->
+            <div id="bar-ghost"></div>
+
+            <!-- Target Indicator -->
+            <div id="target-marker" class="texture-inverted">1</div>
+        </div>
+    </div>
+
+    <!-- SECTION C: STATUS -->
+    <div id="status-panel">
+        <div class="log-entry">SYSTEM READY. WAITING FOR INPUT...</div>
+    </div>
+
+    <!-- CONCLUSION OVERLAY -->
+    <div id="result-overlay">
+        <div class="texture-dither" style="padding: 20px; text-align: center; border: 4px double var(--fg);">
+            <p>SMALLEST NON-CONSTRUCTIBLE VALUE</p>
+            <h1 id="final-result" class="texture-inverted">0</h1>
+            <p style="font-size: 0.8rem; margin-top: 10px;">[REFRESH TO RESET]</p>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * DITHERPUNK ALGORITHMIC VISUALIZER
+         * Smallest Non-Constructible Value
+         */
+
+        // --- CONFIG & STATE ---
+        const RAW_INPUT = [1, 5, 2]; // Intentionally unsorted
+        let coins = [];
+        let currentMaxRange = 0;
+        let scaleUnit = 0; // % width per integer value
+
+        // DOM Elements
+        const elInventory = document.getElementById('inventory');
+        const elBarConstructible = document.getElementById('bar-constructible');
+        const elBarGhost = document.getElementById('bar-ghost');
+        const elTargetMarker = document.getElementById('target-marker');
+        const elStatus = document.getElementById('status-panel');
+        const elOverlay = document.getElementById('result-overlay');
+        const elFinalResult = document.getElementById('final-result');
+
+        // --- UTILITIES ---
+        const log = (msg) => {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.innerHTML = msg;
+            elStatus.prepend(div); // Add to top
+        };
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // --- CORE LOGIC & ANIMATION ---
+
+        async function init() {
+            // 1. Calculate Scale
+            // Total width must accommodate sum of all coins + gap buffer.
+            const totalSum = RAW_INPUT.reduce((a, b) => a + b, 0);
+            const buffer = 2; 
+            // 1 unit = percent of screen width
+            scaleUnit = 100 / (totalSum + buffer);
+
+            // 2. Initial Render of Unsorted Coins
+            RAW_INPUT.forEach((val, index) => {
+                const coin = document.createElement('div');
+                coin.className = 'coin texture-dither';
+                coin.innerText = val;
+                coin.dataset.value = val;
+                coin.id = `coin-${index}`;
+                elInventory.appendChild(coin);
+            });
+
+            // Set initial marker pos
+            updateMarker(1);
+
+            await sleep(1000);
+            
+            // 3. Sort Animation
+            log("INITIALIZING SORT ROUTINE...");
+            await sortCoins();
+            
+            // 4. Start Algorithm
+            log("SORT COMPLETE. BEGINNING EVALUATION LOOP.");
+            await runAlgorithm();
+        }
+
+        async function sortCoins() {
+            // Visually simplistic bubble sort feeling or just direct reordering
+            // For a robust visual, we clear and re-append in order with animation
+            
+            // Logic Sort
+            coins = [...RAW_INPUT].sort((a, b) => a - b);
+            
+            // Visual Sort
+            const domCoins = Array.from(elInventory.children);
+            
+            // Fade out
+            domCoins.forEach(c => c.style.opacity = '0');
+            await sleep(500);
+            
+            // Remove old
+            elInventory.innerHTML = '';
+            
+            // Append new sorted
+            coins.forEach((val, i) => {
+                const coin = document.createElement('div');
+                coin.className = 'coin texture-dither';
+                coin.innerText = val;
+                coin.dataset.value = val;
+                coin.id = `sorted-coin-${i}`;
+                coin.style.opacity = '0';
+                coin.style.transform = 'translateY(-20px)';
+                elInventory.appendChild(coin);
+            });
+
+            // Cascade fade in
+            for(let i=0; i<coins.length; i++) {
+                const c = document.getElementById(`sorted-coin-${i}`);
+                c.style.opacity = '1';
+                c.style.transform = 'translateY(0)';
+                await sleep(200);
+            }
+            await sleep(500);
+        }
+
+        async function runAlgorithm() {
+            
+            for (let i = 0; i < coins.length; i++) {
+                const coinVal = coins[i];
+                const coinEl = document.getElementById(`sorted-coin-${i}`);
+                const target = currentMaxRange + 1;
+
+                log(`CURRENT RANGE: [0, ${currentMaxRange}]`);
+                log(`NEXT COIN: <span class="highlight">${coinVal}</span>. TARGET IS ${target}.`);
+
+                // 1. Select Coin (Style Change)
+                coinEl.classList.remove('texture-dither');
+                coinEl.classList.add('texture-hatch');
+                await sleep(500);
+
+                // 2. Animate Coin to Stage
+                await animateCoinToStage(coinEl, currentMaxRange, coinVal);
+
+                // 3. Show Ghost Bar
+                // Position: left = currentMaxRange * scaleUnit
+                // Width: coinVal * scaleUnit
+                elBarGhost.style.left = (currentMaxRange * scaleUnit) + '%';
+                elBarGhost.style.width = (coinVal * scaleUnit) + '%';
+                elBarGhost.style.opacity = '1';
+                
+                await sleep(800); // Pause for tension
+
+                // 4. Logic Check
+                if (coinVal <= target) {
+                    // --- SUCCESS ---
+                    log(`CHECK: ${coinVal} <= ${target} [OK]`);
+                    
+                    // Ghost fills in
+                    elBarGhost.classList.add('texture-solid'); 
+                    // (Actually we just expand the main bar and hide ghost for cleaner DOM logic)
+                    
+                    await sleep(400);
+                    
+                    // Update Logic
+                    currentMaxRange += coinVal;
+                    
+                    // Update Visuals
+                    elBarConstructible.style.width = (currentMaxRange * scaleUnit) + '%';
+                    elBarGhost.style.opacity = '0';
+                    elBarGhost.classList.remove('texture-solid'); // Reset for next
+                    
+                    // Move Marker
+                    updateMarker(currentMaxRange + 1);
+                    
+                    log(`RANGE EXTENDED TO [0, ${currentMaxRange}]`);
+
+                    // Remove Coin from inventory visually (it merged)
+                    coinEl.style.opacity = 0;
+
+                } else {
+                    // --- FAILURE ---
+                    log(`CHECK: ${coinVal} > ${target} [FAIL]`);
+                    log(`<span class="highlight blink">GAP FOUND AT ${target}</span>`);
+                    
+                    // Visual Failure Effect
+                    // Coin flies past marker
+                    elBarGhost.style.left = ((target + 0.5) * scaleUnit) + '%'; // Move ghost visibly past
+                    elBarGhost.style.borderColor = 'var(--bg)';
+                    elBarGhost.style.backgroundColor = 'var(--fg)'; 
+                    
+                    // Blink the target marker
+                    elTargetMarker.classList.add('blink');
+                    elTargetMarker.classList.remove('texture-inverted');
+                    elTargetMarker.style.backgroundColor = 'var(--bg)';
+                    elTargetMarker.style.color = 'var(--fg)';
+                    elTargetMarker.style.border = '2px solid var(--fg)';
+
+                    await sleep(1500);
+                    
+                    // Trigger Conclusion
+                    finish(target);
+                    return; // Stop loop
+                }
+                
+                await sleep(1000);
+            }
+
+            // If we run out of coins without failing
+            finish(currentMaxRange + 1);
+        }
+
+        // Moves the marker to specific integer value
+        function updateMarker(val) {
+            // Position left = val * scaleUnit
+            // We center the 40px marker, so we rely on left css 
+            // But simply setting left % aligns the LEFT edge. 
+            // To center it on the line tick: calc(X% - 20px)
+            elTargetMarker.style.left = `calc(${val * scaleUnit}% - 20px)`;
+            elTargetMarker.innerText = val;
+        }
+
+        // Handles the "Flying" animation from Inventory to Stage
+        function animateCoinToStage(element, startValueOnLine, widthValue) {
+            return new Promise(resolve => {
+                const rectStart = element.getBoundingClientRect();
+                
+                // Calculate destination pixel coordinates
+                // Destination X: The end of the solid bar
+                // We need to convert % to px relative to the stage container
+                const stageRect = document.getElementById('axis-container').getBoundingClientRect();
+                const destX = stageRect.left + (stageRect.width * (startValueOnLine * scaleUnit) / 100);
+                const destY = stageRect.top - 50; // Hover slightly above line
+
+                // Create a clone for animation
+                const clone = element.cloneNode(true);
+                clone.classList.add('flying-coin');
+                clone.style.top = rectStart.top + 'px';
+                clone.style.left = rectStart.left + 'px';
+                clone.style.width = rectStart.width + 'px';
+                clone.style.margin = 0;
+                document.body.appendChild(clone);
+
+                // Trigger reflow
+                clone.offsetHeight;
+
+                // Animate
+                clone.style.transform = `translate(${destX - rectStart.left}px, ${destY - rectStart.top}px)`;
+
+                // When done
+                clone.addEventListener('transitionend', () => {
+                    clone.remove();
+                    resolve();
+                }, {once: true});
+            });
+        }
+
+        function finish(result) {
+            elFinalResult.innerText = result;
+            elOverlay.classList.add('visible');
+            log(`ALGORITHM HALTED. RESULT: ${result}`);
+        }
+
+        // Boot
+        window.addEventListener('load', init);
+
+    </script>
+</body>
+</html>

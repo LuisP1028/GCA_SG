@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRAILING_FLOOR_VISUALIZER // DITHERPUNK</title>
+    <style>
+        /* 
+         * DITHERPUNK AESTHETIC STYLESHEET
+         * STRICT MONOCHROME PALETTE: #000000 (VOID) & #00FF00 (PHOSPHOR)
+         */
+
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --phosphor-main: #00FF00;
+            --phosphor-dim: #008F00; /* For subtle CRT effects only, not used for logic */
+            --void: #000000;
+            --crt-scanline: rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            background-color: var(--void);
+            color: var(--phosphor-main);
+            font-family: 'VT323', monospace;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        /* CRT MONITOR CONTAINER */
+        #monitor-casing {
+            border: 4px solid var(--phosphor-main);
+            padding: 2px;
+            box-shadow: 0 0 20px var(--phosphor-main), inset 0 0 20px var(--phosphor-main);
+            position: relative;
+            width: 800px;
+            max-width: 95vw;
+        }
+
+        /* SCANLINE OVERLAY */
+        #monitor-casing::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--phosphor-main);
+            padding: 10px;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--phosphor-main);
+        }
+
+        /* CANVAS */
+        canvas {
+            display: block;
+            background-color: var(--void);
+            image-rendering: pixelated; /* Crucial for coarse pixel look */
+            width: 100%;
+        }
+
+        /* DASHBOARD */
+        #dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0;
+            border-top: 2px solid var(--phosphor-main);
+        }
+
+        .stat-box {
+            border-right: 2px solid var(--phosphor-main);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-box:last-child {
+            border-right: none;
+        }
+
+        .label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 0 0 8px var(--phosphor-main);
+        }
+
+        /* LOGGING CONSOLE */
+        #console-container {
+            border-top: 2px solid var(--phosphor-main);
+            height: 120px;
+            overflow-y: hidden;
+            padding: 10px;
+            font-size: 0.9rem;
+            position: relative;
+        }
+
+        #log-output {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            min-height: 100%;
+        }
+
+        .log-entry {
+            margin-bottom: 2px;
+        }
+
+        .log-entry::before {
+            content: "> ";
+        }
+
+        /* GLITCH ANIMATION CLASS */
+        .glitch-active {
+            animation: glitch-anim 0.2s infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+
+        /* BLINKER */
+        .blink {
+            animation: blinker 1s step-end infinite;
+        }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="monitor-casing">
+        <header>
+            <span>ALG_VIS: MAX_DIFF_PROBLEM</span>
+            <span>SYSTEM: ONLINE <span class="blink">_</span></span>
+        </header>
+
+        <canvas id="visCanvas" width="800" height="400"></canvas>
+
+        <div id="dashboard">
+            <div class="stat-box">
+                <span class="label">CURRENT VALUE</span>
+                <span id="val-current" class="value">000</span>
+            </div>
+            <div class="stat-box">
+                <span class="label">FLOOR (MIN)</span>
+                <span id="val-floor" class="value">---</span>
+            </div>
+            <div class="stat-box">
+                <span class="label">MAX PROFIT</span>
+                <span id="val-profit" class="value">000</span>
+            </div>
+        </div>
+
+        <div id="console-container">
+            <div id="log-output">
+                <!-- Logs go here -->
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * TRAILING FLOOR VISUALIZER
+ * Aesthetic: Ditherpunk / Retro-Terminal
+ * Logic: Single Pass Maximum Difference
+ */
+
+// --- CONFIGURATION ---
+const CONFIG = {
+    color: '#00FF00',
+    bg: '#000000',
+    dataCount: 30,
+    minVal: 10,
+    maxVal: 90, // Keeping headroom for visuals
+    stepDelay: 300, // ms between logic steps
+    pixelSize: 4 // "Coarse" pixel multiplier
+};
+
+// --- STATE MANAGEMENT ---
+const state = {
+    data: [],
+    currentIndex: 0,
+    minPrice: Infinity,
+    minPriceIndex: 0,
+    maxProfit: 0,
+    bestBuyIndex: -1,
+    bestSellIndex: -1,
+    isComplete: false,
+    lastTime: 0,
+    glitchFrameCount: 0,
+    newRecordFound: false
+};
+
+// --- DOM ELEMENTS ---
+const canvas = document.getElementById('visCanvas');
+const ctx = canvas.getContext('2d');
+const elCurrent = document.getElementById('val-current');
+const elFloor = document.getElementById('val-floor');
+const elProfit = document.getElementById('val-profit');
+const elLog = document.getElementById('log-output');
+const container = document.getElementById('monitor-casing');
+
+// --- HELPER: DITHERING ---
+// Creates a pattern for the "Gap" visualization
+function drawDitheredRect(ctx, x, y, w, h, patternType = 'checker') {
+    ctx.save();
+    
+    // We simulate dithering by iterating, but for performance in the loop,
+    // we step by pixelSize. 
+    // Note: To be strictly "Vanilla" and performant, we draw rects directly.
+    
+    ctx.fillStyle = CONFIG.color;
+    
+    // Pattern density control
+    const step = CONFIG.pixelSize; 
+
+    for (let px = x; px < x + w; px += step) {
+        for (let py = y; py < y + h; py += step) {
+            
+            let draw = false;
+            
+            // Map coordinates to grid
+            const gx = Math.floor(px / step);
+            const gy = Math.floor(py / step);
+
+            if (patternType === 'checker') {
+                // Classic Checkerboard (Atkinson-ish simulation)
+                if ((gx + gy) % 2 === 0) draw = true;
+            } else if (patternType === 'stripe') {
+                // Dotted line simulation
+                if (gx % 2 === 0) draw = true;
+            } else if (patternType === 'dense') {
+                // Denser pattern for high profit
+                if ((gx % 3 !== 0) || (gy % 3 !== 0)) draw = true;
+            }
+
+            if (draw) {
+                ctx.fillRect(px, py, step, step);
+            }
+        }
+    }
+    ctx.restore();
+}
+
+// --- LOGGING ---
+function log(msg) {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerText = msg;
+    elLog.appendChild(div);
+    // Auto scroll
+    const container = document.getElementById('console-container');
+    container.scrollTop = container.scrollHeight;
+}
+
+// --- INITIALIZATION ---
+function init() {
+    // Generate Data
+    state.data = [];
+    for (let i = 0; i < CONFIG.dataCount; i++) {
+        state.data.push(Math.floor(Math.random() * (CONFIG.maxVal - CONFIG.minVal + 1)) + CONFIG.minVal);
+    }
+    
+    // Reset State
+    state.currentIndex = 0;
+    state.minPrice = Infinity; // Start high so first is min
+    state.minPriceIndex = 0;
+    state.maxProfit = 0;
+    state.isComplete = false;
+
+    log("INITIATING SEQUENCE...");
+    log(`DATA LOADED: ${CONFIG.dataCount} ENTRIES`);
+    
+    requestAnimationFrame(loop);
+}
+
+// --- LOGIC STEP ---
+function updateLogic() {
+    if (state.isComplete) return;
+
+    const currentPrice = state.data[state.currentIndex];
+    const xPos = state.currentIndex;
+
+    elCurrent.innerText = currentPrice;
+    state.newRecordFound = false; // Reset flash flag
+
+    // 1. Check Floor Update
+    if (currentPrice < state.minPrice) {
+        state.minPrice = currentPrice;
+        state.minPriceIndex = state.currentIndex;
+        elFloor.innerText = currentPrice;
+        
+        // Trigger Glitch Effect
+        state.glitchFrameCount = 10; // Glitch for 10 frames
+        container.classList.add('glitch-active');
+        log(`NEW FLOOR DETECTED: ${currentPrice}`);
+    } else {
+        // 2. Check Profit (Only if we aren't at a new floor)
+        const potentialProfit = currentPrice - state.minPrice;
+        if (potentialProfit > state.maxProfit) {
+            state.maxProfit = potentialProfit;
+            state.bestBuyIndex = state.minPriceIndex;
+            state.bestSellIndex = state.currentIndex;
+            state.newRecordFound = true; // For visual flair
+            elProfit.innerText = state.maxProfit;
+            log(`!!! RECORD BROKEN: +${state.maxProfit}`);
+        }
+    }
+
+    // Move to next
+    state.currentIndex++;
+    if (state.currentIndex >= state.data.length) {
+        state.isComplete = true;
+        log("ALGORITHM COMPLETE.");
+        container.classList.remove('glitch-active');
+    }
+}
+
+// --- RENDERING ---
+function draw() {
+    // 1. Clear Screen (Void)
+    ctx.fillStyle = CONFIG.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Handle Glitch Offset for Camera Shake
+    let offsetX = 0;
+    let offsetY = 0;
+    if (state.glitchFrameCount > 0) {
+        offsetX = (Math.random() - 0.5) * 10;
+        offsetY = (Math.random() - 0.5) * 10;
+        state.glitchFrameCount--;
+        if (state.glitchFrameCount === 0) container.classList.remove('glitch-active');
+    }
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+
+    // Layout Calculation
+    const margin = 40;
+    const w = canvas.width - (margin * 2);
+    const h = canvas.height - (margin * 2);
+    const stepX = w / (CONFIG.dataCount - 1);
+    
+    // Y-Scale Mapping
+    const mapY = (val) => {
+        const range = 100; // Fixed visual range 0-100
+        const normalized = val / range; 
+        return (canvas.height - margin) - (normalized * h);
+    };
+
+    const mapX = (idx) => margin + (idx * stepX);
+
+    // 2. Draw The Sequence Path (Line Graph)
+    ctx.beginPath();
+    ctx.strokeStyle = CONFIG.color;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < state.data.length; i++) {
+        const px = mapX(i);
+        const py = mapY(state.data[i]);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Draw nodes
+    for (let i = 0; i < state.data.length; i++) {
+        const px = mapX(i);
+        const py = mapY(state.data[i]);
+        ctx.fillStyle = CONFIG.bg;
+        ctx.fillRect(px - 3, py - 3, 6, 6); // knockout
+        ctx.strokeRect(px - 3, py - 3, 6, 6); // square nodes
+    }
+
+    // --- LOGIC VISUALIZATION ---
+
+    // A. The Record (Global Max) - Drawn "behind" or persistently
+    if (state.maxProfit > 0) {
+        const bX = mapX(state.bestBuyIndex);
+        const sX = mapX(state.bestSellIndex);
+        const bY = mapY(state.data[state.bestBuyIndex]);
+        const sY = mapY(state.data[state.bestSellIndex]);
+
+        // Draw Inverted Block or Flashing Box
+        const isFlashing = state.newRecordFound && Math.floor(Date.now() / 50) % 2 === 0;
+        
+        // Highlight Area
+        ctx.fillStyle = isFlashing ? CONFIG.color : '#003300'; // Dim green if old, Bright if new
+        // Draw the profit rectangle area
+        const rectX = bX;
+        const rectY = sY;
+        const rectW = sX - bX;
+        const rectH = bY - sY;
+        
+        if (state.isComplete) {
+            // Final Winner State: Invert Colors
+            ctx.fillStyle = CONFIG.color;
+            ctx.fillRect(rectX, rectY, rectW, rectH);
+            
+            // Draw text in black
+            ctx.fillStyle = CONFIG.bg;
+            ctx.font = "20px VT323";
+            ctx.fillText("MAX_PROFIT", rectX + 5, rectY + 20);
+        } else {
+            // Dithered background for record so far
+             drawDitheredRect(ctx, rectX, rectY, rectW, rectH, 'dense');
+        }
+    }
+
+    // Only draw active scanner logic if not complete
+    if (!state.isComplete && state.currentIndex < state.data.length) {
+        const currentIdx = state.currentIndex;
+        const currentVal = state.data[currentIdx];
+        const cx = mapX(currentIdx);
+        const cy = mapY(currentVal);
+        
+        // B. The Scanner (Vertical Line)
+        ctx.beginPath();
+        ctx.strokeStyle = CONFIG.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]); // Solid
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, canvas.height);
+        ctx.stroke();
+
+        // C. The Floor (Min Price So Far)
+        // extends from minPriceIndex to currentIndex
+        if (state.minPrice !== Infinity) {
+            const floorY = mapY(state.minPrice);
+            const startX = mapX(state.minPriceIndex);
+            
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            // Ditherpunk override: Dotted Line (1px on, 3px off -> scaled to 4px on 12px off)
+            ctx.setLineDash([4, 8]); 
+            ctx.moveTo(startX, floorY);
+            ctx.lineTo(cx, floorY);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+
+            // D. The Gap (Potential Profit Bar)
+            // Vertical bar from Floor Y to Current Y
+            const barHeight = floorY - cy;
+            const barWidth = 16; // Fixed width for visibility
+
+            if (barHeight > 0) {
+                // Use Dithering helper
+                // Draw bar to left of scanner line
+                drawDitheredRect(ctx, cx - barWidth, cy, barWidth, barHeight, 'checker');
+            }
+        }
+    }
+
+    ctx.restore();
+}
+
+// --- ANIMATION LOOP ---
+function loop(timestamp) {
+    if (!state.lastTime) state.lastTime = timestamp;
+    const elapsed = timestamp - state.lastTime;
+
+    // Logic tick
+    if (elapsed > CONFIG.stepDelay) {
+        updateLogic();
+        state.lastTime = timestamp;
+    }
+
+    // Render every frame (for glitches/flashes)
+    draw();
+
+    requestAnimationFrame(loop);
+}
+
+// Start
+window.onload = init;
+
+</script>
+</body>
+</html>

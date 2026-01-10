@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transit Hub: In-Place Permutation Visualizer</title>
+    <style>
+        :root {
+            --black: #000000;
+            --green: #00FF41;
+            --dark-grey: #1A1A1A;
+            --white: #FFFFFF;
+            --font-main: 'Courier New', Courier, monospace;
+            --cell-size: 60px;
+            --gap: 20px;
+        }
+
+        /* --- Ditherpunk Global Styles --- */
+        body {
+            background-color: var(--black);
+            color: var(--green);
+            font-family: var(--font-main);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        /* Scanline Overlay */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Layout Architecture */
+        #terminal-container {
+            width: 800px;
+            height: 90vh;
+            display: grid;
+            grid-template-rows: 1fr 1fr 1.5fr; /* Map, Data, Controls */
+            gap: 2rem;
+            padding: 2rem;
+            border: 2px solid var(--green);
+            box-shadow: 0 0 15px var(--green);
+            position: relative;
+            z-index: 1;
+            background: rgba(0, 20, 0, 0.3);
+        }
+
+        h3 {
+            margin: 0 0 10px 0;
+            border-bottom: 1px dashed var(--green);
+            padding-bottom: 5px;
+            font-size: 14px;
+            opacity: 0.8;
+            letter-spacing: 1px;
+        }
+
+        /* Row Styles */
+        .row-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        .array-container {
+            display: flex;
+            gap: var(--gap);
+            padding: 20px;
+            justify-content: center;
+            align-items: center;
+            min-height: 80px;
+        }
+
+        /* Cell Elements */
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid var(--green);
+            font-size: 1.5rem;
+            font-weight: bold;
+            position: relative;
+            background-color: var(--black);
+            transition: transform 0.1s;
+        }
+
+        .cell .label {
+            position: absolute;
+            top: -20px;
+            font-size: 0.7rem;
+            color: var(--green);
+            opacity: 0.6;
+        }
+
+        /* --- Metaphor Mappings --- */
+        
+        /* 1. The Map (P Array) */
+        .p-cell {
+            background-color: var(--black);
+        }
+
+        .p-cell.locked {
+            background-color: var(--green);
+            color: var(--black);
+            border-color: var(--green);
+        }
+        
+        .p-cell.locked::after {
+            content: "[X]";
+            position: absolute;
+            bottom: -20px;
+            font-size: 10px;
+            color: var(--green);
+        }
+
+        /* "Green Arrow" (Next Pointer) */
+        .pointer-arrow {
+            position: absolute;
+            bottom: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 15px solid var(--green);
+            display: none;
+            transition: left 0.3s ease;
+        }
+        .p-cell.has-pointer .pointer-arrow {
+            display: block;
+        }
+
+        /* 2. The Data (A Array) */
+        .a-cell {
+            position: relative;
+            overflow: visible;
+        }
+        
+        /* Dither overlay */
+        .a-cell .dither-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(var(--green) 15%, transparent 16%);
+            background-size: 4px 4px;
+            opacity: 0.3;
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .a-cell span {
+            z-index: 2;
+        }
+
+        /* "Gold Frame" (Iterator i) -> White Pulsating Hub */
+        .a-cell.hub {
+            border: 3px solid var(--white);
+            box-shadow: 0 0 10px var(--white), inset 0 0 10px var(--white);
+            animation: pulse-hub 1.5s infinite;
+            z-index: 10;
+        }
+
+        @keyframes pulse-hub {
+            0% { border-color: var(--white); box-shadow: 0 0 5px var(--white); }
+            50% { border-color: #888; box-shadow: 0 0 2px #888; }
+            100% { border-color: var(--white); box-shadow: 0 0 5px var(--white); }
+        }
+
+        /* Animation States */
+        .lifting {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0, 255, 65, 0.4);
+            z-index: 20;
+            background-color: var(--dark-grey);
+            border-color: var(--white);
+        }
+
+        /* --- Controls & Legend --- */
+        #controls-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        #log-panel {
+            border: 1px solid var(--green);
+            padding: 10px;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            background: rgba(0, 255, 65, 0.05);
+            font-family: 'Courier New', Courier, monospace;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+        .log-entry::before { content: "> "; opacity: 0.7; }
+
+        #button-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            background: var(--black);
+            color: var(--green);
+            border: 1px solid var(--green);
+            padding: 10px;
+            cursor: pointer;
+            font-family: var(--font-main);
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--black);
+        }
+
+        button:disabled {
+            border-color: var(--dark-grey);
+            color: var(--dark-grey);
+            cursor: not-allowed;
+            background: transparent;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 15px;
+            width: 15px;
+            background: var(--green);
+            cursor: pointer;
+            margin-top: -5px; 
+            border: 1px solid var(--black);
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 5px;
+            cursor: pointer;
+            background: var(--dark-grey);
+            border: 1px solid var(--green);
+        }
+
+        /* SVG Overlay */
+        #svg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        line {
+            stroke: var(--green);
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+            animation: dash 1s linear infinite;
+        }
+        
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="terminal-container">
+        <!-- Overlay for drawing connection lines -->
+        <svg id="svg-overlay"></svg>
+
+        <!-- Top Row: Permutation P -->
+        <div class="row-section">
+            <h3>// MAP (PERMUTATION P)</h3>
+            <div class="array-container" id="container-p"></div>
+        </div>
+
+        <!-- Middle Row: Data A -->
+        <div class="row-section">
+            <h3>// DATA (ARRAY A)</h3>
+            <div class="array-container" id="container-a"></div>
+        </div>
+
+        <!-- Bottom Row: Controls -->
+        <div class="row-section">
+            <h3>// SYSTEM_LOG & CONTROLS</h3>
+            <div id="controls-row">
+                <div id="log-panel">
+                    <!-- Logs will be injected here by JS -->
+                </div>
+                <div id="button-panel">
+                    <button id="btn-next">Execute Step</button>
+                    <button id="btn-auto">Auto-Run [OFF]</button>
+                    <button id="btn-random">Randomize Data</button>
+                    <button id="btn-reset">System Reset</button>
+                    
+                    <div class="slider-container">
+                        <label for="speed-range">Clock Speed</label>
+                        <input type="range" id="speed-range" min="100" max="2000" value="1000">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    /**
+     * TRANSIT HUB - ALGORITHM VISUALIZER
+     * Logic: In-Place Permutation (Cycle Decomposition)
+     */
+
+    // --- Configuration & State ---
+    const INITIAL_P = [3, 2, 1, 4, 0];
+    const INITIAL_A = ['A', 'B', 'C', 'D', 'E'];
+
+    let state = {
+        P: [],
+        A: [],
+        i: 0,           
+        next: 0,        
+        phase: 'INIT',  
+        auto: false,
+        isAnimating: false
+    };
+
+    // --- DOM Elements ---
+    const containerP = document.getElementById('container-p');
+    const containerA = document.getElementById('container-a');
+    const logPanel = document.getElementById('log-panel');
+    const svgOverlay = document.getElementById('svg-overlay');
+    const speedSlider = document.getElementById('speed-range');
+    const btnNext = document.getElementById('btn-next');
+    const btnAuto = document.getElementById('btn-auto');
+    const btnRandom = document.getElementById('btn-random');
+    const btnReset = document.getElementById('btn-reset');
+    const terminalContainer = document.getElementById('terminal-container');
+
+    // --- Core Functions ---
+
+    function startSystem() {
+        // Load Defaults
+        state.P = [...INITIAL_P];
+        state.A = [...INITIAL_A];
+        init();
+        log("System Booted. Default memory loaded.");
+    }
+
+    function init() {
+        // Reset pointers and UI flags, but keep data if it exists
+        if (state.P.length === 0) {
+            state.P = [...INITIAL_P];
+            state.A = [...INITIAL_A];
+        }
+
+        state.i = 0;
+        state.next = 0;
+        state.phase = 'INIT';
+        state.isAnimating = false;
+        state.auto = false;
+        
+        btnAuto.innerText = "Auto-Run [OFF]";
+        btnNext.disabled = false;
+        
+        // Don't clear log entirely, just separate runs
+        const spacer = document.createElement('div');
+        spacer.style.borderTop = "1px dashed var(--green)";
+        spacer.style.margin = "10px 0";
+        logPanel.appendChild(spacer);
+
+        renderArrays();
+        log(`Memory Ready. P:[${state.P}]`);
+        
+        clearSVG();
+        updateVisuals();
+    }
+
+    function renderArrays() {
+        if (!containerP || !containerA) {
+            console.error("Critical Error: Array Containers not found in DOM.");
+            return;
+        }
+
+        containerP.innerHTML = '';
+        containerA.innerHTML = '';
+
+        // Render P
+        state.P.forEach((val, idx) => {
+            const el = document.createElement('div');
+            el.className = 'cell p-cell';
+            el.id = `p-${idx}`;
+            
+            const lbl = document.createElement('div');
+            lbl.className = 'label';
+            lbl.innerText = idx;
+            el.appendChild(lbl);
+
+            const valSpan = document.createElement('span');
+            valSpan.innerText = val;
+            el.appendChild(valSpan);
+
+            const arrow = document.createElement('div');
+            arrow.className = 'pointer-arrow';
+            el.appendChild(arrow);
+
+            if (val < 0) el.classList.add('locked');
+            containerP.appendChild(el);
+        });
+
+        // Render A
+        state.A.forEach((val, idx) => {
+            const el = document.createElement('div');
+            el.className = 'cell a-cell';
+            el.id = `a-${idx}`;
+            
+            const dither = document.createElement('div');
+            dither.className = 'dither-overlay';
+            el.appendChild(dither);
+
+            const lbl = document.createElement('div');
+            lbl.className = 'label';
+            lbl.innerText = idx;
+            el.appendChild(lbl);
+
+            const valSpan = document.createElement('span');
+            valSpan.innerText = val;
+            el.appendChild(valSpan);
+
+            containerA.appendChild(el);
+        });
+    }
+
+    function updateVisuals() {
+        // Clean previous states
+        document.querySelectorAll('.hub').forEach(el => el.classList.remove('hub'));
+        document.querySelectorAll('.has-pointer').forEach(el => el.classList.remove('has-pointer'));
+        
+        // Hub (i)
+        if (state.i < state.A.length) {
+            const hubEl = document.getElementById(`a-${state.i}`);
+            if (hubEl) hubEl.classList.add('hub');
+        }
+
+        // Pointer (next)
+        if (state.next < state.P.length && state.phase !== 'FINISHED' && state.P[state.next] !== undefined) {
+            const pEl = document.getElementById(`p-${state.next}`);
+            if (pEl) pEl.classList.add('has-pointer');
+        }
+
+        // Locks
+        state.P.forEach((val, idx) => {
+            const el = document.getElementById(`p-${idx}`);
+            if(!el) return;
+            const span = el.querySelector('span');
+            if (val < 0) {
+                el.classList.add('locked');
+                span.innerText = val; 
+            } else {
+                el.classList.remove('locked');
+                span.innerText = val;
+            }
+        });
+    }
+
+    function randomizeSystem() {
+        const size = 5;
+        // Generate valid permutation [0..4]
+        const newP = Array.from({length: size}, (_, i) => i);
+        
+        // Fisher-Yates Shuffle
+        for (let i = size - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newP[i], newP[j]] = [newP[j], newP[i]];
+        }
+
+        // Reset Data A (Keep it sorted so user sees the scramble effect)
+        const newA = ['A', 'B', 'C', 'D', 'E'];
+
+        state.P = newP;
+        state.A = newA;
+
+        log("Generating Random Permutation...");
+        init();
+    }
+
+    function resetSystem() {
+        state.P = [...INITIAL_P];
+        state.A = [...INITIAL_A];
+        log("Restoring Default Config...");
+        init();
+    }
+
+    // --- Logic Loop ---
+
+    async function nextStep() {
+        if (state.isAnimating || state.phase === 'FINISHED') return;
+
+        state.isAnimating = true;
+        const duration = parseInt(speedSlider.value) || 1000;
+
+        try {
+            switch (state.phase) {
+                case 'INIT': {
+                    if (state.i >= state.P.length) {
+                        state.phase = 'FINISHED';
+                        log("Process Terminated. All cycles resolved.");
+                        btnNext.disabled = true;
+                        if(state.auto) toggleAuto();
+                        state.isAnimating = false;
+                        return;
+                    }
+
+                    if (state.P[state.i] < 0) {
+                         // Fast forward
+                         log(`Index ${state.i} marked. Skipping.`);
+                         state.phase = 'ADVANCE_HUB';
+                         state.isAnimating = false;
+                         if(state.auto) nextStep();
+                         else nextStep(); 
+                    } else {
+                        log(`Cycle Start at Index ${state.i}. Hub Active.`);
+                        state.next = state.i; 
+                        state.phase = 'CHECK';
+                        updateVisuals();
+                        state.isAnimating = false;
+                    }
+                    break;
+                }
+
+                case 'CHECK': {
+                    const targetIdx = state.P[state.next];
+                    drawConnection(state.next, targetIdx);
+
+                    if (targetIdx < 0) {
+                        log(`Target ${targetIdx} is Locked. Cycle Closed.`);
+                        await wait(duration / 2);
+                        clearSVG();
+                        state.phase = 'ADVANCE_HUB';
+                        state.isAnimating = false;
+                    } else {
+                        log(`Target: Index ${targetIdx}. Retrieval Sequence Initiated.`);
+                        await wait(duration / 2);
+                        state.phase = 'SWAP';
+                        state.isAnimating = false;
+                        if(state.auto) nextStep();
+                    }
+                    break;
+                }
+
+                case 'SWAP': {
+                    const hubIdx = state.i;
+                    const targetIdx = state.P[state.next];
+                    
+                    if (hubIdx === targetIdx) {
+                        log(`Self-reference detected. Marking.`);
+                        state.phase = 'MARK';
+                        state.isAnimating = false;
+                        nextStep();
+                        return;
+                    }
+
+                    log(`Swapping Hub [${hubIdx}] <-> Target [${targetIdx}]...`);
+                    
+                    await animateSwap(hubIdx, targetIdx, duration);
+
+                    // Logic Swap
+                    const temp = state.A[hubIdx];
+                    state.A[hubIdx] = state.A[targetIdx];
+                    state.A[targetIdx] = temp;
+                    
+                    renderArrays(); 
+                    updateVisuals();
+                    clearSVG();
+
+                    log(`Swap Complete.`);
+                    state.phase = 'MARK';
+                    state.isAnimating = false;
+                    break;
+                }
+
+                case 'MARK': {
+                    const originalVal = state.P[state.next];
+                    // Flag as visited (negative)
+                    const newVal = originalVal - state.P.length - 10;
+                    state.P[state.next] = newVal;
+                    
+                    updateVisuals();
+                    log(`Index ${state.next} Locked (Val: ${newVal}).`);
+                    
+                    await wait(duration / 2);
+
+                    // Move pointer
+                    const oldTarget = originalVal;
+                    state.next = oldTarget;
+
+                    updateVisuals();
+                    log(`Pointer moved to ${state.next}.`);
+                    
+                    state.phase = 'CHECK';
+                    state.isAnimating = false;
+                    break;
+                }
+
+                case 'ADVANCE_HUB': {
+                    state.i++;
+                    state.phase = 'INIT';
+                    state.isAnimating = false;
+                    nextStep(); 
+                    break;
+                }
+                    
+                case 'FINISHED': {
+                    break;
+                }
+            }
+
+            // Auto-Run trigger
+            if (state.auto && state.phase !== 'FINISHED') {
+                setTimeout(() => nextStep(), duration * 0.1);
+            }
+
+        } catch (e) {
+            console.error(e);
+            log("ERR: " + e.message);
+            state.isAnimating = false;
+        }
+    }
+
+    // --- Animation Helpers ---
+
+    function animateSwap(idx1, idx2, duration) {
+        return new Promise(resolve => {
+            const el1 = document.getElementById(`a-${idx1}`);
+            const el2 = document.getElementById(`a-${idx2}`);
+
+            if(!el1 || !el2) { resolve(); return; }
+
+            el1.classList.add('lifting');
+            el2.classList.add('lifting');
+
+            const rect1 = el1.getBoundingClientRect();
+            const rect2 = el2.getBoundingClientRect();
+            const deltaX = rect2.left - rect1.left;
+            
+            // Force layout reflow
+            el1.offsetHeight; 
+
+            el1.style.transition = `transform ${duration}ms cubic-bezier(0.4, 0.0, 0.2, 1)`;
+            el2.style.transition = `transform ${duration}ms cubic-bezier(0.4, 0.0, 0.2, 1)`;
+
+            el1.style.transform = `translateX(${deltaX}px)`;
+            el2.style.transform = `translateX(${-deltaX}px)`;
+
+            setTimeout(() => {
+                el1.classList.remove('lifting');
+                el2.classList.remove('lifting');
+                el1.style.transform = '';
+                el2.style.transform = '';
+                el1.style.transition = '';
+                el2.style.transition = '';
+                resolve();
+            }, duration);
+        });
+    }
+
+    function drawConnection(pIdx, aIdx) {
+        clearSVG();
+        if (aIdx < 0) return; // Don't draw to negative indices
+
+        const pEl = document.getElementById(`p-${pIdx}`);
+        const aEl = document.getElementById(`a-${aIdx}`);
+        if (!pEl || !aEl) return;
+
+        const pRect = pEl.getBoundingClientRect();
+        const aRect = aEl.getBoundingClientRect();
+        const containerRect = terminalContainer.getBoundingClientRect();
+
+        const x1 = pRect.left + pRect.width / 2 - containerRect.left;
+        const y1 = pRect.bottom - containerRect.top;
+        
+        const x2 = aRect.left + aRect.width / 2 - containerRect.left;
+        const y2 = aRect.top - containerRect.top;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+
+        svgOverlay.appendChild(line);
+    }
+
+    function clearSVG() {
+        svgOverlay.innerHTML = '';
+    }
+
+    // --- Utilities ---
+
+    function log(msg) {
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        div.innerText = msg;
+        logPanel.appendChild(div);
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function toggleAuto() {
+        state.auto = !state.auto;
+        btnAuto.innerText = state.auto ? "Auto-Run [ON]" : "Auto-Run [OFF]";
+        if (state.auto && !state.isAnimating) {
+            nextStep();
+        }
+    }
+
+    // --- Event Bindings ---
+    btnNext.addEventListener('click', () => nextStep());
+    btnAuto.addEventListener('click', toggleAuto);
+    btnRandom.addEventListener('click', randomizeSystem);
+    btnReset.addEventListener('click', resetSystem);
+
+    // --- Boot System ---
+    startSystem();
+
+});
+</script>
+</body>
+</html>

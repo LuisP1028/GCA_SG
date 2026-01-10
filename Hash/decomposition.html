@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLIDING_WINDOW_PROTOCOL // DITHER_PUNK</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #00FF41;
+            --fg-dim: #003b0f;
+            --err: #ff0000; /* Only used for critical rejects if desired, strictly 1-bit implies staying green/black, but distinct patterns are better. We will stay Mono-Green per prompt but use inversion for errors. */
+            
+            --font-stack: 'VT323', 'Courier New', monospace;
+            --unit: 20px;
+            --gap: 10px;
+        }
+
+        /* RESET & BASE */
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0;
+            height: 100%; width: 100%;
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-stack);
+            overflow: hidden;
+            font-size: 16px;
+            user-select: none;
+        }
+
+        /* UTILS: DITHERING & PATTERNS */
+        .dither-bg {
+            /* Procedural Atkinson-ish Dithering via gradients */
+            background-image: radial-gradient(var(--fg) 15%, transparent 16%),
+                              radial-gradient(var(--fg) 15%, transparent 16%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 2px;
+        }
+        
+        .dither-fill {
+            /* Denser pattern for filled states */
+            background: repeating-linear-gradient(
+                45deg,
+                var(--fg),
+                var(--fg) 2px,
+                var(--bg) 2px,
+                var(--bg) 4px
+            );
+        }
+
+        /* LAYOUT GRID */
+        .layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            grid-template-rows: 60px 1fr 100px;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* UI ELEMENTS */
+        .panel {
+            border: 1px solid var(--fg);
+            box-shadow: 4px 4px 0 var(--fg);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            position: relative;
+        }
+
+        .panel-label {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: var(--bg);
+            padding: 0 5px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* HEADER */
+        header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--fg);
+        }
+        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; }
+
+        /* SIDEBAR (FOUND INDICES) */
+        .sidebar {
+            grid-row: 2 / 4;
+            font-size: 0.9rem;
+        }
+        #log-output {
+            margin-top: 10px;
+            height: 100%;
+            overflow-y: auto;
+            font-family: monospace;
+            line-height: 1.4;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed var(--fg-dim); }
+
+        /* MAIN STAGE */
+        .stage {
+            grid-column: 2;
+            grid-row: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ZONE A: INVENTORY */
+        .zone-a {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            border: 1px dashed var(--fg-dim);
+            padding: 20px;
+        }
+        .word-bin {
+            text-align: center;
+        }
+        .word-label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .slots-container { display: flex; gap: 5px; }
+        .slot {
+            width: 40px; height: 40px;
+            border: 1px solid var(--fg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        /* ZONE B: DATA STREAM */
+        .zone-b {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            border-top: 1px solid var(--fg);
+            border-bottom: 1px solid var(--fg);
+            background: #051005;
+        }
+        
+        .tape-container {
+            display: flex;
+            font-family: monospace;
+            font-size: 2rem;
+            letter-spacing: 5px;
+            white-space: nowrap;
+            padding-left: 50%; /* Center start */
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .char {
+            display: inline-block;
+            width: 30px;
+            text-align: center;
+            opacity: 0.5;
+        }
+        .char.active { opacity: 1; text-shadow: 0 0 5px var(--fg); }
+
+        /* The Window Overlay */
+        .scan-window {
+            position: absolute;
+            left: 50%;
+            top: 10%;
+            height: 80%;
+            transform: translateX(0); /* Fixed center, tape moves */
+            border: 2px solid var(--fg);
+            box-shadow: 0 0 10px var(--fg);
+            pointer-events: none;
+            display: flex;
+        }
+        .window-segment {
+            flex: 1;
+            border-right: 1px dashed var(--fg);
+            height: 100%;
+        }
+        .window-segment:last-child { border-right: none; }
+
+        /* ZONE C: PROCESSING */
+        .zone-c {
+            grid-column: 2;
+            grid-row: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            position: relative; /* For flying elements */
+        }
+
+        /* ANIMATION ELEMENTS */
+        .chunk-flyer {
+            position: fixed;
+            border: 1px solid var(--fg);
+            background: var(--bg);
+            color: var(--fg);
+            padding: 5px 10px;
+            font-family: monospace;
+            font-weight: bold;
+            z-index: 100;
+            transition: all 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+        .chunk-flyer.rejected {
+            background: var(--fg);
+            color: var(--bg);
+            animation: blink 0.1s infinite;
+        }
+
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+
+        /* CONTROLS */
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: var(--bg);
+            color: var(--fg);
+            border: 1px solid var(--fg);
+            padding: 10px 20px;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 var(--fg);
+            transition: transform 0.1s;
+        }
+        button:active { transform: translate(2px, 2px); box-shadow: none; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* CRT EFFECT OVERLAY */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.95; }
+            5% { opacity: 0.85; }
+            10% { opacity: 0.95; }
+        }
+
+        /* FOUND INDICES MARKERS */
+        .found-marker {
+            color: var(--bg);
+            background: var(--fg);
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div class="layout">
+        <!-- HEADER -->
+        <header>
+            <h1>// SUBSTRING_MATCHER_V1</h1>
+            <div class="status-light" style="width:10px; height:10px; background:var(--fg); animation: blink 1s infinite;"></div>
+        </header>
+
+        <!-- SIDEBAR -->
+        <aside class="panel sidebar">
+            <span class="panel-label">[SYSTEM_LOG]</span>
+            <div id="log-output">
+                <div class="log-entry">> INIT_SEQUENCE...</div>
+                <div class="log-entry">> TARGET: ["foo", "bar"]</div>
+                <div class="log-entry">> STREAM: "barfoothefoobarman"</div>
+                <div class="log-entry">> READY.</div>
+            </div>
+        </aside>
+
+        <!-- MAIN STAGE -->
+        <div class="stage">
+            
+            <!-- ZONE A: INVENTORY -->
+            <div class="panel zone-a" id="inventory-zone">
+                <span class="panel-label">[TARGET_MANIFEST]</span>
+                <!-- Bins generated by JS -->
+            </div>
+
+            <!-- ZONE B: TAPE -->
+            <div class="panel zone-b" id="tape-zone">
+                <span class="panel-label">[DATA_STREAM]</span>
+                <div class="tape-container" id="tape-content">
+                    <!-- Text generated by JS -->
+                </div>
+                <div class="scan-window" id="scan-window">
+                    <!-- Grid lines generated by JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ZONE C: PROCESSING & CONTROLS -->
+        <div class="panel zone-c">
+            <span class="panel-label">[LOGIC_GATE]</span>
+            <div id="processing-stage" style="width: 100px; height: 40px; border: 1px dotted var(--fg-dim); display:flex; justify-content:center; align-items:center; opacity: 0.5;">BUFFER</div>
+            
+            <div class="controls">
+                <button id="btn-step">EXEC_STEP()</button>
+                <button id="btn-auto">AUTO_RUN</button>
+                <button id="btn-reset">RESET</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * DITHERPUNK SLIDING WINDOW VISUALIZER
+         * Logic: LeetCode "Substring with Concatenation of All Words"
+         */
+
+        // --- CONFIG & STATE ---
+        const CONFIG = {
+            sentence: "barfoothefoobarman",
+            words: ["foo", "bar"],
+            wordLen: 3,
+            animSpeed: 600
+        };
+
+        const STATE = {
+            currentIndex: 0,
+            isAutoPlaying: false,
+            isAnimating: false,
+            foundIndices: [],
+            totalWindowLen: CONFIG.words.length * CONFIG.wordLen
+        };
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            tape: document.getElementById('tape-content'),
+            window: document.getElementById('scan-window'),
+            inventory: document.getElementById('inventory-zone'),
+            log: document.getElementById('log-output'),
+            btnStep: document.getElementById('btn-step'),
+            btnAuto: document.getElementById('btn-auto'),
+            btnReset: document.getElementById('btn-reset'),
+            processStage: document.getElementById('processing-stage')
+        };
+
+        // --- INITIALIZATION ---
+
+        function init() {
+            // 1. Render Tape
+            els.tape.innerHTML = CONFIG.sentence.split('').map((char, i) => 
+                `<span class="char" data-index="${i}">${char}</span>`
+            ).join('');
+
+            // 2. Render Window Grid
+            els.window.style.width = `${STATE.totalWindowLen * 30}px`; // 30px per char
+            els.window.innerHTML = '';
+            for(let i=0; i<CONFIG.words.length; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'window-segment';
+                els.window.appendChild(segment);
+            }
+
+            // 3. Render Inventory Bins
+            renderInventory();
+            
+            // 4. Initial Align
+            updateTapePosition();
+        }
+
+        function renderInventory() {
+            els.inventory.innerHTML = '<span class="panel-label">[TARGET_MANIFEST]</span>';
+            
+            // Count frequency
+            const counts = {};
+            CONFIG.words.forEach(w => counts[w] = (counts[w] || 0) + 1);
+
+            Object.keys(counts).forEach(word => {
+                const bin = document.createElement('div');
+                bin.className = 'word-bin';
+                bin.dataset.word = word;
+                
+                const label = document.createElement('span');
+                label.className = 'word-label';
+                label.innerText = `"${word}"`;
+                
+                const slotsCont = document.createElement('div');
+                slotsCont.className = 'slots-container';
+
+                for(let i=0; i<counts[word]; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    slot.dataset.status = 'empty'; 
+                    slotsCont.appendChild(slot);
+                }
+
+                bin.appendChild(label);
+                bin.appendChild(slotsCont);
+                els.inventory.appendChild(bin);
+            });
+        }
+
+        // --- LOGIC & ANIMATION CORE ---
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.innerText = `> ${msg}`;
+            els.log.prepend(div);
+        }
+
+        function updateTapePosition() {
+            // We want STATE.currentIndex to be centered under the window
+            // The window is absolutely centered.
+            // So we shift the tape to the left based on index.
+            // Base offset is roughly the padding-left (50%)
+            const charWidth = 30;
+            const offset = -(STATE.currentIndex * charWidth);
+            els.tape.style.transform = `translateX(${offset}px)`;
+
+            // Highlight active chars
+            document.querySelectorAll('.char').forEach(c => c.classList.remove('active'));
+            for(let i=0; i<STATE.totalWindowLen; i++) {
+                const target = document.querySelector(`.char[data-index="${STATE.currentIndex + i}"]`);
+                if(target) target.classList.add('active');
+            }
+        }
+
+        async function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function step() {
+            if (STATE.isAnimating) return;
+            if (STATE.currentIndex > CONFIG.sentence.length - STATE.totalWindowLen) {
+                log("END OF STREAM REACHED.");
+                STATE.isAutoPlaying = false;
+                els.btnAuto.innerText = "AUTO_RUN";
+                return;
+            }
+
+            STATE.isAnimating = true;
+            resetInventoryVisuals(); // Clear previous filled slots
+            updateTapePosition();
+
+            log(`SCANNING INDEX [${STATE.currentIndex}]`);
+            
+            // 1. EXTRACT CHUNKS
+            const currentSub = CONFIG.sentence.substr(STATE.currentIndex, STATE.totalWindowLen);
+            const chunks = [];
+            for (let i = 0; i < CONFIG.words.length; i++) {
+                chunks.push(currentSub.substr(i * CONFIG.wordLen, CONFIG.wordLen));
+            }
+
+            // Temp map for checking
+            const wordMap = {};
+            CONFIG.words.forEach(w => wordMap[w] = (wordMap[w] || 0) + 1);
+            const seen = {};
+            let validMatches = 0;
+
+            // 2. PROCESS EACH CHUNK
+            for (let i = 0; i < chunks.length; i++) {
+                const chunkStr = chunks[i];
+                
+                // Spawn Element in Processing Zone
+                const flyer = document.createElement('div');
+                flyer.className = 'chunk-flyer';
+                flyer.innerText = chunkStr;
+                
+                // Get coordinates
+                const startRect = els.processStage.getBoundingClientRect();
+                flyer.style.left = `${startRect.left}px`;
+                flyer.style.top = `${startRect.top}px`;
+                document.body.appendChild(flyer);
+
+                await sleep(CONFIG.animSpeed / 2);
+
+                // Check logic
+                const isTarget = wordMap[chunkStr] !== undefined;
+                seen[chunkStr] = (seen[chunkStr] || 0) + 1;
+                
+                let targetSlot = null;
+
+                if (isTarget && seen[chunkStr] <= wordMap[chunkStr]) {
+                    // Find a specific empty slot in DOM
+                    const bin = document.querySelector(`.word-bin[data-word="${chunkStr}"]`);
+                    const slots = bin.querySelectorAll('.slot');
+                    // Find first empty slot
+                    for(let s of slots) {
+                        if(s.dataset.status === 'empty') {
+                            targetSlot = s;
+                            s.dataset.status = 'reserved'; // temporary lock
+                            break;
+                        }
+                    }
+                }
+
+                if (targetSlot) {
+                    // ANIMATE TO SLOT
+                    const destRect = targetSlot.getBoundingClientRect();
+                    flyer.style.left = `${destRect.left}px`;
+                    flyer.style.top = `${destRect.top}px`;
+                    
+                    await sleep(CONFIG.animSpeed); // Wait for flight
+
+                    // Snap in
+                    targetSlot.classList.add('dither-fill');
+                    targetSlot.innerText = chunkStr;
+                    flyer.remove();
+                    validMatches++;
+
+                } else {
+                    // REJECT ANIMATION
+                    flyer.classList.add('rejected');
+                    flyer.innerText = "ERR";
+                    
+                    // Jiggle
+                    flyer.style.transform = `translate(${Math.random()*20-10}px, -20px)`;
+                    
+                    await sleep(CONFIG.animSpeed);
+                    flyer.remove();
+                    
+                    log(`MATCH FAIL: "${chunkStr}"`);
+                    // Optimization: We could break here, but visualizer looks cooler if it finishes the scan
+                }
+            }
+
+            // 3. VERDICT
+            if (validMatches === CONFIG.words.length) {
+                log(`>> PATTERN MATCH FOUND AT ${STATE.currentIndex}`);
+                STATE.foundIndices.push(STATE.currentIndex);
+                
+                // Success Visual
+                els.window.style.boxShadow = `0 0 20px var(--fg), inset 0 0 20px var(--fg)`;
+                await sleep(CONFIG.animSpeed);
+                els.window.style.boxShadow = `0 0 10px var(--fg)`;
+            }
+
+            STATE.currentIndex++;
+            STATE.isAnimating = false;
+
+            if (STATE.isAutoPlaying) {
+                setTimeout(() => step(), 100);
+            }
+        }
+
+        function resetInventoryVisuals() {
+            const slots = document.querySelectorAll('.slot');
+            slots.forEach(s => {
+                s.className = 'slot';
+                s.innerText = '';
+                s.dataset.status = 'empty';
+            });
+        }
+
+        function resetAll() {
+            STATE.currentIndex = 0;
+            STATE.isAutoPlaying = false;
+            STATE.isAnimating = false;
+            STATE.foundIndices = [];
+            els.btnAuto.innerText = "AUTO_RUN";
+            els.log.innerHTML = '<div class="log-entry">> RESET COMPLETE.</div>';
+            resetInventoryVisuals();
+            updateTapePosition();
+        }
+
+        // --- EVENTS ---
+
+        els.btnStep.addEventListener('click', step);
+        
+        els.btnAuto.addEventListener('click', () => {
+            STATE.isAutoPlaying = !STATE.isAutoPlaying;
+            els.btnAuto.innerText = STATE.isAutoPlaying ? "STOP_RUN" : "AUTO_RUN";
+            if (STATE.isAutoPlaying) step();
+        });
+
+        els.btnReset.addEventListener('click', resetAll);
+
+        // --- START ---
+        init();
+
+    </script>
+</body>
+</html>

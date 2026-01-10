@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ditherpunk: Remove Duplicates</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-phosphor: #33ff00;
+            --color-dim: #1a8000;
+            --color-void: #050505;
+            --font-main: 'VT323', monospace;
+            --cell-size: 60px;
+            --gap: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: #000;
+            color: var(--color-phosphor);
+            font-family: var(--font-main);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- CRT & VIGNETTE EFFECTS --- */
+        .monitor-frame {
+            position: relative;
+            width: 95vw;
+            height: 90vh;
+            background: var(--color-void);
+            border: 4px solid var(--color-phosphor);
+            border-radius: 20px;
+            box-shadow: 
+                0 0 20px var(--color-dim),
+                inset 0 0 100px rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+        .glow-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            box-shadow: inset 0 0 50px rgba(51, 255, 0, 0.1);
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        /* --- UI LAYOUT --- */
+        .status-log {
+            height: 60px;
+            border-bottom: 2px solid var(--color-dim);
+            padding: 15px;
+            font-size: 1.5rem;
+            text-shadow: 0 0 5px var(--color-phosphor);
+            display: flex;
+            align-items: center;
+        }
+
+        .caret {
+            display: inline-block;
+            width: 10px;
+            height: 1.2rem;
+            background: var(--color-phosphor);
+            margin-left: 5px;
+            animation: blink 1s step-end infinite;
+        }
+
+        .stage {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* --- THE ARRAY --- */
+        .array-container {
+            display: flex;
+            gap: var(--gap);
+            position: relative;
+            padding-top: 50px; /* Space for Scout */
+            padding-bottom: 50px;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: 2px solid var(--color-phosphor);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            position: relative;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px var(--color-phosphor);
+        }
+
+        /* State: Locked (Clean) */
+        .cell.locked {
+            background-color: var(--color-phosphor);
+            color: var(--color-void);
+            text-shadow: none;
+        }
+
+        /* State: Trash (Duplicate) */
+        .cell.trash {
+            color: var(--color-dim);
+            border-color: var(--color-dim);
+        }
+        
+        /* Dither Pattern for Trash */
+        .cell.trash::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(45deg, var(--color-dim) 25%, transparent 25%), 
+                              linear-gradient(-45deg, var(--color-dim) 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, var(--color-dim) 75%), 
+                              linear-gradient(-45deg, transparent 75%, var(--color-dim) 75%);
+            background-size: 4px 4px;
+            opacity: 0.5;
+        }
+
+        .cell.dissolve {
+            animation: noise-dissolve 1s forwards;
+        }
+
+        /* --- AGENTS --- */
+        
+        /* The Anchor (Write Index) - Block Cursor */
+        .anchor {
+            position: absolute;
+            top: 50px; /* Aligned with array top (padding) */
+            height: var(--cell-size);
+            width: 8px;
+            background-color: var(--color-phosphor);
+            transform: translateX(-50%); /* Center on gap */
+            box-shadow: 0 0 10px var(--color-phosphor);
+            transition: left 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 10;
+        }
+
+        /* The Scout (Read Index) - Arrow */
+        .scout {
+            position: absolute;
+            top: 10px;
+            width: var(--cell-size);
+            text-align: center;
+            font-size: 2rem;
+            transition: left 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            text-shadow: 0 0 8px var(--color-phosphor);
+            z-index: 10;
+        }
+
+        /* --- VISUAL FX --- */
+        
+        /* Flying Number for Overwrite */
+        .flying-bit {
+            position: fixed;
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background: var(--color-phosphor);
+            color: var(--color-void);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            z-index: 100;
+            border: 2px solid var(--color-phosphor);
+            pointer-events: none;
+        }
+
+        .glitch {
+            animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* SVG Line Container */
+        .connections {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .connector-line {
+            stroke: var(--color-phosphor);
+            stroke-width: 2;
+            stroke-dasharray: 5;
+            animation: dash 0.5s linear infinite;
+        }
+
+        .logic-symbol {
+            position: absolute;
+            font-size: 1.5rem;
+            background: var(--color-void);
+            border: 1px solid var(--color-phosphor);
+            padding: 2px 5px;
+            top: -30px; /* Above the line */
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .bracket-label {
+            position: absolute;
+            bottom: -30px;
+            font-size: 1.2rem;
+            text-align: center;
+            color: var(--color-phosphor);
+            border-top: 2px solid var(--color-phosphor);
+            padding-top: 5px;
+        }
+
+        /* --- CONTROLS --- */
+        .controls {
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+            border-top: 2px solid var(--color-dim);
+            background: rgba(0,0,0,0.5);
+        }
+
+        button {
+            background: var(--color-void);
+            color: var(--color-phosphor);
+            border: 2px solid var(--color-phosphor);
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            padding: 10px 20px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--color-dim);
+            transition: all 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--color-dim);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: var(--color-dim);
+            box-shadow: none;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        @keyframes noise-dissolve {
+            0% { opacity: 1; filter: contrast(1); }
+            50% { background-image: radial-gradient(var(--color-phosphor) 1px, transparent 1px); background-size: 3px 3px; }
+            100% { opacity: 0; filter: contrast(500%); transform: scale(0.9); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="monitor-frame">
+    <div class="scanlines"></div>
+    <div class="glow-layer"></div>
+
+    <div class="status-log">
+        <span id="log-text">INIT_SYSTEM... AWAITING INPUT</span><span class="caret"></span>
+    </div>
+
+    <div class="stage">
+        <!-- SVG Layer for connector lines -->
+        <svg class="connections" id="svg-layer">
+            <line id="compare-line" x1="0" y1="0" x2="0" y2="0" class="connector-line" style="display:none;" />
+        </svg>
+
+        <div class="logic-symbol" id="logic-symbol">==</div>
+
+        <div class="array-container" id="array-root">
+            <!-- Agents are inside here for relative positioning logic -->
+            <div id="scout" class="scout">▼</div>
+            <div id="anchor" class="anchor"></div>
+            <!-- Cells generated by JS -->
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btn-init" onclick="initSystem()">[ INIT SYSTEM ]</button>
+        <button id="btn-step" onclick="runStep()">[ STEP ]</button>
+        <button id="btn-auto" onclick="toggleAuto()">[ AUTO-RUN ]</button>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG & STATE ---
+    const INITIAL_DATA = [2, 3, 3, 3, 5, 7, 7];
+    const CELL_SIZE = 60;
+    const GAP = 10;
+    const TOTAL_CELL_WIDTH = CELL_SIZE + GAP;
+
+    let data = [];
+    let writeIndex = 0;
+    let readIndex = 0;
+    
+    let isAuto = false;
+    let isProcessing = false;
+    let isFinished = false;
+
+    // DOM Elements
+    const arrayRoot = document.getElementById('array-root');
+    const scoutEl = document.getElementById('scout');
+    const anchorEl = document.getElementById('anchor');
+    const logEl = document.getElementById('log-text');
+    const svgLine = document.getElementById('compare-line');
+    const logicSymbol = document.getElementById('logic-symbol');
+    
+    // --- UTILS ---
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function updateLog(text) {
+        logEl.innerText = `> ${text.toUpperCase()}`;
+    }
+
+    function getCellLeftPos(index) {
+        return index * TOTAL_CELL_WIDTH;
+    }
+
+    // --- INITIALIZATION ---
+    function initSystem() {
+        // Reset State
+        data = [...INITIAL_DATA];
+        writeIndex = 1; // Start after the first element
+        readIndex = 1;
+        isFinished = false;
+        isAuto = false;
+        isProcessing = false;
+        
+        // Clear DOM
+        arrayRoot.querySelectorAll('.cell, .bracket-label').forEach(el => el.remove());
+        
+        // Build Cells
+        data.forEach((val, i) => {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.id = `cell-${i}`;
+            cell.innerText = val;
+            arrayRoot.appendChild(cell);
+        });
+
+        // Initial Visual State
+        // Lock Index 0 immediately
+        const firstCell = document.getElementById('cell-0');
+        firstCell.classList.add('locked');
+
+        // Position Agents
+        // Anchor sits between 0 and 1 (visual index 1 * width - half gap)
+        updateAgents();
+
+        updateLog("System Initialized. Anchoring Index 0.");
+        
+        // Reset Visuals
+        svgLine.style.display = 'none';
+        logicSymbol.style.opacity = '0';
+    }
+
+    function updateAgents() {
+        // Scout is exactly above the readIndex cell
+        scoutEl.style.left = `${getCellLeftPos(readIndex)}px`;
+        
+        // Anchor is between writeIndex-1 and writeIndex. 
+        // Visually, it acts as a wall BEFORE writeIndex.
+        // Position = (writeIndex * totalWidth) - (gap / 2)
+        const anchorPos = (writeIndex * TOTAL_CELL_WIDTH) - (GAP / 2);
+        anchorEl.style.left = `${anchorPos}px`;
+    }
+
+    // --- ANIMATION ROUTINES ---
+
+    async function drawConnection(idx1, idx2, type) {
+        const rect1 = document.getElementById(`cell-${idx1}`).getBoundingClientRect();
+        const rect2 = document.getElementById(`cell-${idx2}`).getBoundingClientRect();
+        const rootRect = arrayRoot.getBoundingClientRect();
+
+        // Calculate relative coordinates for SVG inside .stage
+        const x1 = (rect1.left - rootRect.left) + (CELL_SIZE/2);
+        const y1 = (rect1.top - rootRect.top) + (CELL_SIZE/2);
+        const x2 = (rect2.left - rootRect.left) + (CELL_SIZE/2);
+        const y2 = (rect2.top - rootRect.top) + (CELL_SIZE/2);
+
+        svgLine.setAttribute('x1', x1);
+        svgLine.setAttribute('y1', y1);
+        svgLine.setAttribute('x2', x2);
+        svgLine.setAttribute('y2', y2);
+        svgLine.style.display = 'block';
+
+        // Position Symbol
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2 - 40; // Float above
+        logicSymbol.style.left = `${midX + arrayRoot.offsetLeft}px`; // Adjust for root offset
+        logicSymbol.style.top = `${midY + arrayRoot.offsetTop}px`;
+        
+        logicSymbol.innerText = (type === 'MATCH') ? '==' : '!=';
+        logicSymbol.style.opacity = '1';
+
+        await sleep(600);
+    }
+
+    function clearConnection() {
+        svgLine.style.display = 'none';
+        logicSymbol.style.opacity = '0';
+    }
+
+    async function animateOverwrite(sourceIdx, targetIdx, value) {
+        const sourceCell = document.getElementById(`cell-${sourceIdx}`);
+        const targetCell = document.getElementById(`cell-${targetIdx}`);
+        
+        const sRect = sourceCell.getBoundingClientRect();
+        const tRect = targetCell.getBoundingClientRect();
+
+        // Create Flying Element
+        const flyer = document.createElement('div');
+        flyer.classList.add('flying-bit');
+        flyer.innerText = value;
+        flyer.style.left = `${sRect.left}px`;
+        flyer.style.top = `${sRect.top}px`;
+        document.body.appendChild(flyer);
+
+        // Animate
+        // Force reflow
+        flyer.getBoundingClientRect();
+        
+        flyer.style.transition = 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+        flyer.style.left = `${tRect.left}px`;
+        flyer.style.top = `${tRect.top}px`;
+        flyer.style.transform = 'scale(1.1)'; // Slight pulse
+
+        await sleep(600);
+
+        // Impact
+        targetCell.classList.add('glitch');
+        targetCell.innerText = value; // Update Visual Data
+        flyer.remove();
+        
+        await sleep(300);
+        targetCell.classList.remove('glitch');
+    }
+
+    // --- CORE ALGORITHM ---
+
+    async function runStep() {
+        if (isProcessing || isFinished) return;
+        isProcessing = true;
+
+        // 1. Check Bounds
+        if (readIndex >= data.length) {
+            await terminateSystem();
+            isProcessing = false;
+            return;
+        }
+
+        // 2. Discovery Phase
+        updateLog(`Comparing Read[${readIndex}] vs Anchor-1[${writeIndex-1}]`);
+        
+        // Draw visual line between Scout(read) and Last Clean(write-1)
+        await drawConnection(readIndex, writeIndex - 1, (data[readIndex] === data[writeIndex-1] ? 'MATCH' : 'DIFF'));
+
+        if (data[readIndex] === data[writeIndex - 1]) {
+            // DUPLICATE FOUND
+            updateLog("Duplicate detected. Marking as Trash.");
+            const cell = document.getElementById(`cell-${readIndex}`);
+            cell.classList.add('trash');
+            
+            await sleep(500);
+            clearConnection();
+
+            // Logic: Just move read pointer
+            readIndex++;
+        } else {
+            // UNIQUE VALUE FOUND
+            updateLog("Unique value found. Overwriting.");
+            clearConnection();
+            
+            // Visual: Fly Animation
+            await animateOverwrite(readIndex, writeIndex, data[readIndex]);
+
+            // Logic: Update data array
+            data[writeIndex] = data[readIndex];
+            
+            // Visual: Lock the new cell
+            document.getElementById(`cell-${writeIndex}`).classList.add('locked');
+            if (writeIndex !== readIndex) {
+                 // Mark the old read position as 'processed/trash' implicitly if we want, 
+                 // but typically in this algo we just leave it. 
+                 // For visual clarity, let's dim the original read cell to show it's been "moved"
+                 document.getElementById(`cell-${readIndex}`).style.opacity = '0.5';
+            }
+
+            writeIndex++;
+            readIndex++;
+        }
+
+        updateAgents();
+        isProcessing = false;
+
+        if (isAuto && !isFinished) {
+            setTimeout(runStep, 800);
+        }
+    }
+
+    async function terminateSystem() {
+        isFinished = true;
+        isAuto = false;
+        scoutEl.style.opacity = '0';
+        updateLog(`Process Complete. k = ${writeIndex}`);
+
+        // Label the valid array
+        const bracket = document.createElement('div');
+        bracket.classList.add('bracket-label');
+        bracket.innerText = `k = ${writeIndex}`;
+        bracket.style.width = `${(writeIndex * TOTAL_CELL_WIDTH) - GAP}px`;
+        bracket.style.left = '0';
+        arrayRoot.appendChild(bracket);
+
+        // Dissolve the garbage
+        for (let i = writeIndex; i < data.length; i++) {
+            const cell = document.getElementById(`cell-${i}`);
+            cell.classList.add('dissolve');
+            await sleep(100);
+        }
+    }
+
+    function toggleAuto() {
+        if (isFinished) return;
+        isAuto = !isAuto;
+        document.getElementById('btn-auto').innerText = isAuto ? '[ STOP AUTO ]' : '[ AUTO-RUN ]';
+        if (isAuto) runStep();
+    }
+
+    // Start
+    window.onload = initSystem;
+
+</script>
+</body>
+</html>

@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUMP_GAME_VISUALIZER // DITHERPUNK</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --term-green: #00FF00;
+            --term-bg: #050a05;
+            --ui-border: 2px solid var(--term-green);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            color: var(--term-green);
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* CRT Scanline Effect Overlay */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #game-container {
+            position: relative;
+            width: 960px; /* Scaled up 3x from internal resolution 320 */
+            height: 540px; /* Scaled up 3x from internal resolution 180 */
+            border: var(--ui-border);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            /* Crisp pixel art scaling */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        /* UI Overlays */
+        .ui-box {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--term-green);
+            padding: 10px;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px rgba(0, 255, 0, 0.3);
+            font-size: 1.2rem;
+            z-index: 5;
+        }
+
+        #stats-box {
+            top: 20px;
+            right: 20px;
+            width: 200px;
+        }
+
+        #log-box {
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 80px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            border-top: 4px double var(--term-green);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .stat-val {
+            color: #EEFFEE;
+            text-shadow: 0 0 5px #EEFFEE;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            opacity: 0.8;
+        }
+        .log-entry.new {
+            color: #fff;
+            opacity: 1;
+            font-weight: bold;
+        }
+        
+        /* Flicker animation for dead end */
+        @keyframes strobe-red {
+            0% { border-color: #FF0055; box-shadow: 0 0 20px #FF0055; }
+            50% { border-color: #000; }
+            100% { border-color: #FF0055; box-shadow: 0 0 20px #FF0055; }
+        }
+        
+        .danger-mode {
+            animation: strobe-red 0.2s infinite;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <div id="game-container">
+        <canvas id="mainCanvas"></canvas>
+        
+        <!-- Stats UI -->
+        <div id="stats-box" class="ui-box">
+            <div class="stat-row"><span>INDEX:</span> <span id="ui-index" class="stat-val">0</span></div>
+            <div class="stat-row"><span>POWER:</span> <span id="ui-power" class="stat-val">-</span></div>
+            <div class="stat-row"><span>HORIZON:</span> <span id="ui-horizon" class="stat-val">0</span></div>
+        </div>
+
+        <!-- Log UI -->
+        <div id="log-box" class="ui-box">
+            <div id="log-content"></div>
+        </div>
+    </div>
+
+<script>
+/**
+ * DITHERPUNK GREEDY ALGORITHM VISUALIZER
+ * 
+ * Logic: Jump Game (Greedy)
+ * Visuals: Low-res canvas with real-time Atkinson Dithering
+ */
+
+// --- CONFIGURATION ---
+const INTERNAL_WIDTH = 320;
+const INTERNAL_HEIGHT = 180;
+
+// Palette (R, G, B)
+const PALETTE = {
+    BLACK:   { r: 0,   g: 10,  b: 0 },
+    GREEN:   { r: 0,   g: 255, b: 0 },   // Primary
+    CYAN:    { r: 0,   g: 255, b: 255 }, // Reach/Calcs
+    PINK:    { r: 255, g: 0,   b: 85 },  // Danger
+    WHITE:   { r: 238, g: 255, b: 238 }  // Horizon/Gold
+};
+
+// Game Data
+// const NUMS = [2, 3, 1, 1, 4]; // Standard solvable
+const NUMS = Array.from({length: 6}, () => Math.floor(Math.random() * 4)); 
+// Ensure last index is goal, just to be visually distinct
+if(NUMS.length > 0) NUMS[NUMS.length-1] = 0; 
+
+// --- SETUP CANVAS ---
+const mainCanvas = document.getElementById('mainCanvas');
+const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
+
+// We draw logic to an offscreen buffer, then dither it to main canvas
+const bufferCanvas = document.createElement('canvas');
+const bCtx = bufferCanvas.getContext('2d', { willReadFrequently: true });
+
+mainCanvas.width = INTERNAL_WIDTH;
+mainCanvas.height = INTERNAL_HEIGHT;
+bufferCanvas.width = INTERNAL_WIDTH;
+bufferCanvas.height = INTERNAL_HEIGHT;
+
+// --- STATE MANAGEMENT ---
+const STATE = {
+    START: 0,
+    SEEK: 1,      // Moving car to index
+    CHECK: 2,     // Is index > horizon?
+    CALCULATE: 3, // Draw jump arc
+    EXTEND: 4,    // Move horizon line
+    LOOP: 5,      // Prep next index
+    SUCCESS: 6,
+    FAIL: 7
+};
+
+let game = {
+    state: STATE.START,
+    idx: 0,
+    horizon: 0,         // The max reach found so far
+    prevHorizon: 0,     // For animation
+    
+    // Animation specific
+    t: 0,               // Interpolation factor (0.0 to 1.0)
+    carX: 0,
+    targetX: 0,
+    horizonX: 0,
+    
+    // Geometry
+    groundY: 120,
+    spacing: 40,
+    startX: 30
+};
+
+// --- DOM UI ---
+const uiIndex = document.getElementById('ui-index');
+const uiPower = document.getElementById('ui-power');
+const uiHorizon = document.getElementById('ui-horizon');
+const logContent = document.getElementById('log-content');
+
+function log(msg) {
+    const div = document.createElement('div');
+    div.className = 'log-entry new';
+    div.innerText = `> ${msg}`;
+    logContent.appendChild(div);
+    if(logContent.children.length > 3) {
+        logContent.removeChild(logContent.children[0]);
+        logContent.children[0].classList.remove('new');
+    }
+}
+
+// --- INITIALIZATION ---
+function init() {
+    game.idx = 0;
+    game.horizon = 0; // Starts at index 0 + nums[0], but handled in logic
+    game.prevHorizon = 0;
+    game.carX = game.startX;
+    game.horizonX = game.startX; // Visual horizon position
+    game.state = STATE.SEEK;
+    
+    // Pre-calculate positions
+    game.positions = NUMS.map((_, i) => game.startX + (i * game.spacing));
+    
+    log("SYSTEM INITIALIZED.");
+    log(`ARRAY: [${NUMS.join(', ')}]`);
+    
+    requestAnimationFrame(loop);
+}
+
+// --- CORE UTILS ---
+function lerp(start, end, amt) {
+    return (1 - amt) * start + amt * end;
+}
+
+// --- DITHERING ENGINE (Atkinson) ---
+function applyDither() {
+    // Get pixel data from buffer
+    const imageData = bCtx.getImageData(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    const data = imageData.data;
+    const w = INTERNAL_WIDTH;
+    const h = INTERNAL_HEIGHT;
+
+    // Helper to find closest palette color
+    const getClosestColor = (r, g, b) => {
+        let minDist = Infinity;
+        let closest = PALETTE.BLACK;
+        
+        for (let key in PALETTE) {
+            const c = PALETTE[key];
+            // Simple Euclidean distance
+            const dist = Math.sqrt((r-c.r)**2 + (g-c.g)**2 + (b-c.b)**2);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = c;
+            }
+        }
+        return closest;
+    };
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            
+            const oldR = data[i];
+            const oldG = data[i+1];
+            const oldB = data[i+2];
+
+            const c = getClosestColor(oldR, oldG, oldB);
+            
+            data[i] = c.r;
+            data[i+1] = c.g;
+            data[i+2] = c.b;
+
+            // Quantization Error
+            const errR = oldR - c.r;
+            const errG = oldG - c.g;
+            const errB = oldB - c.b;
+
+            // Atkinson Diffusion
+            //       X   1/8 1/8
+            //   1/8 1/8 1/8
+            //       1/8
+            
+            const distribute = (dx, dy, factor) => {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                    const ni = (ny * w + nx) * 4;
+                    data[ni]   += errR * factor;
+                    data[ni+1] += errG * factor;
+                    data[ni+2] += errB * factor;
+                }
+            };
+
+            distribute(1, 0, 1/8);
+            distribute(2, 0, 1/8);
+            distribute(-1, 1, 1/8);
+            distribute(0, 1, 1/8);
+            distribute(1, 1, 1/8);
+            distribute(0, 2, 1/8);
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+}
+
+// --- DRAWING ---
+function drawScene() {
+    // Clear buffer with Black
+    bCtx.fillStyle = `rgb(${PALETTE.BLACK.r},${PALETTE.BLACK.g},${PALETTE.BLACK.b})`;
+    bCtx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+
+    // 1. Draw The Highway/Bridge
+    // Safe zone (from 0 to Horizon)
+    bCtx.fillStyle = `rgb(${PALETTE.GREEN.r},${PALETTE.GREEN.g},${PALETTE.GREEN.b})`;
+    // Draw base line
+    bCtx.fillRect(0, game.groundY, INTERNAL_WIDTH, 2);
+    
+    // Fill "Safe" area
+    let visualHorizonX = game.horizonX; 
+    
+    // Draw bridge struts/posts
+    bCtx.textAlign = 'center';
+    bCtx.font = '10px monospace';
+    
+    NUMS.forEach((val, i) => {
+        let px = game.positions[i];
+        
+        // Post
+        bCtx.fillStyle = (i <= game.horizon) ? 
+            `rgb(${PALETTE.GREEN.r},${PALETTE.GREEN.g},${PALETTE.GREEN.b})` : 
+            `rgb(40, 40, 40)`; // Grayed out in void
+            
+        bCtx.fillRect(px - 1, game.groundY, 2, 10);
+        
+        // Index Label
+        bCtx.fillText(i, px, game.groundY + 20);
+
+        // Gas Can (Value)
+        let canColor = `rgb(${PALETTE.GREEN.r},${PALETTE.GREEN.g},${PALETTE.GREEN.b})`;
+        if (i === game.idx && game.state !== STATE.SEEK) canColor = `rgb(${PALETTE.WHITE.r},${PALETTE.WHITE.g},${PALETTE.WHITE.b})`; // Highlight current
+        
+        bCtx.fillStyle = canColor;
+        bCtx.fillRect(px - 6, game.groundY - 25, 12, 14);
+        
+        // Text inside can
+        bCtx.fillStyle = `rgb(${PALETTE.BLACK.r},${PALETTE.BLACK.g},${PALETTE.BLACK.b})`;
+        bCtx.fillText(val, px, game.groundY - 16);
+    });
+
+    // 2. Draw Arc (Reach) during CALCULATE phase
+    if (game.state === STATE.CALCULATE || game.state === STATE.EXTEND) {
+        let startX = game.positions[game.idx];
+        let jump = NUMS[game.idx];
+        // Clamp jump target for drawing so it doesn't go off screen wildly
+        let targetIndex = Math.min(game.idx + jump, NUMS.length + 1);
+        let endX = game.startX + (targetIndex * game.spacing);
+        
+        bCtx.beginPath();
+        bCtx.moveTo(startX, game.groundY - 25);
+        bCtx.quadraticCurveTo((startX + endX)/2, game.groundY - 80, endX, game.groundY);
+        bCtx.strokeStyle = `rgb(${PALETTE.CYAN.r},${PALETTE.CYAN.g},${PALETTE.CYAN.b})`;
+        bCtx.lineWidth = 2;
+        bCtx.stroke();
+
+        // Label
+        bCtx.fillStyle = `rgb(${PALETTE.CYAN.r},${PALETTE.CYAN.g},${PALETTE.CYAN.b})`;
+        bCtx.fillText("REACH " + (game.idx + jump), (startX + endX)/2, game.groundY - 60);
+    }
+
+    // 3. Draw The Car
+    bCtx.fillStyle = `rgb(${PALETTE.GREEN.r},${PALETTE.GREEN.g},${PALETTE.GREEN.b})`;
+    // Simple pixel sprite car
+    let cx = game.carX - 8;
+    let cy = game.groundY - 10;
+    bCtx.fillRect(cx, cy, 16, 8); // Body
+    bCtx.fillRect(cx + 4, cy - 4, 8, 4); // Top
+    // Wheels
+    bCtx.fillStyle = `rgb(${PALETTE.BLACK.r},${PALETTE.BLACK.g},${PALETTE.BLACK.b})`;
+    bCtx.fillRect(cx + 2, cy + 6, 2, 2);
+    bCtx.fillRect(cx + 12, cy + 6, 2, 2);
+
+    // 4. Draw Horizon Line (The Gold Line)
+    bCtx.fillStyle = `rgb(${PALETTE.WHITE.r},${PALETTE.WHITE.g},${PALETTE.WHITE.b})`;
+    bCtx.fillRect(game.horizonX, game.groundY - 100, 2, 100);
+    // Glow effect (solid circles for dither to eat)
+    if (Math.random() > 0.5) {
+        bCtx.fillRect(game.horizonX - 1, game.groundY - 100, 4, 100);
+    }
+
+    // 5. FAIL STATE VISUALS
+    if (game.state === STATE.FAIL) {
+        bCtx.fillStyle = `rgba(${PALETTE.PINK.r},${PALETTE.PINK.g},${PALETTE.PINK.b}, 0.5)`;
+        bCtx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+        bCtx.fillStyle = `rgb(${PALETTE.PINK.r},${PALETTE.PINK.g},${PALETTE.PINK.b})`;
+        bCtx.font = "30px monospace";
+        bCtx.fillText("DEAD END", INTERNAL_WIDTH/2, INTERNAL_HEIGHT/2);
+    }
+
+    // 6. SUCCESS STATE VISUALS
+    if (game.state === STATE.SUCCESS) {
+         // Strobe green
+         if (Math.floor(Date.now() / 100) % 2 === 0) {
+            bCtx.fillStyle = `rgba(${PALETTE.GREEN.r},${PALETTE.GREEN.g},${PALETTE.GREEN.b}, 0.3)`;
+            bCtx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+         }
+         bCtx.fillStyle = `rgb(${PALETTE.WHITE.r},${PALETTE.WHITE.g},${PALETTE.WHITE.b})`;
+         bCtx.font = "30px monospace";
+         bCtx.fillText("PATH FOUND", INTERNAL_WIDTH/2, INTERNAL_HEIGHT/2);
+    }
+}
+
+// --- UPDATE LOOP ---
+function update() {
+    
+    // UI Updates
+    uiIndex.innerText = game.idx;
+    uiPower.innerText = (game.idx < NUMS.length) ? NUMS[game.idx] : "-";
+    uiHorizon.innerText = game.horizon;
+
+    switch (game.state) {
+        
+        case STATE.SEEK:
+            // Move car to current index
+            if (game.t === 0) {
+                game.startCarX = game.carX;
+                game.targetCarX = game.positions[game.idx];
+            }
+            
+            game.t += 0.05;
+            game.carX = lerp(game.startCarX, game.targetCarX, Math.min(game.t, 1));
+            
+            if (game.t >= 1) {
+                game.t = 0;
+                game.state = STATE.CHECK;
+            }
+            break;
+
+        case STATE.CHECK:
+            // Logic: Is current index reachable? (i <= horizon)
+            // Wait a moment for visual impact
+            if (game.t === 0) {
+                if (game.idx > game.horizon) {
+                    log(`CRITICAL FAIL: Index ${game.idx} is unreachable.`);
+                    document.getElementById('game-container').classList.add('danger-mode');
+                    game.state = STATE.FAIL;
+                } else {
+                    log(`Checking index ${game.idx}. Safe.`);
+                    setTimeout(() => { game.state = STATE.CALCULATE; }, 500);
+                }
+            }
+            break;
+
+        case STATE.CALCULATE:
+            if (game.idx === NUMS.length - 1) {
+                log("Destination Reached!");
+                game.state = STATE.SUCCESS;
+                return;
+            }
+
+            // Calc new reach
+            let currentJump = NUMS[game.idx];
+            let potentialReach = game.idx + currentJump;
+            
+            if (game.t === 0) {
+                log(`Power: ${currentJump}. Potential Reach: ${potentialReach}`);
+                game.t = 1; // Just a flag here to run once
+                setTimeout(() => { 
+                    game.state = STATE.EXTEND; 
+                    game.t = 0;
+                }, 800);
+            }
+            break;
+
+        case STATE.EXTEND:
+            let reachVal = game.idx + NUMS[game.idx];
+            let targetHorizon = Math.max(game.horizon, reachVal);
+            
+            // Visual Target for Horizon Line
+            // Clamp visual position to last index so line doesn't go off screen
+            let visReachIndex = Math.min(targetHorizon, NUMS.length);
+            let targetHorizonX = game.startX + (visReachIndex * game.spacing);
+
+            if (game.t === 0) {
+                game.startHorizonX = game.horizonX;
+                
+                if (targetHorizon > game.horizon) {
+                    log(`Extending Horizon to ${targetHorizon}...`);
+                    game.prevHorizon = game.horizon;
+                    game.horizon = targetHorizon;
+                } else {
+                    log("Horizon unchanged.");
+                    game.state = STATE.LOOP;
+                    return;
+                }
+            }
+
+            game.t += 0.05;
+            game.horizonX = lerp(game.startHorizonX, targetHorizonX, Math.min(game.t, 1));
+
+            if (game.t >= 1) {
+                game.t = 0;
+                game.state = STATE.LOOP;
+            }
+            break;
+
+        case STATE.LOOP:
+            game.idx++;
+            if (game.idx >= NUMS.length) {
+                game.state = STATE.SUCCESS;
+                log("Sequence Complete.");
+            } else {
+                game.state = STATE.SEEK;
+                log("Advancing...");
+            }
+            break;
+    }
+}
+
+// --- MAIN LOOP ---
+function loop() {
+    update();
+    drawScene();
+    applyDither(); // Post-processing
+    requestAnimationFrame(loop);
+}
+
+// Start
+init();
+
+</script>
+</body>
+</html>

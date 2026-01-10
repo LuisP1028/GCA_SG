@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAP_FINDER_V1.0 // DITHERPUNK</title>
+    <style>
+        /* --- 1. CORE AESTHETICS & RESET --- */
+        :root {
+            --color-bg: #000000;
+            --color-fg: #00FF41;
+            --color-dim: rgba(0, 255, 65, 0.3);
+            --font-main: 'Courier New', Courier, monospace;
+            --border-thick: 4px;
+            --border-thin: 2px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-fg);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-transform: uppercase;
+        }
+
+        /* --- 2. DITHER & CRT EFFECTS --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            z-index: 100;
+            opacity: 0.6;
+        }
+
+        .dither-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            /* Simple 1-bit dither simulation */
+            background-image: radial-gradient(var(--color-fg) 1px, transparent 0);
+            background-size: 3px 3px;
+            opacity: 0.1;
+            z-index: 99;
+        }
+
+        /* --- 3. LAYOUT ARCHITECTURE --- */
+        .main-grid {
+            width: 90vw;
+            max-width: 1000px;
+            height: 80vh;
+            display: grid;
+            grid-template-rows: auto 1fr 1fr;
+            gap: 20px;
+            border: var(--border-thick) solid var(--color-fg);
+            padding: 20px;
+            position: relative;
+            background: var(--color-bg);
+            box-shadow: 0 0 15px var(--color-dim);
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: var(--border-thin) solid var(--color-fg);
+            padding-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #003300;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            background: var(--color-bg);
+            border: var(--border-thin) solid var(--color-fg);
+            color: var(--color-fg);
+            font-family: var(--font-main);
+            padding: 5px 10px;
+            text-transform: uppercase;
+            font-size: 1rem;
+            width: 300px;
+        }
+
+        button {
+            background: var(--color-fg);
+            color: var(--color-bg);
+            border: none;
+            padding: 5px 15px;
+            font-family: var(--font-main);
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background: #fff;
+        }
+
+        button:disabled {
+            background: var(--color-dim);
+            cursor: not-allowed;
+        }
+
+        /* TOP SECTION: TIMELINE */
+        .timeline-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 20px;
+            border: var(--border-thin) dashed var(--color-dim);
+        }
+
+        .word-card {
+            border: 1px solid var(--color-fg);
+            padding: 10px 15px;
+            font-size: 1.2rem;
+            position: relative;
+            background: var(--color-bg);
+            transition: all 0.2s;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .word-card.active {
+            border: 4px solid var(--color-fg);
+            animation: blink-border 0.5s infinite;
+            box-shadow: 0 0 10px var(--color-fg);
+        }
+
+        .word-card.repeat {
+            background: var(--color-fg);
+            color: var(--color-bg);
+            font-weight: bold;
+        }
+
+        /* MIDDLE OVERLAY: SVG CANVAS */
+        #svg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* BOTTOM SPLIT */
+        .bottom-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 100%;
+        }
+
+        /* LEFT: CACHE (MEMORY DUMP) */
+        .cache-panel {
+            border: var(--border-thin) solid var(--color-fg);
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            background: var(--color-fg);
+            color: var(--color-bg);
+            padding: 2px 5px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        td, th {
+            text-align: left;
+            padding: 5px;
+            border-bottom: 1px dotted var(--color-dim);
+        }
+
+        tr.flash {
+            animation: flash-row 0.5s ease;
+        }
+
+        /* RIGHT: REGISTER (MIN GAP) */
+        .register-panel {
+            border: var(--border-thick) solid var(--color-fg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--color-bg),
+                var(--color-bg) 10px,
+                #001100 10px,
+                #001100 20px
+            );
+        }
+
+        #min-gap-display {
+            font-size: 6rem;
+            font-weight: bold;
+            text-shadow: 4px 4px 0 var(--color-dim);
+        }
+
+        .gap-label {
+            font-size: 1rem;
+            letter-spacing: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* --- 4. ANIMATIONS --- */
+        @keyframes blink-border {
+            0% { border-color: var(--color-fg); }
+            50% { border-color: transparent; }
+            100% { border-color: var(--color-fg); }
+        }
+
+        @keyframes flash-row {
+            0% { background: var(--color-fg); color: var(--color-bg); }
+            100% { background: transparent; color: var(--color-fg); }
+        }
+
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .slide-in {
+            animation: slide-in 0.3s forwards;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- VISUAL FILTERS -->
+    <div class="scanlines"></div>
+    <div class="dither-overlay"></div>
+
+    <!-- MAIN INTERFACE -->
+    <div class="main-grid">
+        <!-- SVG LAYER (Calculated Lines) -->
+        <svg id="svg-canvas"></svg>
+
+        <header>
+            <h1>GAP_FINDER_V1.0</h1>
+            <div class="controls">
+                <input type="text" id="input-sentence" value="CODE REPEAT CODE SLEEP REPEAT">
+                <button id="btn-execute">EXECUTE</button>
+            </div>
+        </header>
+
+        <!-- TIMELINE AREA -->
+        <div class="timeline-container" id="timeline">
+            <!-- Cards injected here -->
+        </div>
+
+        <!-- BOTTOM DATA AREA -->
+        <div class="bottom-split">
+            <!-- CACHE -->
+            <div class="cache-panel">
+                <div class="panel-title">MEMORY_DUMP (MAP)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>KEY (WORD)</th>
+                            <th>VAL (LAST_IDX)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cache-body">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- REGISTER -->
+            <div class="register-panel">
+                <div class="gap-label">MIN_GAP_REGISTER</div>
+                <div id="min-gap-display">∞</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- 5. LOGIC & AUDIO ENGINE --- */
+        
+        // --- AUDIO CONTEXT ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'spawn') {
+                // High blip
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'repeat') {
+                // Low crunch
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'record') {
+                // Success arpeggio
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(880, now + 0.1);
+                osc.frequency.setValueAtTime(1760, now + 0.2);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // --- DOM ELEMENTS ---
+        const inputSentence = document.getElementById('input-sentence');
+        const btnExecute = document.getElementById('btn-execute');
+        const timeline = document.getElementById('timeline');
+        const cacheBody = document.getElementById('cache-body');
+        const minGapDisplay = document.getElementById('min-gap-display');
+        const svgCanvas = document.getElementById('svg-canvas');
+
+        // --- STATE ---
+        let isRunning = false;
+        let delayTime = 1000; // ms between steps
+
+        // --- SCRAMBLE TEXT EFFECT ---
+        function scrambleText(element, finalValue, duration = 300) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&?';
+            const startTime = Date.now();
+            
+            function update() {
+                const elapsed = Date.now() - startTime;
+                if (elapsed > duration) {
+                    element.innerText = finalValue;
+                    return;
+                }
+                
+                let randomStr = '';
+                for(let i=0; i<String(finalValue).length; i++) {
+                    randomStr += chars[Math.floor(Math.random() * chars.length)];
+                }
+                element.innerText = randomStr;
+                requestAnimationFrame(update);
+            }
+            update();
+        }
+
+        // --- SVG DRAWING ---
+        function drawConnection(startEl, endEl, isRecord, gapVal) {
+            const containerRect = document.querySelector('.main-grid').getBoundingClientRect();
+            const r1 = startEl.getBoundingClientRect();
+            const r2 = endEl.getBoundingClientRect();
+
+            // Calculate centers relative to the main-grid container
+            const x1 = r1.left + r1.width / 2 - containerRect.left;
+            const y1 = r1.top - containerRect.top; // Start from top of card
+            const x2 = r2.left + r2.width / 2 - containerRect.left;
+            const y2 = r2.top - containerRect.top;
+
+            // Height of arc depends on distance
+            const dist = Math.abs(x2 - x1);
+            const controlY = y1 - (dist * 0.5) - 30; 
+
+            // Create Path
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const d = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${controlY} ${x2} ${y2}`;
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            
+            if (isRecord) {
+                path.setAttribute("stroke", "#00FF41");
+                path.setAttribute("stroke-width", "4");
+                path.setAttribute("filter", "drop-shadow(0 0 5px #00FF41)");
+            } else {
+                path.setAttribute("stroke", "rgba(0, 255, 65, 0.5)");
+                path.setAttribute("stroke-width", "2");
+                path.setAttribute("stroke-dasharray", "5,5");
+            }
+
+            svgCanvas.appendChild(path);
+
+            // Add Label
+            const textObj = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textObj.setAttribute("x", (x1 + x2) / 2);
+            textObj.setAttribute("y", controlY - 10);
+            textObj.setAttribute("fill", "#00FF41");
+            textObj.setAttribute("text-anchor", "middle");
+            textObj.setAttribute("font-family", "Courier New");
+            textObj.setAttribute("font-size", "14");
+            textObj.textContent = `GAP: ${gapVal}`;
+            svgCanvas.appendChild(textObj);
+        }
+
+        // --- HELPER: SLEEP ---
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        // --- MAIN ALGORITHM ---
+        async function runAlgorithm() {
+            if (isRunning) return;
+            isRunning = true;
+            btnExecute.disabled = true;
+
+            // Reset UI
+            timeline.innerHTML = '';
+            cacheBody.innerHTML = '';
+            minGapDisplay.innerText = '∞';
+            svgCanvas.innerHTML = ''; // Clear lines
+            
+            const words = inputSentence.value.trim().split(/\s+/);
+            const map = new Map(); // Stores word -> index
+            let minGap = Infinity;
+
+            for (let i = 0; i < words.length; i++) {
+                const word = words[i].toUpperCase();
+
+                // 1. Spawn Word
+                const card = document.createElement('div');
+                card.className = 'word-card slide-in active';
+                card.innerText = word;
+                timeline.appendChild(card);
+                
+                playSound('spawn');
+                await sleep(delayTime);
+
+                // 2. Dictionary Check
+                if (map.has(word)) {
+                    // REPEAT FOUND
+                    const prevIndex = map.get(word);
+                    const gap = i - prevIndex;
+                    
+                    playSound('repeat');
+
+                    // Visuals: Highlight previous occurrence
+                    const prevCard = timeline.children[prevIndex];
+                    prevCard.classList.add('repeat');
+                    
+                    // Logic: Check Min Gap
+                    let isNewRecord = false;
+                    if (gap < minGap) {
+                        minGap = gap;
+                        isNewRecord = true;
+                        playSound('record');
+                        scrambleText(minGapDisplay, minGap);
+                    }
+
+                    // Visuals: Draw Line
+                    drawConnection(prevCard, card, isNewRecord, gap);
+                    
+                    await sleep(delayTime / 2);
+
+                    // Update Cache Table Row
+                    const rows = document.querySelectorAll('#cache-body tr');
+                    rows.forEach(row => {
+                        if(row.children[0].innerText === word) {
+                            row.children[1].innerText = i;
+                            row.classList.add('flash');
+                            setTimeout(() => row.classList.remove('flash'), 500);
+                        }
+                    });
+
+                } else {
+                    // NEW WORD
+                    // Add to DOM Table
+                    const row = document.createElement('tr');
+                    row.className = 'flash';
+                    row.innerHTML = `<td>${word}</td><td>${i}</td>`;
+                    cacheBody.appendChild(row);
+                }
+
+                // Update Map
+                map.set(word, i);
+
+                // Remove active focus from current card
+                card.classList.remove('active');
+                await sleep(500);
+            }
+
+            isRunning = false;
+            btnExecute.disabled = false;
+        }
+
+        btnExecute.addEventListener('click', runAlgorithm);
+
+        // Handle Resize to clear lines (simple solution)
+        window.addEventListener('resize', () => {
+            svgCanvas.innerHTML = '';
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DITHERPUNK // RESERVOIR SAMPLING</title>
+    <style>
+        /* --- DITHERPUNK CORE AESTHETICS --- */
+        :root {
+            --bg-color: #000000;
+            --fg-color: #00FF41; /* Terminal Green */
+            --dim-color: #003300;
+            --font-stack: 'Courier New', 'Courier', monospace;
+            --border-style: 2px solid var(--fg-color);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+            text-shadow: 0 0 2px var(--dim-color);
+        }
+
+        /* --- UTILITIES --- */
+        .dither-pattern {
+            /* High density dither (Active) */
+            background-image: radial-gradient(var(--fg-color) 15%, transparent 16%),
+                              radial-gradient(var(--fg-color) 15%, transparent 16%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 2px;
+        }
+
+        .dither-sparse {
+            /* Low density dither (Corrupted/Void) */
+            background-image: radial-gradient(var(--fg-color) 10%, transparent 11%),
+                              radial-gradient(var(--fg-color) 10%, transparent 11%);
+            background-size: 8px 8px;
+            background-position: 0 0, 4px 4px;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom, 
+                rgba(255,255,255,0), 
+                rgba(255,255,255,0) 50%, 
+                rgba(0,0,0,0.4) 50%, 
+                rgba(0,0,0,0.4)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.6;
+        }
+
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        /* --- LAYOUT GRID --- */
+        .dashboard {
+            display: grid;
+            grid-template-rows: 60px 1fr 80px;
+            height: 100%;
+            width: 100%;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        /* --- TOP BAR (STATS) --- */
+        header {
+            border: var(--border-style);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            text-transform: uppercase;
+        }
+
+        .stat-box { display: flex; gap: 20px; align-items: center; width: 100%; }
+        .stat-item { display: flex; flex-direction: column; }
+        .label { font-size: 10px; color: var(--fg-color); opacity: 0.8; }
+        .value { font-size: 18px; font-weight: bold; }
+
+        .prob-container {
+            flex-grow: 1;
+            margin-left: 20px;
+            border: 1px solid var(--fg-color);
+            height: 20px;
+            position: relative;
+            background: var(--dim-color);
+        }
+        .prob-bar {
+            height: 100%;
+            width: 100%; /* Starts full */
+            background-color: var(--fg-color);
+            transition: width 0.2s ease;
+        }
+
+        /* --- MAIN STAGE --- */
+        main {
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
+            gap: 10px;
+            border: var(--border-style);
+            position: relative;
+        }
+
+        h2 {
+            margin: 0;
+            padding: 5px;
+            background: var(--fg-color);
+            color: var(--bg-color);
+            font-size: 12px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        /* Left: Input Stream */
+        #stream-panel {
+            border-right: var(--border-style);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Center: VIP Buffer */
+        #buffer-container {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        #gate-zone {
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 1px dashed var(--dim-color);
+            position: relative;
+        }
+
+        #rng-box {
+            width: 120px;
+            height: 60px;
+            border: 4px double var(--fg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            z-index: 10;
+        }
+        #rng-label { font-size: 10px; }
+        #rng-value { font-size: 24px; font-weight: bold; }
+
+        #buffer-grid {
+            flex-grow: 1;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            grid-auto-rows: 80px;
+            gap: 15px;
+            align-content: start;
+        }
+
+        .slot {
+            width: 80px;
+            height: 80px;
+            border: 2px dashed var(--dim-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .slot.active-target {
+            border-color: var(--fg-color);
+            box-shadow: 0 0 10px var(--fg-color);
+        }
+
+        /* Right: The Void */
+        #void-panel {
+            border-left: var(--border-style);
+            display: flex;
+            flex-direction: column-reverse; /* Pile up from bottom */
+            padding: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- ENTITIES (DATA PACKETS) --- */
+        .packet {
+            width: 60px;
+            height: 60px;
+            border: 2px solid var(--fg-color);
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+            position: absolute; /* Controlled by JS */
+            z-index: 100;
+            box-shadow: 4px 4px 0px var(--dim-color);
+            transition: transform 0.5s cubic-bezier(0.45, 0, 0.55, 1);
+        }
+
+        /* Stick figure SVG embedded */
+        .packet::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            /* Inner frame */
+            border: 1px solid var(--dim-color); 
+            z-index: -1;
+        }
+
+        .packet.voided {
+            border-style: dotted;
+            color: var(--dim-color);
+            box-shadow: none;
+        }
+        .packet.voided .dither-bg {
+            opacity: 0.3;
+        }
+
+        .packet-content {
+            z-index: 2;
+            background: #000;
+            padding: 2px 6px;
+        }
+
+        .packet-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
+
+        /* --- CONTROLS --- */
+        footer {
+            border: var(--border-style);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 10px;
+        }
+
+        button {
+            background: #000;
+            color: var(--fg-color);
+            border: 2px solid var(--fg-color);
+            padding: 10px 20px;
+            font-family: var(--font-stack);
+            font-size: 16px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0 var(--dim-color);
+        }
+        button:hover {
+            background: var(--fg-color);
+            color: #000;
+        }
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+        button:disabled {
+            border-color: var(--dim-color);
+            color: var(--dim-color);
+            cursor: not-allowed;
+            background: #000;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 10px;
+            background: var(--fg-color);
+            cursor: pointer;
+            margin-top: -8px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--dim-color);
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<div class="dashboard">
+    <!-- STATS HEADER -->
+    <header>
+        <div class="stat-box">
+            <div class="stat-item">
+                <span class="label">N (PROCESSED)</span>
+                <span class="value" id="stat-n">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">K (BUFFER SIZE)</span>
+                <span class="value" id="stat-k">5</span>
+            </div>
+            <div class="stat-item" style="flex-grow: 1; display:flex; flex-direction:row; align-items:center;">
+                <span class="label" style="width: 80px;">PROB (K/N)</span>
+                <div class="prob-container">
+                    <div class="prob-bar dither-pattern" id="prob-bar"></div>
+                </div>
+                <span class="value" id="prob-text" style="margin-left:10px;">1.00</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN VISUALIZATION -->
+    <main>
+        <!-- LEFT: INPUT STREAM -->
+        <div id="stream-panel">
+            <h2>Stream Input</h2>
+            <!-- Entities spawn here -->
+        </div>
+
+        <!-- CENTER: VIP BUFFER & GATE -->
+        <div id="buffer-container">
+            <div id="gate-zone">
+                <div id="rng-box">
+                    <span id="rng-label">RNG (1..N)</span>
+                    <span id="rng-value">--</span>
+                </div>
+            </div>
+            <h2>VIP BUFFER MEMORY</h2>
+            <div id="buffer-grid">
+                <!-- Slots generated by JS -->
+            </div>
+        </div>
+
+        <!-- RIGHT: THE VOID -->
+        <div id="void-panel">
+            <h2>The Void / NULL</h2>
+            <!-- Rejected items go here -->
+        </div>
+    </main>
+
+    <!-- CONTROLS -->
+    <footer>
+        <button id="btn-play">INIT / PLAY</button>
+        <button id="btn-pause" disabled>PAUSE</button>
+        <button id="btn-step" disabled>STEP</button>
+        <button id="btn-reset">RESET</button>
+        
+        <div class="slider-container">
+            <span class="label">CLOCK SPEED</span>
+            <input type="range" id="speed-slider" min="100" max="2000" value="1000" step="100">
+        </div>
+    </footer>
+</div>
+
+<script>
+/**
+ * DITHERPUNK RESERVOIR SAMPLING
+ * Logic & Animation Controller
+ */
+
+// Configuration
+const K_SIZE = 5;
+let buffer = []; // Stores IDs currently in VIP
+let n_processed = 0;
+let isRunning = false;
+let isPaused = false;
+let animationSpeed = 1000; // ms
+
+// DOM Elements
+const elStatN = document.getElementById('stat-n');
+const elStatK = document.getElementById('stat-k');
+const elProbBar = document.getElementById('prob-bar');
+const elProbText = document.getElementById('prob-text');
+const elStream = document.getElementById('stream-panel');
+const elBufferGrid = document.getElementById('buffer-grid');
+const elVoid = document.getElementById('void-panel');
+const elRngValue = document.getElementById('rng-value');
+const elRngBox = document.getElementById('rng-box');
+
+// Buttons
+const btnPlay = document.getElementById('btn-play');
+const btnPause = document.getElementById('btn-pause');
+const btnStep = document.getElementById('btn-step');
+const btnReset = document.getElementById('btn-reset');
+const slider = document.getElementById('speed-slider');
+
+// --- INITIALIZATION ---
+
+function initGrid() {
+    elBufferGrid.innerHTML = '';
+    elStatK.textContent = K_SIZE;
+    for(let i=0; i<K_SIZE; i++) {
+        const slot = document.createElement('div');
+        slot.classList.add('slot');
+        slot.id = `slot-${i}`;
+        // Add a faint index identifier
+        const idx = document.createElement('span');
+        idx.innerText = i;
+        idx.style.position = 'absolute';
+        idx.style.bottom = '2px';
+        idx.style.right = '5px';
+        idx.style.fontSize = '10px';
+        idx.style.color = 'var(--dim-color)';
+        slot.appendChild(idx);
+        elBufferGrid.appendChild(slot);
+    }
+}
+
+// --- UTILS ---
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Coordinate calculation for FLIP/Travel animation
+function getPos(el) {
+    const rect = el.getBoundingClientRect();
+    return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+}
+
+// --- ENTITY CREATION ---
+
+function createEntity(id) {
+    const el = document.createElement('div');
+    el.classList.add('packet');
+    el.id = `packet-${id}`;
+    
+    // Aesthetic internals
+    const bg = document.createElement('div');
+    bg.classList.add('packet-bg', 'dither-pattern');
+    el.appendChild(bg);
+
+    const content = document.createElement('span');
+    content.classList.add('packet-content');
+    content.innerText = id;
+    el.appendChild(content);
+
+    // Initial position: Off screen top of Stream Panel
+    // We append to body to allow free absolute movement, but conceptually it starts in Stream
+    document.body.appendChild(el);
+    
+    // Set start pos relative to stream panel
+    const streamRect = elStream.getBoundingClientRect();
+    el.style.left = (streamRect.left + streamRect.width/2 - 30) + 'px';
+    el.style.top = (streamRect.top - 70) + 'px'; // Start above
+
+    return el;
+}
+
+// --- ANIMATION PRIMITIVE ---
+
+async function moveEntityTo(entity, targetEl, duration = 500) {
+    const targetRect = getPos(targetEl);
+    
+    // Center logic
+    const targetX = targetRect.x + (targetRect.width/2) - 30; // 30 is half entity width
+    const targetY = targetRect.y + (targetRect.height/2) - 30;
+
+    entity.style.transition = `transform ${duration}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
+    entity.style.transform = `translate(${targetX - parseFloat(entity.style.left)}px, ${targetY - parseFloat(entity.style.top)}px)`;
+
+    await sleep(duration);
+}
+
+// --- RNG ANIMATION ---
+
+async function runRngAnimation(max) {
+    elRngBox.style.borderColor = 'var(--fg-color)';
+    elRngValue.style.color = 'var(--fg-color)';
+    
+    // Rapid cycle
+    const cycles = 10;
+    const tick = Math.max(50, animationSpeed / 10);
+    
+    for(let i=0; i<cycles; i++) {
+        elRngValue.innerText = Math.floor(Math.random() * max) + 1;
+        await sleep(tick);
+    }
+    
+    const finalRoll = Math.floor(Math.random() * max) + 1;
+    elRngValue.innerText = finalRoll;
+    
+    // Flash effect based on result
+    if (finalRoll <= K_SIZE) {
+        elRngBox.style.background = 'var(--fg-color)';
+        elRngValue.style.color = 'black';
+        await sleep(200);
+        elRngBox.style.background = 'black';
+        elRngValue.style.color = 'var(--fg-color)';
+    } else {
+        elRngBox.style.borderColor = 'var(--dim-color)';
+        elRngValue.style.color = 'var(--dim-color)';
+    }
+
+    return finalRoll;
+}
+
+// --- CORE LOGIC STEP ---
+
+async function processNextStep() {
+    if (isPaused) return;
+
+    n_processed++;
+    updateStats();
+
+    // 1. SPAWN
+    const packet = createEntity(n_processed);
+    // Slide into Stream view
+    const streamRect = elStream.getBoundingClientRect();
+    const startY = streamRect.top + 50;
+    packet.style.transform = `translate(0, ${startY - (parseFloat(packet.style.top))}px)`;
+    await sleep(animationSpeed * 0.5);
+
+    // 2. MOVE TO GATE
+    await moveEntityTo(packet, elRngBox, animationSpeed);
+    
+    // 3. LOGIC
+    if (n_processed <= K_SIZE) {
+        // --- FILL PHASE ---
+        elRngValue.innerText = "FILL";
+        await sleep(animationSpeed * 0.2);
+        
+        const targetSlot = document.getElementById(`slot-${n_processed-1}`);
+        buffer.push({ id: n_processed, el: packet });
+        
+        await moveEntityTo(packet, targetSlot, animationSpeed);
+        
+        // Dock it visually (remove transform, append to slot for resize safety)
+        // For simplicity in this demo, we keep absolute but snap to exact coordinates
+        // To handle window resize properly, one would re-parent. 
+        // Here we just keep absolute for smooth transitions.
+
+    } else {
+        // --- RESERVOIR PHASE ---
+        const roll = await runRngAnimation(n_processed);
+        
+        if (roll <= K_SIZE) {
+            // ACCEPT & REPLACE
+            const slotIndex = roll - 1; // 0-based
+            const victim = buffer[slotIndex];
+            const targetSlot = document.getElementById(`slot-${slotIndex}`);
+
+            // Highlight Victim
+            targetSlot.classList.add('active-target');
+            await sleep(animationSpeed * 0.5);
+
+            // Eject Victim
+            victim.el.classList.add('voided');
+            victim.el.querySelector('.packet-bg').classList.remove('dither-pattern');
+            victim.el.querySelector('.packet-bg').classList.add('dither-sparse');
+            
+            // Random jitter for "corrupted" eject
+            moveEntityTo(victim, elVoid, animationSpeed); // Async start
+            
+            // Insert New
+            buffer[slotIndex] = { id: n_processed, el: packet };
+            await moveEntityTo(packet, targetSlot, animationSpeed);
+            
+            targetSlot.classList.remove('active-target');
+
+        } else {
+            // REJECT
+            packet.classList.add('voided');
+            packet.querySelector('.packet-bg').classList.remove('dither-pattern');
+            packet.querySelector('.packet-bg').classList.add('dither-sparse');
+            
+            await moveEntityTo(packet, elVoid, animationSpeed);
+        }
+    }
+
+    // Cleanup Void (Prevent DOM explosion)
+    const voided = document.querySelectorAll('.packet.voided');
+    if(voided.length > 20) {
+        voided[0].remove();
+    }
+}
+
+// --- STATS UPDATE ---
+
+function updateStats() {
+    elStatN.innerText = n_processed;
+    
+    // Probability of any specific item being in the buffer is k/n
+    const prob = n_processed === 0 ? 1 : Math.min(1, K_SIZE / n_processed);
+    
+    elProbText.innerText = prob.toFixed(4);
+    elProbBar.style.width = `${prob * 100}%`;
+}
+
+// --- CONTROL LOOP ---
+
+async function loop() {
+    while (isRunning) {
+        if (!isPaused) {
+            await processNextStep();
+        } else {
+            await sleep(100);
+        }
+    }
+}
+
+// --- EVENTS ---
+
+btnPlay.addEventListener('click', () => {
+    if(!isRunning) {
+        isRunning = true;
+        isPaused = false;
+        btnPlay.innerText = "RUNNING";
+        btnPlay.disabled = true;
+        btnPause.disabled = false;
+        btnStep.disabled = true;
+        loop();
+    }
+});
+
+btnPause.addEventListener('click', () => {
+    isPaused = !isPaused;
+    if(isPaused) {
+        btnPause.innerText = "RESUME";
+        btnPlay.innerText = "PAUSED";
+        btnStep.disabled = false;
+    } else {
+        btnPause.innerText = "PAUSE";
+        btnPlay.innerText = "RUNNING";
+        btnStep.disabled = true;
+    }
+});
+
+btnStep.addEventListener('click', async () => {
+    if(isPaused) {
+        btnStep.disabled = true;
+        await processNextStep();
+        btnStep.disabled = false;
+    }
+});
+
+btnReset.addEventListener('click', () => {
+    location.reload();
+});
+
+slider.addEventListener('input', (e) => {
+    // Inverse logic: Higher value on slider = Faster speed (Lower ms)
+    // Slider 100 (Fast) to 2000 (Slow)
+    animationSpeed = parseInt(e.target.value);
+});
+
+// Init
+initGrid();
+
+</script>
+</body>
+</html>

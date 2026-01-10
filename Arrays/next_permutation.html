@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DITHERPUNK // PERMUTATION</title>
+    <style>
+        /* 
+         * -----------------------------------------------------------
+         * 1. CORE AESTHETICS & FONTS
+         * -----------------------------------------------------------
+         */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --bg-color: #000000;
+            --term-green: #00FF41;
+            --term-dim: #003b0f;
+            --scan-line: rgba(0, 255, 65, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--term-green);
+            font-family: 'VT323', monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * 2. CRT / TERMINAL EFFECTS
+         * -----------------------------------------------------------
+         */
+        
+        /* The CRT Screen Container */
+        .crt-frame {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            border: 4px solid var(--term-green);
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px var(--term-green), inset 0 0 20px var(--term-dim);
+            background: radial-gradient(circle, #0a0a0a 0%, #000000 100%);
+        }
+
+        /* Scanlines Overlay */
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.4) 50%,
+                rgba(0,0,0,0.4)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+            animation: scanline-scroll 0.5s linear infinite; /* Subtle jitter */
+            opacity: 0.6;
+        }
+
+        /* Vignette */
+        .crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.4) 100%);
+            z-index: 10;
+        }
+
+        /* Text Glow */
+        h1, .log-text, .bar-val, .bar-idx {
+            text-shadow: 0 0 4px var(--term-green);
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * 3. VISUALIZATION COMPONENTS
+         * -----------------------------------------------------------
+         */
+
+        header {
+            border-bottom: 2px dashed var(--term-green);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            letter-spacing: 2px;
+        }
+
+        .chart-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px 0;
+            border: 1px solid var(--term-dim);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        /* The Bars */
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 8%;
+            height: 100%;
+            justify-content: flex-end;
+            transition: transform 0.3s ease;
+        }
+
+        .bar {
+            width: 100%;
+            border: 2px solid var(--term-green);
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        /* Bar Text */
+        .bar-val {
+            margin-bottom: 5px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .bar-idx {
+            margin-top: 5px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * 4. DITHER PATTERNS & STATES
+         * -----------------------------------------------------------
+         */
+
+        /* Neutral: Hollow */
+        .style-neutral {
+            background: transparent;
+        }
+
+        /* Active Scan: Inverted / Blinking */
+        .style-active {
+            background-color: var(--term-green);
+            animation: blink-invert 0.2s steps(2, start) infinite;
+        }
+        
+        .active-text {
+            color: #000;
+            background: var(--term-green);
+        }
+
+        /* Pivot: Solid Fill */
+        .style-pivot {
+            background-color: var(--term-green);
+            box-shadow: 0 0 10px var(--term-green);
+        }
+
+        /* Successor: Checkerboard Dither */
+        .style-successor {
+            background-image: 
+                linear-gradient(45deg, var(--term-green) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--term-green) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--term-green) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--term-green) 75%);
+            background-size: 8px 8px;
+            background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+            border-color: var(--term-green);
+        }
+
+        /* Tail: Diagonal Stripes */
+        .style-tail {
+            background: repeating-linear-gradient(
+                45deg,
+                var(--term-green),
+                var(--term-green) 2px,
+                #000 2px,
+                #000 6px
+            );
+        }
+
+        /* Completion Flash */
+        .flash-anim {
+            animation: full-flash 0.5s ease-out;
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * 5. UI CONTROLS & LOG
+         * -----------------------------------------------------------
+         */
+
+        .terminal-log {
+            height: 80px;
+            border-top: 2px solid var(--term-green);
+            padding: 10px;
+            font-size: 1.1rem;
+            overflow-y: auto;
+            background: rgba(0, 255, 65, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .log-entry::before {
+            content: "> ";
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--term-green);
+            color: var(--term-green);
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            padding: 5px 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px var(--term-dim);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:hover {
+            background: var(--term-green);
+            color: #000;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--term-dim);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-style: dotted;
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * 6. ANIMATIONS
+         * -----------------------------------------------------------
+         */
+
+        @keyframes blink-invert {
+            to {
+                background-color: transparent;
+                border-color: var(--term-green);
+            }
+        }
+
+        @keyframes full-flash {
+            0% { background-color: var(--term-green); }
+            100% { background-color: transparent; }
+        }
+
+        @keyframes scanline-scroll {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-frame">
+        <div class="crt-overlay"></div>
+        
+        <header>
+            <h1>Next_Permutation.exe</h1>
+            <div>SYS.STATUS: <span id="sys-status">ONLINE</span></div>
+        </header>
+
+        <div class="chart-container" id="chart">
+            <!-- Bars rendered via JS -->
+        </div>
+
+        <div class="terminal-log" id="log">
+            <!-- Logs go here -->
+        </div>
+
+        <div class="controls">
+            <button id="btn-step">Step >></button>
+            <button id="btn-auto">Auto-Run</button>
+            <button id="btn-reset">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        /* 
+         * -----------------------------------------------------------
+         * LOGIC & STATE MANAGEMENT
+         * -----------------------------------------------------------
+         */
+
+        // Configuration
+        const INITIAL_DATA = [1, 5, 8, 4, 7, 6, 5, 3, 1];
+        const ANIMATION_DELAY = 800; // ms for auto-play
+
+        // State Enums
+        const STAGES = {
+            INIT: 0,
+            FIND_PIVOT: 1,
+            FIND_SUCCESSOR: 2,
+            SWAP: 3,
+            REVERSE_TAIL: 4,
+            COMPLETION: 5,
+            FINISHED: 6
+        };
+
+        // App State
+        let state = {
+            arr: [...INITIAL_DATA],
+            stage: STAGES.INIT,
+            i: INITIAL_DATA.length - 2, // Pointer for pivot search
+            j: INITIAL_DATA.length - 1, // Pointer for successor search
+            pivotIdx: -1,
+            successorIdx: -1,
+            activeIndices: [], // For scanning effect
+            tailIndices: [],   // For final visualization
+            autoPlaying: false,
+            timer: null
+        };
+
+        // DOM Elements
+        const elChart = document.getElementById('chart');
+        const elLog = document.getElementById('log');
+        const btnStep = document.getElementById('btn-step');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
+        const elStatus = document.getElementById('sys-status');
+
+        /* 
+         * -----------------------------------------------------------
+         * RENDERING ENGINE
+         * -----------------------------------------------------------
+         */
+
+        function render() {
+            elChart.innerHTML = '';
+            
+            // Find max for scaling
+            const maxVal = Math.max(...state.arr);
+
+            state.arr.forEach((val, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'bar-wrapper';
+
+                const valDisplay = document.createElement('div');
+                valDisplay.className = 'bar-val';
+                valDisplay.innerText = val;
+
+                const bar = document.createElement('div');
+                bar.className = 'bar style-neutral';
+                bar.style.height = `${(val / maxVal) * 60}%`;
+
+                const idxDisplay = document.createElement('div');
+                idxDisplay.className = 'bar-idx';
+                idxDisplay.innerText = `[${idx}]`;
+
+                // Apply styles based on state
+                // 1. Pivot
+                if (idx === state.pivotIdx) {
+                    bar.classList.add('style-pivot');
+                }
+                
+                // 2. Successor
+                if (idx === state.successorIdx) {
+                    bar.classList.add('style-successor');
+                }
+
+                // 3. Tail (Reversed section)
+                if (state.stage === STAGES.REVERSE_TAIL || state.stage === STAGES.COMPLETION) {
+                     if (state.pivotIdx !== -1 && idx > state.pivotIdx) {
+                        bar.classList.add('style-tail');
+                     }
+                }
+
+                // 4. Active Scan (overrides others if active)
+                if (state.activeIndices.includes(idx)) {
+                    bar.classList.add('style-active');
+                    valDisplay.classList.add('active-text');
+                }
+
+                // 5. Completion Flash
+                if (state.stage === STAGES.COMPLETION) {
+                    bar.classList.add('flash-anim');
+                }
+
+                wrapper.appendChild(valDisplay);
+                wrapper.appendChild(bar);
+                wrapper.appendChild(idxDisplay);
+                elChart.appendChild(wrapper);
+            });
+
+            // Button States
+            btnStep.disabled = state.stage === STAGES.FINISHED || state.autoPlaying;
+            btnAuto.disabled = state.stage === STAGES.FINISHED || state.autoPlaying;
+        }
+
+        function log(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            elLog.appendChild(entry);
+            elLog.scrollTop = elLog.scrollHeight;
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * ALGORITHM FINITE STATE MACHINE
+         * -----------------------------------------------------------
+         */
+
+        function nextStep() {
+            switch (state.stage) {
+                
+                // STAGE 0: INITIALIZATION
+                case STAGES.INIT:
+                    log("INITIALIZED. GOAL: FIND NEXT LEXICOGRAPHICAL PERMUTATION.");
+                    state.stage = STAGES.FIND_PIVOT;
+                    state.i = state.arr.length - 2;
+                    break;
+
+                // STAGE 1: FIND PIVOT (Right to Left)
+                case STAGES.FIND_PIVOT:
+                    // Clear previous highlights
+                    state.activeIndices = [state.i, state.i + 1];
+                    
+                    if (state.i < 0) {
+                        log("NO PIVOT FOUND. ARRAY IS DESCENDING. REVERSING WHOLE ARRAY.");
+                        state.pivotIdx = -1; // Special case for last permutation
+                        state.stage = STAGES.REVERSE_TAIL;
+                        state.activeIndices = [];
+                        break;
+                    }
+
+                    log(`SCANNING: Is arr[${state.i}] (${state.arr[state.i]}) < arr[${state.i+1}] (${state.arr[state.i+1]})?`);
+
+                    if (state.arr[state.i] < state.arr[state.i + 1]) {
+                        state.pivotIdx = state.i;
+                        log(`PIVOT DETECTED AT INDEX [${state.pivotIdx}]. VALUE: ${state.arr[state.pivotIdx]}.`);
+                        state.activeIndices = [];
+                        state.stage = STAGES.FIND_SUCCESSOR;
+                        state.j = state.arr.length - 1;
+                    } else {
+                        state.i--;
+                    }
+                    break;
+
+                // STAGE 2: FIND SUCCESSOR (Right to Left)
+                case STAGES.FIND_SUCCESSOR:
+                    state.activeIndices = [state.j];
+                    log(`SEARCHING SUCCESSOR: Is arr[${state.j}] (${state.arr[state.j]}) > Pivot (${state.arr[state.pivotIdx]})?`);
+
+                    if (state.arr[state.j] > state.arr[state.pivotIdx]) {
+                        state.successorIdx = state.j;
+                        log(`SUCCESSOR FOUND AT INDEX [${state.successorIdx}]. VALUE: ${state.arr[state.successorIdx]}.`);
+                        state.activeIndices = [];
+                        state.stage = STAGES.SWAP;
+                    } else {
+                        state.j--;
+                    }
+                    break;
+
+                // STAGE 3: SWAP
+                case STAGES.SWAP:
+                    log(`SWAPPING PIVOT (${state.arr[state.pivotIdx]}) AND SUCCESSOR (${state.arr[state.successorIdx]}).`);
+                    
+                    // Logic Swap
+                    let temp = state.arr[state.pivotIdx];
+                    state.arr[state.pivotIdx] = state.arr[state.successorIdx];
+                    state.arr[state.successorIdx] = temp;
+
+                    // Visual Swap update happens in render
+                    state.stage = STAGES.REVERSE_TAIL;
+                    break;
+
+                // STAGE 4: REVERSE TAIL
+                case STAGES.REVERSE_TAIL:
+                    let start = state.pivotIdx + 1;
+                    let end = state.arr.length - 1;
+                    
+                    log(`REVERSING SUFFIX FROM INDEX ${start} TO END.`);
+                    
+                    // Logic Reverse
+                    while (start < end) {
+                        let t = state.arr[start];
+                        state.arr[start] = state.arr[end];
+                        state.arr[end] = t;
+                        start++;
+                        end--;
+                    }
+
+                    state.stage = STAGES.COMPLETION;
+                    break;
+
+                // STAGE 5: COMPLETION
+                case STAGES.COMPLETION:
+                    log("SEQUENCE COMPLETE. NEXT PERMUTATION GENERATED.");
+                    state.pivotIdx = -1;
+                    state.successorIdx = -1;
+                    state.activeIndices = [];
+                    state.stage = STAGES.FINISHED;
+                    elStatus.innerText = "IDLE";
+                    if (state.autoPlaying) stopAutoPlay();
+                    break;
+            }
+            
+            render();
+        }
+
+        /* 
+         * -----------------------------------------------------------
+         * CONTROL LOGIC
+         * -----------------------------------------------------------
+         */
+
+        function reset() {
+            stopAutoPlay();
+            state = {
+                arr: [...INITIAL_DATA],
+                stage: STAGES.INIT,
+                i: INITIAL_DATA.length - 2,
+                j: INITIAL_DATA.length - 1,
+                pivotIdx: -1,
+                successorIdx: -1,
+                activeIndices: [],
+                tailIndices: [],
+                autoPlaying: false,
+                timer: null
+            };
+            elLog.innerHTML = '';
+            elStatus.innerText = "ONLINE";
+            log("SYSTEM RESET.");
+            render();
+            // Trigger first render of Init state
+            nextStep(); 
+        }
+
+        function startAutoPlay() {
+            if (state.stage === STAGES.FINISHED) return;
+            state.autoPlaying = true;
+            elStatus.innerText = "EXECUTING...";
+            btnAuto.innerText = "RUNNING...";
+            render(); // update buttons
+
+            state.timer = setInterval(() => {
+                if (state.stage === STAGES.FINISHED) {
+                    stopAutoPlay();
+                } else {
+                    nextStep();
+                }
+            }, ANIMATION_DELAY);
+        }
+
+        function stopAutoPlay() {
+            state.autoPlaying = false;
+            clearInterval(state.timer);
+            btnAuto.innerText = "Auto-Run";
+            render();
+        }
+
+        // Event Listeners
+        btnStep.addEventListener('click', nextStep);
+        
+        btnAuto.addEventListener('click', () => {
+            if (state.autoPlaying) stopAutoPlay();
+            else startAutoPlay();
+        });
+
+        btnReset.addEventListener('click', reset);
+
+        // Boot
+        reset();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALGO_VIS // STOCK_DP_V2</title>
+    <style>
+        /* --- IMPORTS & VARS --- */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --bg-color: #000000;
+            --term-green: #00FF00;
+            --term-dim: #003300;
+            --term-dark: #001100;
+            --scan-line: rgba(18, 16, 16, 0.5);
+            --crt-flicker: 0.02;
+        }
+
+        /* --- GLOBAL LAYOUT --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--term-green);
+            font-family: 'VT323', monospace;
+            overflow: hidden; /* No scrollbar, full app experience */
+        }
+
+        #terminal-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* --- CRT EFFECTS --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 100;
+            background: 
+                /* Scanlines */
+                linear-gradient(
+                    rgba(18, 16, 16, 0) 50%, 
+                    rgba(0, 0, 0, 0.25) 50%
+                ),
+                /* Vignette */
+                radial-gradient(
+                    circle at center, 
+                    transparent 60%, 
+                    black 100%
+                );
+            background-size: 100% 4px, 100% 100%;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        /* Subtle flicker animation */
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.95; }
+            20% { opacity: 0.98; }
+            50% { opacity: 0.95; }
+            80% { opacity: 0.9; }
+            100% { opacity: 0.97; }
+        }
+
+        #terminal-container {
+            animation: flicker 0.15s infinite;
+        }
+
+        /* --- UI ELEMENTS --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--term-green);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 5px var(--term-green);
+            text-transform: uppercase;
+            font-size: 1.2rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            margin-top: 5px;
+        }
+
+        #system-log {
+            color: var(--term-green);
+            background: var(--term-dark);
+            padding: 5px;
+            font-size: 1.2rem;
+            min-height: 1.5em;
+            margin-bottom: 5px;
+            border-left: 4px solid var(--term-green);
+            padding-left: 10px;
+        }
+
+        /* --- CANVAS PANELS --- */
+        .panel {
+            flex-grow: 1;
+            margin-bottom: 15px;
+            border: 1px solid var(--term-dim);
+            position: relative;
+            background: var(--term-dark);
+            box-shadow: 0 0 10px var(--term-dim);
+        }
+
+        .panel-label {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: var(--bg-color);
+            padding: 2px 5px;
+            font-size: 1rem;
+            border: 1px solid var(--term-dim);
+            opacity: 0.8;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- UTILS --- */
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- CRT Visual Overlay -->
+    <div class="crt-overlay"></div>
+
+    <div id="terminal-container">
+        <header>
+            <span>PROTOCOL: MAX_PROFIT_2_TRANS</span>
+            <span>OS: DITHER_OS v1.0</span>
+            <span id="clock">00:00:00</span>
+        </header>
+
+        <div id="system-log">SYSTEM_LOG: INITIALIZING...</div>
+
+        <!-- PANEL A: Market Context -->
+        <div class="panel" id="panel-a">
+            <div class="panel-label">A: MARKET_DATA_STREAM // PRICE[t]</div>
+            <canvas id="canvasA"></canvas>
+        </div>
+
+        <!-- PANEL B: Bi-Directional Sweep -->
+        <div class="panel" id="panel-b">
+            <div class="panel-label">B: DUAL_SWEEP_ANALYSIS // L_OPT vs R_OPT</div>
+            <canvas id="canvasB"></canvas>
+        </div>
+
+        <!-- PANEL C: Global Optimization -->
+        <div class="panel" id="panel-c">
+            <div class="panel-label">C: TOTAL_YIELD_SYNTHESIS // MAX(L+R)</div>
+            <canvas id="canvasC"></canvas>
+        </div>
+
+        <div class="status-bar">
+            <span id="readout-left">LEFT: $00</span>
+            <span id="readout-right">RIGHT: $00</span>
+            <span id="readout-total" style="font-weight:bold; text-shadow: 0 0 8px var(--term-green);">TOTAL: $00</span>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ------------------------------------------------------------------
+         * CONFIGURATION & STATE
+         * ------------------------------------------------------------------
+         */
+        const COLORS = {
+            bright: '#00FF00',
+            dim: '#004400',
+            dark: '#002200',
+            bg: '#000000',
+            alert: '#AAFF00' // slightly yellower green for highlights
+        };
+
+        // Input Data (Volatile to show good peaks)
+        const prices = [10, 22, 5, 75, 65, 80, 2, 12, 5, 20, 100, 80, 40, 60, 10, 50, 90, 85, 105, 10, 30];
+        const n = prices.length;
+
+        // DP Arrays
+        let leftProfit = new Array(n).fill(0);
+        let rightProfit = new Array(n).fill(0);
+        let totalProfit = new Array(n).fill(0);
+
+        // Precompute DP Logic
+        function calculateDP() {
+            // Forward Pass
+            let minPrice = prices[0];
+            for (let i = 1; i < n; i++) {
+                minPrice = Math.min(minPrice, prices[i]);
+                leftProfit[i] = Math.max(leftProfit[i - 1], prices[i] - minPrice);
+            }
+
+            // Backward Pass
+            let maxPrice = prices[n - 1];
+            for (let i = n - 2; i >= 0; i--) {
+                maxPrice = Math.max(maxPrice, prices[i]);
+                rightProfit[i] = Math.max(rightProfit[i + 1], maxPrice - prices[i]);
+            }
+
+            // Total
+            let maxTotal = 0;
+            let maxIndex = 0;
+            for (let i = 0; i < n; i++) {
+                totalProfit[i] = leftProfit[i] + rightProfit[i];
+                if (totalProfit[i] > maxTotal) {
+                    maxTotal = totalProfit[i];
+                    maxIndex = i;
+                }
+            }
+            return { maxTotal, maxIndex };
+        }
+
+        const globalOptimum = calculateDP();
+
+        // Animation State
+        const STATE = {
+            PHASE: 0, // 0: Wait, 1: Fwd, 2: Bwd, 3: Sweep, 4: Interactive
+            SCANNER_INDEX: 0,
+            FWD_PROGRESS: 0,
+            BWD_PROGRESS: n - 1,
+            SWEEP_PROGRESS: 0,
+            GLOBAL_MAX_IDX: globalOptimum.maxIndex,
+            HOVER_IDX: -1
+        };
+
+        // Canvas Setup
+        const cvsA = document.getElementById('canvasA');
+        const ctxA = cvsA.getContext('2d');
+        const cvsB = document.getElementById('canvasB');
+        const ctxB = cvsB.getContext('2d');
+        const cvsC = document.getElementById('canvasC');
+        const ctxC = cvsC.getContext('2d');
+
+        // DOM Elements
+        const elLog = document.getElementById('system-log');
+        const elLeft = document.getElementById('readout-left');
+        const elRight = document.getElementById('readout-right');
+        const elTotal = document.getElementById('readout-total');
+
+        /**
+         * ------------------------------------------------------------------
+         * GRAPHICS HELPERS
+         * ------------------------------------------------------------------
+         */
+
+        // Handle Resizing
+        function resizeCanvas(canvas) {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height - 25; // subtract label space
+        }
+
+        function resizeAll() {
+            resizeCanvas(cvsA);
+            resizeCanvas(cvsB);
+            resizeCanvas(cvsC);
+        }
+        window.addEventListener('resize', resizeAll);
+        resizeAll();
+
+        // Create a programmatic dither pattern (Crosshatch)
+        function createHatchPattern(ctx) {
+            const patternCanvas = document.createElement('canvas');
+            patternCanvas.width = 4;
+            patternCanvas.height = 4;
+            const pCtx = patternCanvas.getContext('2d');
+            pCtx.fillStyle = COLORS.dim;
+            pCtx.fillRect(0,0,4,4);
+            pCtx.fillStyle = COLORS.bright;
+            // Draw diagonal pixel
+            pCtx.fillRect(0, 0, 1, 1);
+            pCtx.fillRect(2, 2, 1, 1);
+            return ctx.createPattern(patternCanvas, 'repeat');
+        }
+
+        // Coordinate Mapping
+        function getX(index, width) {
+            return (index / (n - 1)) * (width - 40) + 20; // 20px padding
+        }
+
+        function getY(value, height, maxVal) {
+            const norm = value / (maxVal * 1.1); // Add 10% headroom
+            return height - (norm * (height - 20)) - 10;
+        }
+
+        // Helper to find actual Buy/Sell pairs for a given split point 'k'
+        function getTradeDetails(k) {
+            // Trade 1: 0 to k
+            let t1_buy = -1, t1_sell = -1, t1_prof = 0;
+            let minP = prices[0], minIdx = 0;
+            // Re-simulate to find indices
+            let dp = new Array(k+1).fill(0);
+            
+            // Simple approach: Iterate 0 to k to find the pair that generated LeftProfit[k]
+            // Note: LeftProfit[k] is max profit ending BY k.
+            // We want the specific transaction. 
+            // Since we know the profit value, we can find the pair (s, b) where prices[s] - prices[b] == leftProfit[k]
+            // and s <= k.
+            
+            // Recalculate precisely for rendering highlights
+            let curMin = prices[0], curMinIdx = 0;
+            let bestProf = 0;
+            for(let i=0; i<=k; i++) {
+                if(prices[i] < curMin) { curMin = prices[i]; curMinIdx = i; }
+                if(prices[i] - curMin > bestProf) {
+                    bestProf = prices[i] - curMin;
+                    t1_buy = curMinIdx;
+                    t1_sell = i;
+                }
+            }
+            if(t1_buy === -1 && k > 0) { t1_buy=0; t1_sell=0; } // No profit case
+
+            // Trade 2: k to n-1
+            let t2_buy = -1, t2_sell = -1;
+            let bestProf2 = 0;
+            let curMax = prices[n-1], curMaxIdx = n-1;
+            
+            for(let i=n-1; i>=k; i--) {
+                if(prices[i] > curMax) { curMax = prices[i]; curMaxIdx = i; }
+                if(curMax - prices[i] >= bestProf2) { // >= favors earlier trades if equal
+                     // Logic check: rightProfit array is built backwards.
+                     // Simply find pair in range [k, n-1] matching rightProfit[k]
+                }
+            }
+            
+            // Forward scan on suffix to find indices
+            let minSuffix = prices[k], minSuffixIdx = k;
+            for(let i=k; i<n; i++) {
+                if(prices[i] < minSuffix) { minSuffix = prices[i]; minSuffixIdx = i; }
+                if(prices[i] - minSuffix >= rightProfit[k]) {
+                     // This is a candidate, but we want the one that MATCHES rightProfit[k]
+                     if (prices[i] - minSuffix === rightProfit[k]) {
+                         t2_buy = minSuffixIdx;
+                         t2_sell = i;
+                         // Don't break, allow finding other pairs? No, first valid is fine.
+                         break;
+                     }
+                }
+            }
+            if (rightProfit[k] === 0) { t2_buy = k; t2_sell = k; }
+
+            return { t1_buy, t1_sell, t2_buy, t2_sell };
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * DRAWING FUNCTIONS
+         * ------------------------------------------------------------------
+         */
+
+        function drawGrid(ctx, w, h) {
+            ctx.strokeStyle = COLORS.dim;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 4]);
+            
+            // Horizontal lines
+            for(let i=1; i<5; i++) {
+                let y = (h / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+        }
+
+        function drawPanelA(scannerIdx) {
+            const w = cvsA.width;
+            const h = cvsA.height;
+            const maxVal = Math.max(...prices);
+            
+            ctxA.clearRect(0, 0, w, h);
+            drawGrid(ctxA, w, h);
+
+            // Draw Past (Solid)
+            ctxA.beginPath();
+            ctxA.strokeStyle = COLORS.bright;
+            ctxA.lineWidth = 2;
+            ctxA.moveTo(getX(0, w), getY(prices[0], h, maxVal));
+            
+            for (let i = 0; i <= scannerIdx; i++) {
+                ctxA.lineTo(getX(i, w), getY(prices[i], h, maxVal));
+            }
+            ctxA.stroke();
+
+            // Fill Past area
+            ctxA.lineTo(getX(scannerIdx, w), h);
+            ctxA.lineTo(getX(0, w), h);
+            ctxA.fillStyle = 'rgba(0, 255, 0, 0.1)';
+            ctxA.fill();
+
+            // Draw Future (Dithered/Hatched)
+            if (scannerIdx < n - 1) {
+                ctxA.beginPath();
+                ctxA.strokeStyle = COLORS.dim; // Dimmer line for future
+                ctxA.setLineDash([2, 2]); // Pixelated dash
+                ctxA.moveTo(getX(scannerIdx, w), getY(prices[scannerIdx], h, maxVal));
+                
+                for (let i = scannerIdx + 1; i < n; i++) {
+                    ctxA.lineTo(getX(i, w), getY(prices[i], h, maxVal));
+                }
+                ctxA.stroke();
+                ctxA.setLineDash([]);
+
+                // Pattern Fill Future
+                ctxA.lineTo(getX(n-1, w), h);
+                ctxA.lineTo(getX(scannerIdx, w), h);
+                ctxA.fillStyle = createHatchPattern(ctxA);
+                ctxA.fill();
+            }
+
+            // Draw Scanner Line
+            const scanX = getX(scannerIdx, w);
+            ctxA.beginPath();
+            ctxA.strokeStyle = COLORS.bright;
+            ctxA.lineWidth = 1;
+            ctxA.setLineDash([4, 4]);
+            ctxA.moveTo(scanX, 0);
+            ctxA.lineTo(scanX, h);
+            ctxA.stroke();
+            ctxA.setLineDash([]);
+
+            // Draw Highlight Dots for Buy/Sell if in Phase 4
+            if (STATE.PHASE === 4) {
+                const trades = getTradeDetails(scannerIdx);
+                
+                const drawDot = (idx, type) => {
+                    const xx = getX(idx, w);
+                    const yy = getY(prices[idx], h, maxVal);
+                    ctxA.fillStyle = type === 'buy' ? '#000' : COLORS.alert;
+                    ctxA.strokeStyle = COLORS.alert;
+                    ctxA.beginPath();
+                    ctxA.arc(xx, yy, 4, 0, Math.PI*2);
+                    ctxA.fill();
+                    ctxA.stroke();
+                    
+                    // Label
+                    ctxA.fillStyle = COLORS.alert;
+                    ctxA.font = '12px VT323';
+                    ctxA.fillText(type.toUpperCase(), xx - 10, yy - 10);
+                };
+
+                // Only show if profit > 0
+                if (prices[trades.t1_sell] > prices[trades.t1_buy]) {
+                    drawDot(trades.t1_buy, 'buy');
+                    drawDot(trades.t1_sell, 'sell');
+                }
+                
+                // Draw connecting arc for trade 1
+                // ... (simplified to just dots for clarity)
+
+                if (prices[trades.t2_sell] > prices[trades.t2_buy]) {
+                    drawDot(trades.t2_buy, 'buy');
+                    drawDot(trades.t2_sell, 'sell');
+                }
+            }
+        }
+
+        function drawPanelB(scannerIdx, drawMaxL, drawMaxR) {
+            const w = cvsB.width;
+            const h = cvsB.height;
+            const maxVal = Math.max(...totalProfit); // Normalize against total potential
+            
+            ctxB.clearRect(0, 0, w, h);
+            drawGrid(ctxB, w, h);
+
+            // Curve 1: Forward DP (Left Profit)
+            if (drawMaxL > -1) {
+                ctxB.beginPath();
+                ctxB.strokeStyle = COLORS.bright;
+                ctxB.lineWidth = 2;
+                ctxB.moveTo(getX(0, w), getY(leftProfit[0], h, maxVal));
+                let limit = Math.min(drawMaxL, n-1);
+                for(let i=0; i<= limit; i++) {
+                    ctxB.lineTo(getX(i, w), getY(leftProfit[i], h, maxVal));
+                }
+                ctxB.stroke();
+            }
+
+            // Curve 2: Backward DP (Right Profit)
+            if (drawMaxR < n) {
+                ctxB.beginPath();
+                ctxB.strokeStyle = COLORS.dim; // Darker for backward
+                ctxB.lineWidth = 2;
+                // ctxB.setLineDash([2, 2]);
+                ctxB.moveTo(getX(n-1, w), getY(rightProfit[n-1], h, maxVal));
+                let limit = Math.max(drawMaxR, 0);
+                for(let i=n-2; i>= limit; i--) {
+                    ctxB.lineTo(getX(i, w), getY(rightProfit[i], h, maxVal));
+                }
+                ctxB.stroke();
+                ctxB.setLineDash([]);
+            }
+
+            // Markers at Scanner
+            if (STATE.PHASE >= 3) {
+                const x = getX(scannerIdx, w);
+                // Left Val
+                let yL = getY(leftProfit[scannerIdx], h, maxVal);
+                ctxB.fillStyle = COLORS.bright;
+                ctxB.fillRect(x - 3, yL - 3, 6, 6);
+
+                // Right Val
+                let yR = getY(rightProfit[scannerIdx], h, maxVal);
+                ctxB.fillStyle = COLORS.dim;
+                ctxB.fillRect(x - 3, yR - 3, 6, 6);
+                
+                // Scanner Line
+                ctxB.beginPath();
+                ctxB.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+                ctxB.moveTo(x, 0);
+                ctxB.lineTo(x, h);
+                ctxB.stroke();
+            }
+        }
+
+        function drawPanelC(scannerIdx, drawLimit) {
+            const w = cvsC.width;
+            const h = cvsC.height;
+            const maxVal = globalOptimum.maxTotal;
+
+            ctxC.clearRect(0, 0, w, h);
+            drawGrid(ctxC, w, h);
+
+            if (drawLimit > -1) {
+                ctxC.beginPath();
+                ctxC.strokeStyle = COLORS.alert;
+                ctxC.lineWidth = 3;
+                ctxC.shadowBlur = 10;
+                ctxC.shadowColor = COLORS.bright;
+                
+                ctxC.moveTo(getX(0, w), getY(totalProfit[0], h, maxVal));
+                for(let i=0; i<= Math.min(drawLimit, n-1); i++) {
+                    ctxC.lineTo(getX(i, w), getY(totalProfit[i], h, maxVal));
+                }
+                ctxC.stroke();
+                ctxC.shadowBlur = 0;
+            }
+
+            // Global Max Target (Only in Phase 4 or end of 3)
+            if (STATE.PHASE === 4 || (STATE.PHASE === 3 && scannerIdx === n-1)) {
+                const bestX = getX(globalOptimum.maxIndex, w);
+                const bestY = getY(globalOptimum.maxTotal, h, maxVal);
+
+                // Draw Target Reticle
+                ctxC.strokeStyle = COLORS.bright;
+                ctxC.lineWidth = 1;
+                ctxC.beginPath();
+                ctxC.arc(bestX, bestY, 10, 0, Math.PI*2); // Outer ring
+                ctxC.moveTo(bestX - 15, bestY);
+                ctxC.lineTo(bestX + 15, bestY);
+                ctxC.moveTo(bestX, bestY - 15);
+                ctxC.lineTo(bestX, bestY + 15);
+                ctxC.stroke();
+
+                // "TARGET ACQUIRED" text
+                ctxC.fillStyle = COLORS.bright;
+                ctxC.font = '14px VT323';
+                ctxC.fillText("OPT_MAX", bestX + 12, bestY - 12);
+            }
+            
+            // Current Scanner position on Total Curve
+            if (STATE.PHASE >= 3) {
+                const curX = getX(scannerIdx, w);
+                const curY = getY(totalProfit[scannerIdx], h, maxVal);
+                ctxC.fillStyle = COLORS.alert;
+                ctxC.fillRect(curX-2, curY-2, 4, 4);
+                
+                // Vertical scanner line
+                ctxC.beginPath();
+                ctxC.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+                ctxC.moveTo(curX, 0);
+                ctxC.lineTo(curX, h);
+                ctxC.stroke();
+            }
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * ANIMATION LOOP
+         * ------------------------------------------------------------------
+         */
+
+        let lastTime = 0;
+        const SPEED_DRAW = 30; // ms per frame roughly
+
+        function updateUI(idx) {
+            elLeft.innerText = `LEFT_OPT: $${leftProfit[idx]}`;
+            elRight.innerText = `RIGHT_OPT: $${rightProfit[idx]}`;
+            elTotal.innerText = `SUM_YIELD: $${totalProfit[idx]}`;
+            
+            // update clock
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString();
+        }
+
+        function animate(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const delta = timestamp - lastTime;
+
+            if (delta > SPEED_DRAW) {
+                lastTime = timestamp;
+
+                switch (STATE.PHASE) {
+                    case 0: // Init
+                        STATE.PHASE = 1;
+                        elLog.innerText = "SYSTEM_LOG: ANALYZING_PREFIX_OPTIMUM (DP_LEFT)...";
+                        break;
+
+                    case 1: // Forward Draw
+                        if (STATE.FWD_PROGRESS < n) {
+                            STATE.FWD_PROGRESS++;
+                            drawPanelA(STATE.FWD_PROGRESS); // Just show price
+                            drawPanelB(STATE.FWD_PROGRESS, STATE.FWD_PROGRESS, n); // Draw Left curve
+                        } else {
+                            STATE.PHASE = 2;
+                            elLog.innerText = "SYSTEM_LOG: ANALYZING_SUFFIX_OPTIMUM (DP_RIGHT)...";
+                        }
+                        break;
+
+                    case 2: // Backward Draw
+                        if (STATE.BWD_PROGRESS >= 0) {
+                            STATE.BWD_PROGRESS--;
+                            drawPanelA(n-1);
+                            drawPanelB(n, n, STATE.BWD_PROGRESS); // Keep Left curve, draw Right
+                        } else {
+                            STATE.PHASE = 3;
+                            elLog.innerText = "SYSTEM_LOG: AGGREGATING POTENTIAL YIELD...";
+                            STATE.SWEEP_PROGRESS = 0;
+                        }
+                        break;
+
+                    case 3: // Sweep Total
+                        if (STATE.SWEEP_PROGRESS < n) {
+                            let i = STATE.SWEEP_PROGRESS;
+                            drawPanelA(i);
+                            drawPanelB(i, n, 0);
+                            drawPanelC(i, i);
+                            updateUI(i);
+                            STATE.SWEEP_PROGRESS++;
+                        } else {
+                            STATE.PHASE = 4;
+                            elLog.innerText = "SYSTEM_LOG: SCAN_COMPLETE. TARGET_LOCKED. [INTERACTIVE_MODE_ACTIVE]";
+                            elLog.classList.add('blink');
+                            
+                            // Snap to Optimum
+                            STATE.SCANNER_INDEX = globalOptimum.maxIndex;
+                            updateUI(STATE.SCANNER_INDEX);
+                            drawPanelA(STATE.SCANNER_INDEX);
+                            drawPanelB(STATE.SCANNER_INDEX, n, 0);
+                            drawPanelC(STATE.SCANNER_INDEX, n);
+                        }
+                        break;
+
+                    case 4: // Interactive
+                        // Handled by mouse events, but we keep loop running for CRT flicker/clock
+                        updateUI(STATE.SCANNER_INDEX);
+                        // Redraw to ensure CRT flicker effect stays consistent or any subtle idle anims
+                        break;
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * INTERACTION
+         * ------------------------------------------------------------------
+         */
+        const container = document.getElementById('terminal-container');
+        
+        container.addEventListener('mousemove', (e) => {
+            if (STATE.PHASE !== 4) return;
+
+            // Map mouse X to index
+            const rect = cvsA.getBoundingClientRect(); // Use canvas A for reference
+            const x = e.clientX - rect.left;
+            const w = rect.width - 40; // account for padding
+            
+            let idx = Math.floor(((x - 20) / w) * (n - 1));
+            
+            // Clamp
+            if (idx < 0) idx = 0;
+            if (idx >= n) idx = n - 1;
+
+            if (idx !== STATE.SCANNER_INDEX) {
+                STATE.SCANNER_INDEX = idx;
+                
+                // Redraw all
+                drawPanelA(idx);
+                drawPanelB(idx, n, 0);
+                drawPanelC(idx, n);
+            }
+        });
+
+        // Start
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>

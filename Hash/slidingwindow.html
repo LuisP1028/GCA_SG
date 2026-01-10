@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protocol: SLIDING_WINDOW [MIN_SUBSTRING]</title>
+    
+    <!-- Retro Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #050505;
+            --green: #33FF00;
+            --red: #FF0033;
+            --gold: #FFCC00;
+            --dim-green: rgba(51, 255, 0, 0.2);
+            --dim-gold: rgba(255, 204, 0, 0.3);
+            --scanline-color: rgba(18, 16, 16, 0.5);
+            --font-main: 'VT323', monospace;
+            --cell-size: 50px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--green);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: auto 1fr auto auto;
+            text-transform: uppercase;
+            font-size: 1.2rem;
+            cursor: crosshair;
+        }
+
+        /* --- CRT EFFECT LAYERS --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+        
+        .crt-flicker {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 998;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.02; }
+            50% { opacity: 0.05; }
+            100% { opacity: 0.02; }
+        }
+
+        /* --- UTILS --- */
+        .glow-text { text-shadow: 0 0 5px var(--green); }
+        .glow-red { text-shadow: 0 0 5px var(--red); color: var(--red); }
+        .glow-gold { text-shadow: 0 0 5px var(--gold); color: var(--gold); }
+        
+        .dither-bg-green {
+            background-image: radial-gradient(var(--green) 20%, transparent 20%);
+            background-size: 4px 4px;
+        }
+        .dither-bg-gold {
+            background-image: radial-gradient(var(--gold) 20%, transparent 20%);
+            background-size: 4px 4px;
+        }
+
+        /* --- LAYOUT --- */
+        header {
+            padding: 20px;
+            border-bottom: 2px solid var(--green);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .target-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .char-box {
+            width: 40px; height: 40px;
+            border: 2px solid var(--green);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            position: relative;
+        }
+        .char-box.missing { border-color: var(--red); box-shadow: 0 0 5px var(--red); }
+        .char-box.found { background: var(--dim-green); box-shadow: 0 0 5px var(--green); }
+        .char-box.found::after {
+            content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+            background-image: radial-gradient(var(--green) 20%, transparent 20%);
+            background-size: 3px 3px;
+            opacity: 0.5;
+        }
+
+        /* --- TAPE SECTION --- */
+        .tape-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            padding: 60px 20px;
+            border-bottom: 2px solid var(--green);
+            background: #000;
+        }
+        
+        /* Hide scrollbar */
+        .tape-container::-webkit-scrollbar { height: 8px; background: #000; }
+        .tape-container::-webkit-scrollbar-thumb { background: var(--green); }
+
+        .tape-wrapper {
+            display: flex;
+            position: relative;
+            margin: 0 auto; /* Center initially */
+        }
+
+        .tape-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+            position: relative;
+            background: #000;
+            z-index: 2;
+        }
+
+        .tape-cell.active-green { border: 2px solid var(--green); box-shadow: inset 0 0 10px var(--dim-green); }
+        .tape-cell.active-gold { border: 2px solid var(--gold); }
+
+        /* Pointers */
+        .pointer {
+            position: absolute;
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            z-index: 10;
+            transition: left 0.2s cubic-bezier(0, 1, 0.5, 1);
+        }
+        .pointer-left {
+            border-bottom: 15px solid var(--red);
+            bottom: -25px;
+            filter: drop-shadow(0 0 5px var(--red));
+        }
+        .pointer-right {
+            border-bottom: 15px solid var(--green);
+            bottom: -25px;
+            filter: drop-shadow(0 0 5px var(--green));
+        }
+
+        /* Overlays */
+        .window-overlay {
+            position: absolute;
+            height: calc(100% + 10px);
+            top: -5px;
+            background: var(--dim-green);
+            border: 1px dashed var(--green);
+            z-index: 1;
+            transition: left 0.2s, width 0.2s;
+        }
+        .window-overlay::after {
+            content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+            background-image: radial-gradient(var(--green) 15%, transparent 16%);
+            background-size: 3px 3px;
+            opacity: 0.3;
+        }
+
+        .best-overlay {
+            position: absolute;
+            height: calc(100% + 20px);
+            top: -10px;
+            background: var(--dim-gold);
+            border: 2px solid var(--gold);
+            z-index: 0;
+            transition: all 0.3s;
+            display: none; /* Hidden until found */
+        }
+        .best-overlay::after {
+            content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+            background-image: radial-gradient(var(--gold) 15%, transparent 16%);
+            background-size: 3px 3px;
+            opacity: 0.3;
+        }
+
+        /* --- STATS & SIDEBAR --- */
+        .bottom-ui {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            height: 250px;
+        }
+
+        .stats-panel {
+            border-right: 2px solid var(--green);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .counter-box {
+            border: 2px solid var(--red);
+            padding: 10px;
+            color: var(--red);
+            text-align: center;
+            font-size: 1.5rem;
+            transition: all 0.2s;
+        }
+        .counter-box.complete {
+            border-color: var(--green);
+            background: var(--green);
+            color: black;
+            animation: flash 0.5s;
+        }
+
+        @keyframes flash { 0% { background: white; } 100% { background: var(--green); } }
+
+        .hash-map {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .hash-item {
+            border: 1px solid #333;
+            padding: 5px 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+        .hash-item span { font-size: 1.5rem; }
+        .hash-item.updated {
+            animation: glitch-scale 0.3s;
+            border-color: var(--green);
+            color: var(--green);
+            text-shadow: 2px 0 var(--red), -2px 0 var(--gold);
+        }
+
+        @keyframes glitch-scale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2) skew(10deg); }
+            100% { transform: scale(1); }
+        }
+
+        .sidebar {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .leaderboard-title { text-decoration: underline; margin-bottom: 10px; }
+        .best-display {
+            border: 2px solid var(--gold);
+            padding: 15px;
+            color: var(--gold);
+            text-shadow: 0 0 5px var(--gold);
+            word-break: break-all;
+        }
+
+        /* --- CONTROLS --- */
+        .controls {
+            border-top: 2px solid var(--green);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            background: #000;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--green);
+            color: var(--green);
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            padding: 10px 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 5px var(--dim-green);
+            transition: all 0.1s;
+        }
+
+        button:hover { background: var(--green); color: black; }
+        button:active { transform: translateY(2px); }
+        button:disabled { border-color: #333; color: #333; cursor: not-allowed; box-shadow: none; }
+
+        /* SVG Connections Layer */
+        #connections {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+        line.connector {
+            stroke: var(--green);
+            stroke-width: 1;
+            stroke-dasharray: 4;
+            animation: dash 0.5s linear infinite;
+        }
+        @keyframes dash { to { stroke-dashoffset: -8; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+    <div class="crt-flicker"></div>
+    <svg id="connections"></svg>
+
+    <header>
+        <div class="title glow-text">>> SLIDING_WINDOW_PROTOCOL</div>
+        <div class="target-container" id="targetContainer">
+            <span style="margin-right:10px">TARGET:</span>
+            <!-- Target boxes generated by JS -->
+        </div>
+    </header>
+
+    <main class="tape-container" id="scrollContainer">
+        <div class="tape-wrapper" id="tapeWrapper">
+            <!-- Cells generated by JS -->
+            
+            <div id="windowOverlay" class="window-overlay" style="width: 0; left: 0; opacity: 0;"></div>
+            <div id="bestOverlay" class="best-overlay"></div>
+
+            <div id="ptrLeft" class="pointer pointer-left" style="left: 0;"></div>
+            <div id="ptrRight" class="pointer pointer-right" style="left: 0;"></div>
+        </div>
+    </main>
+
+    <div class="bottom-ui">
+        <section class="stats-panel">
+            <div id="counterBox" class="counter-box">
+                REMAINING TO COVER: <span id="remainVal">--</span>
+            </div>
+            <div>
+                <div style="margin-bottom:10px; color:#555;">>> MEMORY_DUMP (Window Counts)</div>
+                <div class="hash-map" id="hashMap">
+                    <!-- Hash items generated by JS -->
+                </div>
+            </div>
+        </section>
+
+        <aside class="sidebar">
+            <div class="leaderboard-title glow-gold">BEST WINDOW SO FAR</div>
+            <div class="best-display" id="bestDisplay">
+                SEARCHING...
+            </div>
+        </aside>
+    </div>
+
+    <footer class="controls">
+        <button id="btnPlay">▶ PLAY</button>
+        <button id="btnPause">❚❚ PAUSE</button>
+        <button id="btnStep">⏭ STEP</button>
+        <button id="btnReset">⟲ RESET</button>
+    </footer>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const S = "ADOBECODEBANC";
+        const T = "ABC";
+        
+        const state = {
+            left: 0,
+            right: 0,
+            windowCounts: {},
+            requiredCounts: {},
+            formed: 0,
+            required: 0,
+            ans: [-1, 0, 0], // length, left, right
+            mode: 'EXPAND', // EXPAND, CHECK, SHRINK, FINISHED
+            isPlaying: false,
+            timer: null,
+            speed: 600,
+            initialized: false
+        };
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            tapeWrapper: document.getElementById('tapeWrapper'),
+            scrollContainer: document.getElementById('scrollContainer'),
+            targetContainer: document.getElementById('targetContainer'),
+            ptrLeft: document.getElementById('ptrLeft'),
+            ptrRight: document.getElementById('ptrRight'),
+            windowOverlay: document.getElementById('windowOverlay'),
+            bestOverlay: document.getElementById('bestOverlay'),
+            counterBox: document.getElementById('counterBox'),
+            remainVal: document.getElementById('remainVal'),
+            hashMap: document.getElementById('hashMap'),
+            bestDisplay: document.getElementById('bestDisplay'),
+            svg: document.getElementById('connections'),
+            btnPlay: document.getElementById('btnPlay'),
+            btnPause: document.getElementById('btnPause'),
+            btnStep: document.getElementById('btnStep'),
+            btnReset: document.getElementById('btnReset')
+        };
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Build Required Map
+            state.requiredCounts = {};
+            for(let char of T) {
+                state.requiredCounts[char] = (state.requiredCounts[char] || 0) + 1;
+            }
+            state.required = Object.keys(state.requiredCounts).length;
+            
+            renderTape();
+            renderTarget();
+            renderHashMap();
+            resetState();
+            
+            state.initialized = true;
+        }
+
+        function resetState() {
+            stopAutoPlay();
+            state.left = 0;
+            state.right = 0;
+            state.windowCounts = {};
+            state.formed = 0;
+            state.ans = [-1, 0, 0];
+            state.mode = 'EXPAND';
+            
+            // Clear UI
+            updatePointers();
+            updateWindowOverlay();
+            els.bestOverlay.style.display = 'none';
+            els.counterBox.className = 'counter-box';
+            els.remainVal.innerText = state.required;
+            els.bestDisplay.innerHTML = "SEARCHING...";
+            els.bestDisplay.className = "best-display";
+            
+            // Clear Hash Map UI
+            els.hashMap.innerHTML = '';
+            renderHashMap(); // Re-render empty
+            
+            // Clear Tape Highlights
+            document.querySelectorAll('.tape-cell').forEach(c => c.className = 'tape-cell');
+            document.querySelectorAll('.char-box').forEach(c => c.classList.remove('found'));
+        }
+
+        function renderTape() {
+            els.tapeWrapper.innerHTML = '';
+            // Re-add pointers and overlays first so they stay in DOM
+            els.tapeWrapper.appendChild(els.windowOverlay);
+            els.tapeWrapper.appendChild(els.bestOverlay);
+            els.tapeWrapper.appendChild(els.ptrLeft);
+            els.tapeWrapper.appendChild(els.ptrRight);
+
+            for(let i=0; i<S.length; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'tape-cell';
+                cell.innerText = S[i];
+                cell.id = `cell-${i}`;
+                els.tapeWrapper.appendChild(cell);
+            }
+        }
+
+        function renderTarget() {
+            els.targetContainer.innerHTML = '<span style="margin-right:10px">TARGET:</span>';
+            const uniqueChars = [...new Set(T.split(''))];
+            uniqueChars.forEach(char => {
+                const box = document.createElement('div');
+                box.className = 'char-box missing';
+                box.id = `target-${char}`;
+                box.innerText = char;
+                const sub = document.createElement('span');
+                sub.style.fontSize = '0.7rem';
+                sub.style.position = 'absolute';
+                sub.style.bottom = '2px';
+                sub.style.right = '2px';
+                sub.innerText = state.requiredCounts[char];
+                box.appendChild(sub);
+                els.targetContainer.appendChild(box);
+            });
+        }
+
+        function renderHashMap() {
+            // Only render items relevant to Target or items encountered
+            // Ideally, we just show target items initially, then add others as they appear
+            // For simplicity and aesthetic, let's keep the target items fixed and add dynamic ones
+        }
+
+        // --- CORE ALGORITHM STEP ---
+        function step() {
+            if (state.mode === 'FINISHED') return;
+
+            // 1. EXPAND PHASE
+            if (state.mode === 'EXPAND') {
+                if (state.right >= S.length) {
+                    state.mode = 'FINISHED';
+                    els.btnPlay.disabled = true;
+                    els.btnStep.disabled = true;
+                    return;
+                }
+
+                const char = S[state.right];
+                const cell = document.getElementById(`cell-${state.right}`);
+                
+                // Visuals
+                cell.classList.add('active-green');
+                drawConnection(cell, char); // Juice
+
+                // Logic
+                state.windowCounts[char] = (state.windowCounts[char] || 0) + 1;
+                updateHashMapUI(char);
+
+                if (state.requiredCounts[char] && state.windowCounts[char] === state.requiredCounts[char]) {
+                    state.formed++;
+                    flashTarget(char);
+                }
+
+                // Move Pointer Visual
+                state.right++; 
+                updatePointers();
+                updateWindowOverlay();
+                updateStats();
+
+                // Check Transition
+                if (state.formed === state.required) {
+                    state.mode = 'CHECK'; // Immediate transition check next tick
+                }
+            }
+
+            // 2. CHECK PHASE (Validity & Best Window)
+            else if (state.mode === 'CHECK') {
+                els.counterBox.classList.add('complete');
+                els.remainVal.innerText = "0";
+
+                const currentLen = state.right - state.left;
+                if (state.ans[0] === -1 || currentLen < state.ans[0]) {
+                    state.ans = [currentLen, state.left, state.right];
+                    updateBestWindowUI();
+                }
+                
+                state.mode = 'SHRINK';
+            }
+
+            // 3. SHRINK PHASE
+            else if (state.mode === 'SHRINK') {
+                const char = S[state.left];
+                const cell = document.getElementById(`cell-${state.left}`);
+                
+                // Logic removal
+                state.windowCounts[char]--;
+                updateHashMapUI(char); // Update UI
+                cell.classList.remove('active-green'); // Remove highlight as it leaves window
+
+                if (state.requiredCounts[char] && state.windowCounts[char] < state.requiredCounts[char]) {
+                    state.formed--;
+                    unflashTarget(char);
+                }
+
+                // Move Left
+                state.left++;
+                updatePointers();
+                updateWindowOverlay();
+                updateStats();
+
+                // Decide next mode
+                if (state.formed < state.required) {
+                    els.counterBox.classList.remove('complete');
+                    state.mode = 'EXPAND';
+                } else {
+                    // Still valid, check for better window next tick
+                    state.mode = 'CHECK';
+                }
+            }
+        }
+
+        // --- UI UPDATERS ---
+
+        function updatePointers() {
+            const cellSize = 50; // matches css
+            // Right pointer points to the *next* slot, so visually it sits on the right edge of previous
+            // But for this vis, let's point to the cell index.
+            // Requirement: Right pointer at bottom-right of cell (right-1)
+            // Left pointer at bottom-left of cell (left)
+            
+            const rIndex = state.right - 1; 
+            const lIndex = state.left;
+
+            // Constrain visual if initially 0
+            const visualR = Math.max(0, rIndex);
+            
+            els.ptrLeft.style.left = (lIndex * cellSize) + 'px';
+            els.ptrRight.style.left = (visualR * cellSize) + (cellSize - 10) + 'px'; // -10 to align arrow center
+
+            // Auto scroll
+            const containerWidth = els.scrollContainer.clientWidth;
+            const scrollPos = els.scrollContainer.scrollLeft;
+            const activePos = state.right * cellSize;
+            
+            if (activePos > scrollPos + containerWidth - 100) {
+                els.scrollContainer.scrollTo({ left: activePos - containerWidth + 150, behavior: 'smooth' });
+            }
+        }
+
+        function updateWindowOverlay() {
+            if (state.right === 0) return;
+            const cellSize = 50;
+            const width = (state.right - state.left) * cellSize;
+            const left = state.left * cellSize;
+            
+            els.windowOverlay.style.opacity = '1';
+            els.windowOverlay.style.left = left + 'px';
+            els.windowOverlay.style.width = width + 'px';
+        }
+
+        function updateBestWindowUI() {
+            const [len, l, r] = state.ans;
+            const cellSize = 50;
+            const width = (r - l) * cellSize;
+            const left = l * cellSize;
+
+            els.bestOverlay.style.display = 'block';
+            els.bestOverlay.style.left = left + 'px';
+            els.bestOverlay.style.width = width + 'px';
+
+            const str = S.substring(l, r);
+            els.bestDisplay.innerHTML = `"${str}" <br> LEN: ${len}`;
+            els.bestDisplay.classList.add('glow-gold');
+            
+            // Highlight cells in Best Window
+            setTimeout(() => els.bestDisplay.classList.remove('glow-gold'), 500);
+        }
+
+        function updateHashMapUI(char) {
+            // Find or create box
+            let box = document.getElementById(`hash-${char}`);
+            if (!box) {
+                box = document.createElement('div');
+                box.className = 'hash-item';
+                box.id = `hash-${char}`;
+                box.innerHTML = `${char} : <span id="count-${char}">0</span>`;
+                els.hashMap.appendChild(box);
+            }
+
+            const countSpan = document.getElementById(`count-${char}`);
+            countSpan.innerText = state.windowCounts[char];
+            
+            // Glitch effect
+            box.classList.remove('updated');
+            void box.offsetWidth; // trigger reflow
+            box.classList.add('updated');
+        }
+
+        function updateStats() {
+            if (state.formed === state.required) {
+                els.remainVal.innerText = "0";
+            } else {
+                els.remainVal.innerText = state.required - state.formed;
+            }
+        }
+
+        function flashTarget(char) {
+            const box = document.getElementById(`target-${char}`);
+            if(box) {
+                box.classList.remove('missing');
+                box.classList.add('found');
+            }
+        }
+
+        function unflashTarget(char) {
+            const box = document.getElementById(`target-${char}`);
+            if(box) {
+                box.classList.remove('found');
+                box.classList.add('missing');
+            }
+        }
+
+        // --- THE JUICE: CONNECTING LINES ---
+        function drawConnection(cellElem, char) {
+            // Find the hash map entry
+            let hashElem = document.getElementById(`hash-${char}`);
+            if (!hashElem) return; // Might be created next frame, skip visual for now
+
+            const r1 = cellElem.getBoundingClientRect();
+            const r2 = hashElem.getBoundingClientRect();
+            const bodyRect = document.body.getBoundingClientRect();
+
+            const x1 = r1.left + (r1.width/2);
+            const y1 = r1.bottom;
+            const x2 = r2.left + (r2.width/2);
+            const y2 = r2.top;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', 'connector');
+            
+            els.svg.appendChild(line);
+
+            setTimeout(() => {
+                line.remove();
+            }, 300);
+        }
+
+        // --- CONTROLS LOGIC ---
+        function tick() {
+            if (!state.isPlaying) return;
+            step();
+            if (state.mode !== 'FINISHED') {
+                state.timer = setTimeout(tick, state.speed);
+            }
+        }
+
+        function startAutoPlay() {
+            if (state.isPlaying) return;
+            state.isPlaying = true;
+            els.btnPlay.style.background = 'var(--green)';
+            els.btnPlay.style.color = 'black';
+            tick();
+        }
+
+        function stopAutoPlay() {
+            state.isPlaying = false;
+            clearTimeout(state.timer);
+            els.btnPlay.style.background = 'transparent';
+            els.btnPlay.style.color = 'var(--green)';
+        }
+
+        els.btnPlay.addEventListener('click', startAutoPlay);
+        els.btnPause.addEventListener('click', stopAutoPlay);
+        els.btnStep.addEventListener('click', () => {
+            stopAutoPlay();
+            step();
+        });
+        els.btnReset.addEventListener('click', () => {
+            stopAutoPlay();
+            els.btnPlay.disabled = false;
+            els.btnStep.disabled = false;
+            resetState();
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

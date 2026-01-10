@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protocol: Backward Merge // Ditherpunk // Responsive</title>
+    <style>
+        /* --- 1. CORE AESTHETICS & VARIABLES --- */
+        :root {
+            --c-void: #050505;
+            --c-term: #33FF00;
+            --c-dim: #1A5510;
+            --c-ghost: #112211;
+            --font-stack: 'Courier New', 'VT323', monospace;
+            
+            /* Responsive Sizing */
+            --block-size: clamp(40px, 8vw, 70px); 
+            --gap-size: clamp(5px, 1vw, 15px);
+            --border-width: 2px;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--c-void);
+            color: var(--c-term);
+            font-family: var(--font-stack);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden; /* Prevent horiz scroll from flying elements */
+            text-transform: uppercase;
+        }
+
+        /* --- CRT / DITHER TEXTURE OVERLAY --- */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.95; }
+            100% { opacity: 0.97; }
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            position: relative;
+            z-index: 1;
+            animation: flicker 0.15s infinite;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            text-shadow: 2px 2px 0px var(--c-dim);
+            border-bottom: 2px dashed var(--c-term);
+            padding-bottom: 10px;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+
+        /* --- 2. VISUAL SETUP (THE TRACKS) --- */
+        .stage {
+            display: flex;
+            flex-direction: column;
+            gap: calc(var(--block-size) * 1.5); /* Space for pointers */
+            padding: 20px;
+            border: 2px solid var(--c-term);
+            background: 
+                repeating-linear-gradient(
+                    45deg,
+                    var(--c-void),
+                    var(--c-void) 2px,
+                    #0a0a0a 2px,
+                    #0a0a0a 4px
+                );
+            position: relative;
+        }
+
+        .track-label {
+            font-weight: bold;
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            display: flex;
+            justify-content: space-between;
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            right: 10px;
+        }
+
+        .array-row {
+            display: flex;
+            justify-content: center; /* Center the array */
+            gap: var(--gap-size);
+            position: relative;
+            margin-top: 20px; /* Space for label */
+            height: var(--block-size);
+        }
+
+        /* BLOCKS */
+        .block {
+            width: var(--block-size);
+            height: var(--block-size);
+            flex-shrink: 0; /* Prevent squishing */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-weight: bold;
+            transition: background 0.1s, color 0.1s; /* Only colors animate via CSS */
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Solid Data Block */
+        .block.filled {
+            background: var(--c-term);
+            color: var(--c-void);
+            border: 2px solid var(--c-term);
+            box-shadow: 4px 4px 0px var(--c-dim);
+        }
+
+        /* Ghost/Buffer Block */
+        .block.ghost {
+            background: var(--c-void);
+            color: var(--c-dim);
+            border: 2px dashed var(--c-dim);
+            background-image: radial-gradient(var(--c-dim) 15%, transparent 16%);
+            background-size: 4px 4px;
+        }
+
+        /* Highlight State */
+        .block.highlight {
+            background: #FFF;
+            color: #000;
+            border-color: #FFF;
+            box-shadow: 0 0 15px #FFF;
+            z-index: 10;
+        }
+
+        /* Locked State */
+        .block.locked {
+            background: var(--c-dim);
+            color: var(--c-term);
+            border: 2px solid var(--c-term);
+            background-image: 
+                linear-gradient(45deg, var(--c-ghost) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--c-ghost) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--c-ghost) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--c-ghost) 75%);
+            background-size: 4px 4px;
+        }
+
+        /* Flying Block (For Physical Animation) */
+        .flying-block {
+            position: absolute;
+            width: var(--block-size);
+            height: var(--block-size);
+            background: var(--c-term);
+            color: var(--c-void);
+            border: 2px solid #FFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            z-index: 50;
+            box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        /* --- POINTERS --- */
+        /* Pointers are now positioned absolute relative to .array-row via JS */
+        .pointer {
+            position: absolute;
+            width: var(--block-size);
+            height: 40px;
+            text-align: center;
+            transition: left 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            color: var(--c-term);
+            z-index: 20;
+            white-space: nowrap;
+        }
+
+        .pointer span {
+            background: var(--c-void);
+            padding: 2px 4px;
+            border: 1px solid var(--c-dim);
+        }
+
+        .pointer i {
+            font-style: normal;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: block;
+            line-height: 1;
+        }
+
+        /* --- SAFETY ZONE --- */
+        .safety-zone {
+            position: absolute;
+            height: calc(100% + 10px);
+            top: -5px;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                var(--c-dim) 5px,
+                var(--c-dim) 10px
+            );
+            opacity: 0.5;
+            z-index: 1;
+            transition: left 0.2s, width 0.2s;
+            cursor: help;
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--c-term);
+            color: var(--c-void);
+            padding: 5px;
+            font-size: 0.7rem;
+            width: max-content;
+            max-width: 200px;
+            text-align: center;
+            display: none;
+            border: 2px solid var(--c-void);
+            box-shadow: 4px 4px 0 var(--c-dim);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .safety-zone:hover .tooltip { display: block; }
+
+        /* --- 3. LOG & CONTROLS --- */
+        .ui-panel {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        @media(min-width: 600px) {
+            .ui-panel { grid-template-columns: 2fr 1fr; }
+        }
+
+        .console {
+            border: 2px solid var(--c-dim);
+            background: #000;
+            height: 100px;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+        }
+
+        .log-entry { margin-bottom: 4px; word-break: break-word; }
+        .log-entry::before { content: "> "; color: var(--c-dim); }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: var(--c-ghost);
+            padding: 10px;
+            border: 2px solid var(--c-term);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: var(--c-void);
+            color: var(--c-term);
+            border: 2px solid var(--c-term);
+            padding: 8px 12px;
+            font-family: var(--font-stack);
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--c-dim);
+            flex: 1;
+            min-width: 80px;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--c-dim);
+        }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            justify-content: center;
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 15px;
+            width: 15px;
+            background: var(--c-term);
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 1px 1px 0 #000;
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 3px;
+            background: var(--c-dim);
+            border: 1px solid var(--c-term);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>BACKWARD_MERGE.EXE</h1>
+
+        <!-- Track A -->
+        <div class="stage">
+            <div class="track-label">MEMORY_BLOCK_A [DATA + BUFFER]</div>
+            <div class="array-row" id="row-a">
+                <!-- Safety Zone injected here -->
+                <div id="safety-zone" class="safety-zone">
+                    <div class="tooltip">MEMORY PROTECTION:<br>WRITE > READ</div>
+                </div>
+                <!-- Pointers for A and Write injected here -->
+                <div id="ptr-write" class="pointer" style="top: -100%;">
+                    <i>V</i>
+                    <span>WRITE</span>
+                </div>
+                <div id="ptr-a" class="pointer" style="bottom: -100%;">
+                    <span>END A</span>
+                    <i>^</i>
+                </div>
+                <!-- Blocks injected via JS -->
+            </div>
+        </div>
+
+        <!-- Track B -->
+        <div class="stage">
+            <div class="track-label">MEMORY_BLOCK_B [INCOMING]</div>
+            <div class="array-row" id="row-b">
+                <!-- Pointer for B -->
+                <div id="ptr-b" class="pointer" style="top: -100%;">
+                    <i>V</i>
+                    <span>END B</span>
+                </div>
+                <!-- Blocks injected via JS -->
+            </div>
+        </div>
+
+        <!-- UI Panel -->
+        <div class="ui-panel">
+            <div class="console" id="console-output">
+                <div class="log-entry">SYSTEM READY. RESIZE SAFE.</div>
+            </div>
+
+            <div class="controls">
+                <div class="btn-group">
+                    <button id="btn-play">PLAY</button>
+                    <button id="btn-step">STEP</button>
+                    <button id="btn-reset">RESET</button>
+                </div>
+                <div class="slider-container">
+                    <span>SPD</span>
+                    <input type="range" id="speed-slider" min="100" max="2000" value="1000" step="100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flight Layer for physical animations -->
+    <div id="flight-layer" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 9999;"></div>
+
+    <script>
+        /**
+         * RESIZABLE RETRO VISUALIZER
+         * Uses getBoundingClientRect for all coordinate math.
+         */
+
+        const config = {
+            initialA: [2, 5, 8],
+            bufferSize: 3,
+            initialB: [3, 6, 9]
+        };
+
+        let state = {
+            A: [], 
+            B: [],
+            ptrA: 0,
+            ptrB: 0,
+            writePtr: 0,
+            isPlaying: false,
+            isFinished: false,
+            delay: 1000
+        };
+
+        // --- DOM Cache ---
+        const elRowA = document.getElementById('row-a');
+        const elRowB = document.getElementById('row-b');
+        const ptrA = document.getElementById('ptr-a');
+        const ptrB = document.getElementById('ptr-b');
+        const ptrWrite = document.getElementById('ptr-write');
+        const elSafetyZone = document.getElementById('safety-zone');
+        const elConsole = document.getElementById('console-output');
+        const flightLayer = document.getElementById('flight-layer');
+        const btnPlay = document.getElementById('btn-play');
+        const btnStep = document.getElementById('btn-step');
+
+        // --- Initialization ---
+        function init() {
+            state.A = [...config.initialA, ...Array(config.bufferSize).fill(null)];
+            state.B = [...config.initialB];
+            
+            state.ptrA = config.initialA.length - 1;
+            state.ptrB = config.initialB.length - 1;
+            state.writePtr = state.A.length - 1;
+            
+            state.isFinished = false;
+            state.isPlaying = false;
+            btnPlay.textContent = "PLAY";
+            btnStep.disabled = false;
+            
+            renderDOM();
+            updatePositions(); // Initial geometry calculation
+            log("SYSTEM INITIALIZED.");
+        }
+
+        // --- Core Rendering (Creates Blocks) ---
+        function renderDOM() {
+            // Clear existing blocks (keep pointers)
+            document.querySelectorAll('.block').forEach(e => e.remove());
+
+            // Create A Blocks
+            state.A.forEach((val, i) => {
+                const b = createBlock(val, i, 'a');
+                if(val === null) b.classList.add('ghost');
+                else b.classList.add('filled');
+                // Insert before the pointers to keep DOM order clean
+                elRowA.insertBefore(b, elSafetyZone);
+            });
+
+            // Create B Blocks
+            state.B.forEach((val, i) => {
+                const b = createBlock(val, i, 'b');
+                b.classList.add('filled');
+                // Different styling logic can go here if needed
+                elRowB.appendChild(b);
+            });
+        }
+
+        function createBlock(val, i, type) {
+            const div = document.createElement('div');
+            div.className = 'block';
+            div.id = `blk-${type}-${i}`;
+            div.textContent = val !== null ? val : '';
+            return div;
+        }
+
+        // --- Geometric Positioning (Window Agnostic) ---
+        function getBlockRect(type, index) {
+            const el = document.getElementById(`blk-${type}-${index}`);
+            if(!el) return null;
+            // Get relative position within the container for pointers
+            // But flight animation needs global coordinates
+            return el; 
+        }
+
+        function updatePositions() {
+            // Update Pointer A
+            alignPointer(ptrA, 'a', state.ptrA);
+            // Update Pointer Write
+            alignPointer(ptrWrite, 'a', state.writePtr);
+            // Update Pointer B
+            alignPointer(ptrB, 'b', state.ptrB);
+            
+            // Update Safety Zone
+            updateSafetyZone();
+        }
+
+        function alignPointer(ptrEl, type, index) {
+            if (index < 0) {
+                ptrEl.style.opacity = 0;
+                return;
+            }
+            const target = document.getElementById(`blk-${type}-${index}`);
+            if (target) {
+                ptrEl.style.opacity = 1;
+                // Calculate position relative to parent row
+                // This assumes pointers are children of row-a/row-b
+                const parentRect = target.parentElement.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                
+                const leftPos = targetRect.left - parentRect.left;
+                ptrEl.style.left = `${leftPos}px`;
+            }
+        }
+
+        function updateSafetyZone() {
+            // Zone is between ptrA (exclusive) and writePtr (exclusive)
+            // But visually, it covers the gap.
+            if(state.ptrA < 0) {
+                elSafetyZone.style.width = '0px';
+                return;
+            }
+
+            const startIdx = state.ptrA + 1;
+            const endIdx = state.writePtr;
+            
+            if (startIdx > endIdx) {
+                elSafetyZone.style.width = '0px';
+                return;
+            }
+
+            const startEl = document.getElementById(`blk-a-${startIdx}`);
+            const endEl = document.getElementById(`blk-a-${endIdx}`); // Use end element to calculate width
+            
+            // If pointers meet, no zone
+            if(!startEl || !endEl) {
+                 elSafetyZone.style.width = '0px';
+                 return;
+            }
+
+            const parentRect = elRowA.getBoundingClientRect();
+            const startRect = startEl.getBoundingClientRect();
+            const endRect = endEl.getBoundingClientRect();
+
+            // Left pos relative to container
+            const left = startRect.left - parentRect.left;
+            // Width spans from start of startBlock to end of endBlock? 
+            // Actually usually gap is strictly empty slots.
+            // Let's cover from Start of StartBlock to Start of WriteBlock (write ptr is at dest)
+            // The logic: Zone covers slots [ptrA+1 ... writePtr-1] + the gaps. 
+            // Visually simpler: Left of (ptrA+1) to Left of (writePtr)
+            
+            const writeEl = document.getElementById(`blk-a-${state.writePtr}`);
+            const writeLeft = writeEl.getBoundingClientRect().left - parentRect.left;
+            
+            // Slight visual gap
+            const gap = 5; 
+            
+            elSafetyZone.style.left = left + 'px';
+            elSafetyZone.style.width = Math.max(0, writeLeft - left - gap) + 'px';
+        }
+
+        // --- Animations ---
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        function animateFlight(sourceEl, targetEl, val) {
+            return new Promise(resolve => {
+                const sRect = sourceEl.getBoundingClientRect();
+                const tRect = targetEl.getBoundingClientRect();
+
+                // Create Flying Clone
+                const fly = document.createElement('div');
+                fly.className = 'flying-block';
+                fly.textContent = val;
+                
+                // Set Initial Position (Fixed to viewport)
+                fly.style.left = sRect.left + 'px';
+                fly.style.top = sRect.top + 'px';
+                fly.style.width = sRect.width + 'px';
+                fly.style.height = sRect.height + 'px';
+                
+                flightLayer.appendChild(fly);
+
+                // Force Reflow
+                fly.getBoundingClientRect();
+
+                // Transition
+                fly.style.transition = `all ${state.delay * 0.4}ms ease-in-out`;
+                fly.style.left = tRect.left + 'px';
+                fly.style.top = tRect.top + 'px';
+
+                // Cleanup after animation
+                setTimeout(() => {
+                    fly.remove();
+                    resolve();
+                }, state.delay * 0.4);
+            });
+        }
+
+        // --- Logic Step ---
+        async function step() {
+            if (state.isFinished) return;
+
+            // Update geometrical positions just in case window moved
+            updatePositions();
+
+            // 1. Finish Condition
+            if (state.ptrB < 0) {
+                log("OPTIMIZATION: A ALREADY SORTED. DONE.");
+                state.isFinished = true;
+                state.isPlaying = false;
+                btnPlay.textContent = "DONE";
+                btnStep.disabled = true;
+                return;
+            }
+
+            const blockDest = document.getElementById(`blk-a-${state.writePtr}`);
+
+            // 2. Flush Condition (A Empty)
+            if (state.ptrA < 0) {
+                log(`A DEPLETED. FLUSHING B[${state.ptrB}]`);
+                const blockB = document.getElementById(`blk-b-${state.ptrB}`);
+                
+                await animateFlight(blockB, blockDest, state.B[state.ptrB]);
+                
+                // Commit Data
+                finalizeMove('b', state.ptrB, state.B[state.ptrB]);
+                state.ptrB--;
+                state.writePtr--;
+                updatePositions();
+                return;
+            }
+
+            // 3. Comparison
+            const valA = state.A[state.ptrA];
+            const valB = state.B[state.ptrB];
+            const blockA = document.getElementById(`blk-a-${state.ptrA}`);
+            const blockB = document.getElementById(`blk-b-${state.ptrB}`);
+
+            blockA.classList.add('highlight');
+            blockB.classList.add('highlight');
+            log(`> COMPARING: ${valA} vs ${valB}`);
+            
+            await sleep(state.delay * 0.4);
+
+            let picked = '';
+            
+            if (valA > valB) {
+                log(`> ${valA} IS LARGER.`);
+                blockA.classList.remove('highlight');
+                blockB.classList.remove('highlight');
+                
+                // Animate
+                await animateFlight(blockA, blockDest, valA);
+                finalizeMove('a', state.ptrA, valA);
+                state.ptrA--;
+            } else {
+                log(`> ${valB} IS LARGER.`);
+                blockA.classList.remove('highlight');
+                blockB.classList.remove('highlight');
+                
+                await animateFlight(blockB, blockDest, valB);
+                finalizeMove('b', state.ptrB, valB);
+                state.ptrB--;
+            }
+
+            state.writePtr--;
+            updatePositions();
+        }
+
+        function finalizeMove(sourceType, sourceIdx, val) {
+            // Update Source DOM
+            const sourceEl = document.getElementById(`blk-${sourceType}-${sourceIdx}`);
+            if(sourceType === 'a') {
+                sourceEl.classList.remove('filled');
+                sourceEl.classList.add('ghost');
+                sourceEl.textContent = '';
+                state.A[sourceIdx] = null;
+            } else {
+                sourceEl.style.opacity = 0.3;
+                sourceEl.style.borderStyle = 'dashed';
+            }
+
+            // Update Dest DOM
+            const destEl = document.getElementById(`blk-a-${state.writePtr}`);
+            state.A[state.writePtr] = val;
+            destEl.textContent = val;
+            destEl.classList.remove('ghost');
+            destEl.classList.add('locked');
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.textContent = msg;
+            elConsole.appendChild(div);
+            elConsole.scrollTop = elConsole.scrollHeight;
+        }
+
+        // --- Event Listeners ---
+        
+        // Window Resize Handler
+        window.addEventListener('resize', () => {
+            updatePositions();
+        });
+
+        btnPlay.addEventListener('click', async () => {
+            if (state.isFinished) return;
+            state.isPlaying = !state.isPlaying;
+            btnPlay.textContent = state.isPlaying ? "PAUSE" : "PLAY";
+            btnStep.disabled = state.isPlaying;
+            
+            while(state.isPlaying && !state.isFinished) {
+                await step();
+                if(state.isPlaying) await sleep(state.delay * 0.2); // Gap between steps
+            }
+        });
+
+        btnStep.addEventListener('click', () => step());
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            state.isPlaying = false;
+            elConsole.innerHTML = '';
+            // Reset Styles
+            document.querySelectorAll('.block').forEach(b => {
+                b.style.opacity = 1;
+                b.style.borderStyle = '';
+            });
+            init();
+        });
+
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            state.delay = 2100 - parseInt(e.target.value);
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

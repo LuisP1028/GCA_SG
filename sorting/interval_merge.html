@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INTERVAL_ACCUMULATOR // DITHERPUNK</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --term-green: #33FF00;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* Container to maintain aspect ratio and CRT framing */
+        #monitor {
+            position: relative;
+            width: 90vw;
+            height: 90vh;
+            max-width: 1200px; /* Max constraint */
+            max-height: 900px;
+            box-shadow: 0 0 20px rgba(51, 255, 0, 0.2);
+            border: 2px solid #333;
+            background: #000;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            /* Critical for the retro look: prevents blurring when scaling up */
+            image-rendering: pixelated; 
+            image-rendering: crisp-edges;
+        }
+
+        /* CRT Overlay Effects */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(0,0,0,0) 50%,
+                rgba(0,0,0,0.2) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.7);
+            pointer-events: none;
+            z-index: 11;
+        }
+    </style>
+</head>
+<body>
+
+<div id="monitor">
+    <div class="scanlines"></div>
+    <div class="glow"></div>
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+/**
+ * DITHERPUNK VISUALIZER
+ * - Resolution: 320x240 (Internal)
+ * - Algorithm: Merge Intervals
+ * - Style: 1-Bit Atkinson Dithering
+ */
+
+// --- CONFIGURATION ---
+const WIDTH = 320;
+const HEIGHT = 240;
+const COLOR_ON = [51, 255, 0]; // #33FF00
+const COLOR_OFF = [10, 20, 10]; // Very dark green/black
+const FPS = 30;
+
+// Algorithm Data
+const EXISTING_INTERVALS = [[2,4], [6,9], [10,13], [18,20], [22,23]];
+const NEW_INTERVAL = [8, 19];
+const SCALE_X = 10; // Pixels per unit
+const OFFSET_X = 20;
+
+// Zones (Y-coords)
+const ZONE_A_Y = 50;  // Input
+const ZONE_B_Y = 110; // Magnet
+const ZONE_C_Y = 180; // Output
+
+// --- ENGINE CLASSES ---
+
+class Utils {
+    static lerp(start, end, t) {
+        return start * (1 - t) + end * t;
+    }
+    
+    static rectIntersect(r1, r2) {
+        return !(r2.left > r1.right || 
+                 r2.right < r1.left || 
+                 r2.top > r1.bottom || 
+                 r2.bottom < r1.top);
+    }
+}
+
+class IntervalBlock {
+    constructor(start, end, type) {
+        this.start = start;
+        this.end = end;
+        this.type = type; // 'passive', 'magnet', 'final'
+        
+        // Positioning
+        this.x = OFFSET_X + (start * SCALE_X);
+        this.w = (end - start) * SCALE_X;
+        
+        // Setup initial Y based on type
+        this.y = type === 'magnet' ? ZONE_B_Y : ZONE_A_Y;
+        this.targetY = this.y;
+        
+        this.h = 20;
+        
+        // Animation States
+        this.opacity = 1.0;
+        this.shake = 0;
+        this.dissolving = false;
+    }
+
+    update() {
+        // Movement interpolation
+        this.y = Utils.lerp(this.y, this.targetY, 0.1);
+        
+        // Recalculate geometry in case of expansion
+        this.x = OFFSET_X + (this.start * SCALE_X);
+        this.w = (this.end - this.start) * SCALE_X;
+
+        // Dissolve logic
+        if (this.dissolving) {
+            this.opacity -= 0.1;
+            if (this.opacity < 0) this.opacity = 0;
+        }
+
+        // Shake decay
+        if (this.shake > 0) this.shake *= 0.8;
+    }
+
+    draw(ctx) {
+        if (this.opacity <= 0.01) return;
+
+        let drawX = Math.floor(this.x);
+        let drawY = Math.floor(this.y);
+        
+        // Apply shake
+        if (this.shake > 0.5) {
+            drawX += (Math.random() - 0.5) * this.shake;
+            drawY += (Math.random() - 0.5) * this.shake;
+        }
+
+        const width = Math.floor(this.w);
+        const height = this.h;
+
+        // Draw based on Visual Vocabulary
+        
+        // 1. MAGNET (Active) - Solid, Pulsing
+        if (this.type === 'magnet') {
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`; // White becomes Green in dither
+            ctx.fillRect(drawX, drawY, width, height);
+            
+            // Inner glow effect (lighter center)
+            ctx.fillStyle = "#000";
+            ctx.fillRect(drawX + 2, drawY + 2, width - 4, height - 4);
+            ctx.fillStyle = "#FFF";
+            ctx.fillRect(drawX + 4, drawY + 4, width - 8, height - 8);
+        }
+        
+        // 2. PASSIVE (Existing) - Gray (Dithers to checkerboard)
+        else if (this.type === 'passive') {
+            ctx.fillStyle = `rgba(100, 100, 100, ${this.opacity})`; // 40% Gray dithers to pattern
+            ctx.fillRect(drawX, drawY, width, height);
+            ctx.strokeStyle = "#FFF";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(drawX, drawY, width, height);
+        }
+        
+        // 3. FINAL (Result) - Hollow, Thick Border
+        else if (this.type === 'final') {
+            ctx.strokeStyle = "#FFF";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(drawX, drawY, width, height);
+            
+            // Small details
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(drawX, drawY);
+            ctx.lineTo(drawX + width, drawY + height);
+            ctx.stroke();
+        }
+
+        // Labels
+        ctx.fillStyle = (this.type === 'magnet') ? "#000" : "#FFF";
+        ctx.font = "10px monospace";
+        ctx.fillText(`[${this.start},${this.end}]`, drawX, drawY - 4);
+    }
+}
+
+class System {
+    constructor() {
+        this.intervals = EXISTING_INTERVALS.map(i => new IntervalBlock(i[0], i[1], 'passive'));
+        this.magnet = new IntervalBlock(NEW_INTERVAL[0], NEW_INTERVAL[1], 'magnet');
+        
+        this.scannerX = 0;
+        this.idx = 0;
+        this.state = 'SCANNING'; // SCANNING, MERGING, APPENDING, DONE
+        this.statusText = "INIT_SEQUENCE...";
+        
+        this.timer = 0;
+        this.wait = 0;
+    }
+
+    update() {
+        this.timer++;
+        
+        // Update all entities
+        this.magnet.update();
+        this.intervals.forEach(i => i.update());
+
+        // Wait timer for pacing animations
+        if (this.wait > 0) {
+            this.wait--;
+            return;
+        }
+
+        // State Machine
+        if (this.state === 'SCANNING') {
+            if (this.idx >= this.intervals.length) {
+                this.state = 'FINALIZE_MAGNET';
+                return;
+            }
+
+            const current = this.intervals[this.idx];
+            
+            // Move Scanner Visual
+            this.scannerX = current.x;
+
+            // LOGIC: Case 1 - Skipping (Current is completely left of New)
+            // Existing: [2,4], New: [8,19] -> 4 < 8
+            if (current.end < this.magnet.start) {
+                this.statusText = `NO_OVERLAP: [${current.start},${current.end}] >> OUT`;
+                current.targetY = ZONE_C_Y;
+                current.type = 'final';
+                this.wait = 30; // Animation delay
+                this.idx++;
+            }
+            // LOGIC: Case 2 - Merging (Overlap detected)
+            // Existing: [6,9], New: [8,19] -> 6 <= 19
+            else if (current.start <= this.magnet.end) {
+                this.statusText = `DETECTED: [${current.start},${current.end}] + MAGNET`;
+                this.state = 'MERGE_ANIM_DROP';
+            }
+            // LOGIC: Case 3 - Appending (Current is completely right of New)
+            else {
+                this.state = 'FINALIZE_MAGNET';
+            }
+        }
+        else if (this.state === 'MERGE_ANIM_DROP') {
+            const current = this.intervals[this.idx];
+            current.targetY = ZONE_B_Y; // Drop to Magnet level
+            
+            // Wait for drop to finish approx
+            if (Math.abs(current.y - ZONE_B_Y) < 2) {
+                this.state = 'MERGE_ANIM_ABSORB';
+                this.wait = 10;
+            }
+        }
+        else if (this.state === 'MERGE_ANIM_ABSORB') {
+            const current = this.intervals[this.idx];
+            
+            // Logic Math
+            this.magnet.start = Math.min(this.magnet.start, current.start);
+            this.magnet.end = Math.max(this.magnet.end, current.end);
+            
+            // Visuals
+            current.dissolving = true;
+            this.magnet.shake = 10; // Glitch effect
+            this.statusText = `EXPANDING MAGNET >> [${this.magnet.start},${this.magnet.end}]`;
+            
+            this.wait = 45;
+            this.idx++;
+            this.state = 'SCANNING';
+        }
+        else if (this.state === 'FINALIZE_MAGNET') {
+            this.statusText = "MAGNET SEQUENCE COMPLETE. FLUSHING...";
+            this.magnet.targetY = ZONE_C_Y;
+            this.magnet.type = 'final';
+            
+            if (Math.abs(this.magnet.y - ZONE_C_Y) < 2) {
+                this.state = 'FLUSH_REMAINING';
+            }
+        }
+        else if (this.state === 'FLUSH_REMAINING') {
+            // Drop everything else
+            let complete = true;
+            for(let i = this.idx; i < this.intervals.length; i++) {
+                this.intervals[i].targetY = ZONE_C_Y;
+                this.intervals[i].type = 'final';
+                if (Math.abs(this.intervals[i].y - ZONE_C_Y) > 2) complete = false;
+            }
+            
+            if (complete) {
+                this.statusText = "PROCESS TERMINATED. UNION COMPLETE.";
+                this.state = 'DONE';
+            }
+        }
+        else if (this.state === 'DONE') {
+            // Reset loop after a long pause
+            this.wait = 150;
+            this.state = 'RESET';
+        }
+        else if (this.state === 'RESET') {
+            // Hard reset
+            window.location.reload(); 
+        }
+    }
+
+    draw(ctx) {
+        // Draw Intervals
+        this.intervals.forEach(i => i.draw(ctx));
+        this.magnet.draw(ctx);
+
+        // Draw Scanner Line
+        if (this.state !== 'DONE' && this.state !== 'RESET') {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${Math.sin(this.timer*0.5)*0.5 + 0.5})`;
+            ctx.beginPath();
+            ctx.moveTo(this.scannerX + 10, ZONE_A_Y - 10);
+            ctx.lineTo(this.scannerX + 10, ZONE_C_Y + 30);
+            ctx.stroke();
+        }
+    }
+}
+
+// --- MAIN RENDERER ---
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
+
+const sys = new System();
+
+// Pattern for background grid
+const createGrid = () => {
+    ctx.strokeStyle = "#222"; // Very dark gray, will dither to sparse pixels
+    ctx.lineWidth = 1;
+    
+    // Horizontal Zone Lines
+    [ZONE_A_Y, ZONE_B_Y, ZONE_C_Y].forEach(y => {
+        ctx.beginPath();
+        ctx.moveTo(0, y + 25); // Midpoint of zone roughly
+        ctx.lineTo(WIDTH, y + 25);
+        ctx.stroke();
+    });
+
+    // Vertical ticks
+    for(let i=0; i<30; i++) {
+        let x = OFFSET_X + (i * SCALE_X);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, HEIGHT);
+        ctx.stroke();
+    }
+};
+
+const drawUI = () => {
+    ctx.fillStyle = "#FFF";
+    ctx.font = "10px monospace";
+    
+    // Zone Labels
+    ctx.fillText("ZONE A: INPUT STREAM", 5, ZONE_A_Y - 5);
+    ctx.fillText("ZONE B: ACCUMULATOR", 5, ZONE_B_Y - 5);
+    ctx.fillText("ZONE C: UNION STORE", 5, ZONE_C_Y - 5);
+
+    // Status Bar
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, HEIGHT - 20, WIDTH, 20);
+    ctx.fillStyle = "#FFF";
+    ctx.fillText(`> ${sys.statusText}`, 5, HEIGHT - 8);
+    
+    // Blinking Cursor
+    if (Math.floor(Date.now() / 500) % 2 === 0) {
+        ctx.fillRect(WIDTH - 10, HEIGHT - 15, 5, 10);
+    }
+}
+
+// --- DITHER KERNEL (ATKINSON) ---
+// This runs on the CPU, modifying the pixel buffer directly.
+const applyDither = () => {
+    const imageData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
+    const data = imageData.data;
+    const w = WIDTH;
+    const h = HEIGHT;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            
+            // 1. Grayscale Conversion (Perceived Luminance)
+            const oldR = data[i];
+            const oldG = data[i+1];
+            const oldB = data[i+2];
+            const brightness = 0.299 * oldR + 0.587 * oldG + 0.114 * oldB;
+
+            // 2. Thresholding (1-bit)
+            // If bright enough, it's Green (ON), else Black (OFF)
+            const threshold = 128;
+            const active = brightness > threshold;
+            
+            const newR = active ? COLOR_ON[0] : COLOR_OFF[0];
+            const newG = active ? COLOR_ON[1] : COLOR_OFF[1];
+            const newB = active ? COLOR_ON[2] : COLOR_OFF[2];
+
+            // Set pixel
+            data[i] = newR;
+            data[i+1] = newG;
+            data[i+2] = newB;
+
+            // 3. Error Calculation (How much "brightness" did we lose or gain?)
+            const err = brightness - (active ? 255 : 0);
+
+            // 4. Distribute Error (Atkinson Algo)
+            //       X   1   1
+            //   1   1   1
+            //       1
+            // Divisor is 8. We add 1/8th of error to neighbors.
+            
+            const distribute = (dx, dy) => {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                    const ni = (ny * w + nx) * 4;
+                    // We only modify one channel for error propagation in grayscale logic 
+                    // but since we read RGB, let's bump all channels roughly
+                    // For simplicity in monochrome dithering, just bumping R is often enough 
+                    // if we re-read brightness, but let's do it properly:
+                    data[ni] += err / 8;
+                    data[ni+1] += err / 8;
+                    data[ni+2] += err / 8;
+                }
+            };
+
+            distribute(1, 0);
+            distribute(2, 0);
+            distribute(-1, 1);
+            distribute(0, 1);
+            distribute(1, 1);
+            distribute(0, 2);
+        }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+};
+
+// --- LOOP ---
+
+let lastTime = 0;
+const frameDelay = 1000 / FPS;
+
+const loop = (timestamp) => {
+    if (timestamp - lastTime > frameDelay) {
+        lastTime = timestamp;
+
+        // 1. Logic Update
+        sys.update();
+
+        // 2. Clear Buffer (Black)
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // 3. Draw Scene (Pre-Dither)
+        // We draw in grayscale/white. The dither filter handles the green tint.
+        createGrid();
+        sys.draw(ctx);
+        drawUI();
+
+        // 4. Post-Process (The Ditherpunk Pass)
+        applyDither();
+    }
+    requestAnimationFrame(loop);
+};
+
+// Start
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

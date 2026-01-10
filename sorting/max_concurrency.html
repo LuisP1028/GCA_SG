@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE SWEEPING SCANNER // DITHERPUNK</title>
+    <style>
+        :root {
+            --color-bg: #000000;
+            --color-fg: #00FF00;
+            --font-main: 'Courier New', Courier, monospace;
+            --scan-line-color: rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--color-bg);
+            color: var(--color-fg);
+            font-family: var(--font-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- UI LAYOUT --- */
+        .crt-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .panel {
+            border: 2px solid var(--color-fg);
+            margin-bottom: 10px;
+            position: relative;
+            background: var(--color-bg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            background: var(--color-fg);
+            color: var(--color-bg);
+            padding: 2px 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* Hard edges */
+        }
+
+        /* Panel Specifics */
+        #panel-timeline { height: 40%; }
+        #panel-queue { height: 20%; }
+        #panel-monitor { height: 40%; margin-bottom: 60px; /* Space for controls */ }
+
+        /* --- CONTROLS --- */
+        .controls-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-top: 2px dashed var(--color-fg);
+            padding-top: 10px;
+            background: var(--color-bg);
+        }
+
+        button {
+            background: var(--color-bg);
+            color: var(--color-fg);
+            border: 2px solid var(--color-fg);
+            padding: 5px 15px;
+            font-family: var(--font-main);
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px var(--color-fg);
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 10px;
+            background: var(--color-fg);
+            cursor: pointer;
+            border: 1px solid var(--color-bg);
+            margin-top: -8px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--color-fg);
+            border: 1px solid var(--color-bg); /* Cutout effect */
+        }
+
+        /* --- CRT OVERLAY EFFECTS --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 999;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+        
+        /* Slight Bloom */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: rgba(0, 255, 0, 0.02);
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.95; }
+            100% { opacity: 0.97; }
+        }
+
+        .crt-container {
+            animation: flicker 0.15s infinite;
+            text-shadow: 0 0 2px var(--color-fg);
+        }
+
+        .data-readout {
+            font-size: 12px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div class="crt-container">
+        <!-- PANEL A: TIMELINE -->
+        <div id="panel-timeline" class="panel">
+            <div class="panel-header">
+                <span>[A] EVENT_TIMELINE</span>
+                <span id="phase-display">PHASE: INIT</span>
+            </div>
+            <canvas id="canvas-timeline"></canvas>
+        </div>
+
+        <!-- PANEL B: MARKER QUEUE -->
+        <div id="panel-queue" class="panel">
+            <div class="panel-header">
+                <span>[B] SORT_QUEUE</span>
+                <span>RULE: START(▲) < END(▼)</span>
+            </div>
+            <canvas id="canvas-queue"></canvas>
+        </div>
+
+        <!-- PANEL C: CAPACITY -->
+        <div id="panel-monitor" class="panel">
+            <div class="panel-header">
+                <span>[C] CONCURRENCY_LOAD</span>
+                <span id="counter-display">MAX_OVERLAP: 0</span>
+            </div>
+            <canvas id="canvas-monitor"></canvas>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="controls-bar">
+            <button id="btn-play">AUTO_RUN</button>
+            <button id="btn-step">STEP >></button>
+            <button id="btn-reset">RESET</button>
+            <div class="slider-container">
+                <span>SPEED:</span>
+                <input type="range" id="speed-slider" min="1" max="100" value="50">
+            </div>
+            <div class="data-readout" id="data-readout">T: 00</div>
+        </div>
+    </div>
+
+<script>
+/**
+ * DITHERPUNK ALGORITHM VISUALIZER
+ * Logic: Sweep-Line Algorithm
+ * Aesthetic: 1-bit Green/Black
+ */
+
+// --- CONFIGURATION ---
+const THEME = {
+    green: '#00FF00',
+    black: '#000000',
+    grid: '#003300'
+};
+
+const EVENTS = [
+    { id: 'A', start: 10, end: 40, y: 0 },
+    { id: 'B', start: 40, end: 80, y: 1 }, // Collision Edge Case
+    { id: 'C', start: 20, end: 60, y: 2 },
+    { id: 'D', start: 20, end: 50, y: 3 }
+];
+
+// --- GRAPHICS UTILS ---
+const Graphics = {
+    // Creates a dither pattern (checkerboard)
+    createDitherPattern(ctx) {
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = 4;
+        patternCanvas.height = 4;
+        const pCtx = patternCanvas.getContext('2d');
+        pCtx.fillStyle = THEME.green;
+        pCtx.fillRect(0,0,2,2);
+        pCtx.fillRect(2,2,2,2);
+        return ctx.createPattern(patternCanvas, 'repeat');
+    },
+
+    // Draw solid hard-edge pixel line
+    drawLine(ctx, x1, y1, x2, y2, dashed = false) {
+        ctx.beginPath();
+        ctx.strokeStyle = THEME.green;
+        ctx.lineWidth = 1;
+        if(dashed) ctx.setLineDash([4, 4]);
+        else ctx.setLineDash([]);
+        ctx.moveTo(Math.floor(x1) + 0.5, Math.floor(y1) + 0.5);
+        ctx.lineTo(Math.floor(x2) + 0.5, Math.floor(y2) + 0.5);
+        ctx.stroke();
+    },
+
+    // Draw Triangle Marker
+    drawMarker(ctx, x, y, type, active) {
+        const size = 6;
+        ctx.beginPath();
+        if (type === 'start') {
+            // Up Triangle (▲)
+            ctx.moveTo(x, y - size);
+            ctx.lineTo(x - size, y + size);
+            ctx.lineTo(x + size, y + size);
+        } else {
+            // Down Triangle (▼)
+            ctx.moveTo(x, y + size);
+            ctx.lineTo(x - size, y - size);
+            ctx.lineTo(x + size, y - size);
+        }
+        ctx.closePath();
+
+        ctx.strokeStyle = THEME.green;
+        ctx.lineWidth = 1;
+        
+        if (active) {
+            ctx.fillStyle = THEME.green;
+            ctx.fill();
+        } else {
+            ctx.fillStyle = THEME.black;
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+};
+
+// --- APP STATE MANAGEMENT ---
+class App {
+    constructor() {
+        // State
+        this.time = 0;
+        this.isRunning = false;
+        this.phase = 'DECOMPOSITION'; // DECOMPOSITION, SORTING, SWEEP
+        this.markers = [];
+        this.capacityHistory = [{t: 0, val: 0}];
+        this.currentLoad = 0;
+        this.maxLoad = 0;
+        this.speed = 50;
+        
+        // Setup Markers
+        EVENTS.forEach(e => {
+            this.markers.push({ t: e.start, type: 'start', id: e.id, processed: false });
+            this.markers.push({ t: e.end, type: 'end', id: e.id, processed: false });
+        });
+
+        // Pre-sort markers for "target" positions but keep initial random/unsorted for animation if desired
+        // For the visual, we strictly implement the logic sort: Time ASC, Start before End
+        this.sortedMarkers = [...this.markers].sort((a, b) => {
+            if (a.t !== b.t) return a.t - b.t;
+            // Collision logic: Start (-1) comes before End (1)
+            const typeScore = (type) => type === 'start' ? -1 : 1;
+            return typeScore(a.type) - typeScore(b.type);
+        });
+
+        // Initialize Canvases
+        this.canvases = {
+            timeline: this.setupCanvas('canvas-timeline'),
+            queue: this.setupCanvas('canvas-queue'),
+            monitor: this.setupCanvas('canvas-monitor')
+        };
+        
+        this.ditherPattern = Graphics.createDitherPattern(this.canvases.timeline.ctx);
+
+        // Bind Controls
+        document.getElementById('btn-play').onclick = () => this.togglePlay();
+        document.getElementById('btn-step').onclick = () => this.step();
+        document.getElementById('btn-reset').onclick = () => this.reset();
+        document.getElementById('speed-slider').oninput = (e) => this.speed = e.target.value;
+
+        // Resize Listener
+        window.addEventListener('resize', () => this.resize());
+        
+        // Start Loop
+        this.lastFrame = 0;
+        this.animFrame = requestAnimationFrame((t) => this.loop(t));
+        
+        this.resize();
+        this.updateUI();
+    }
+
+    setupCanvas(id) {
+        const c = document.getElementById(id);
+        const ctx = c.getContext('2d');
+        // Disable smoothing for pixel art look
+        ctx.imageSmoothingEnabled = false; 
+        return { c, ctx, width: 0, height: 0 };
+    }
+
+    resize() {
+        for (let key in this.canvases) {
+            const wrapper = this.canvases[key].c.parentElement;
+            const cvs = this.canvases[key].c;
+            const rect = wrapper.getBoundingClientRect();
+            
+            // Handle DPI
+            const dpr = window.devicePixelRatio || 1;
+            cvs.width = rect.width * dpr;
+            cvs.height = (rect.height - 25) * dpr; // Minus header
+            
+            this.canvases[key].width = cvs.width;
+            this.canvases[key].height = cvs.height;
+            this.canvases[key].ctx.scale(dpr, dpr);
+            
+            // CSS size
+            cvs.style.width = `${rect.width}px`;
+            cvs.style.height = `${rect.height - 25}px`;
+        }
+        // Re-generate pattern on resize
+        this.ditherPattern = Graphics.createDitherPattern(this.canvases.timeline.ctx);
+    }
+
+    // --- LOGIC ---
+
+    reset() {
+        this.time = 0;
+        this.phase = 'DECOMPOSITION';
+        this.isRunning = false;
+        this.currentLoad = 0;
+        this.maxLoad = 0;
+        this.capacityHistory = [{t: 0, val: 0}];
+        this.markers.forEach(m => m.processed = false);
+        this.updateUI();
+    }
+
+    togglePlay() {
+        this.isRunning = !this.isRunning;
+        document.getElementById('btn-play').innerText = this.isRunning ? "PAUSE ||" : "AUTO_RUN";
+        if (this.phase === 'DONE') this.reset();
+    }
+
+    step() {
+        this.isRunning = false; // Pause if manual stepping
+        document.getElementById('btn-play').innerText = "AUTO_RUN";
+        this.advanceLogic(true);
+    }
+
+    advanceLogic(forceStep = false) {
+        // 1. DECOMPOSITION PHASE (Visual Setup)
+        if (this.phase === 'DECOMPOSITION') {
+            if (this.time < 100) this.time += 2; 
+            else {
+                this.phase = 'SORTING';
+                this.time = 0;
+            }
+            return;
+        }
+
+        // 2. SORTING PHASE (Markers align)
+        if (this.phase === 'SORTING') {
+            // Just a visual delay to show markers snapping
+            if (this.time < 50) this.time += 1;
+            else {
+                this.phase = 'SWEEP';
+                this.time = 0; // Reset time to 0 for the actual sweep
+            }
+            return;
+        }
+
+        // 3. SWEEP PHASE (The Algorithm)
+        if (this.phase === 'SWEEP') {
+            const nextMarker = this.sortedMarkers.find(m => !m.processed);
+            
+            if (!nextMarker) {
+                this.phase = 'DONE';
+                return;
+            }
+
+            // Move sweep line towards next marker
+            const dx = (nextMarker.t - this.time);
+            
+            // If we are close enough or forced step
+            if (dx <= 0.5 || forceStep) {
+                this.time = nextMarker.t;
+                this.processMarker(nextMarker);
+                
+                // CRITICAL: Pause briefly on collision overlap to show the spike
+                // If there is another marker at the EXACT same time, don't update chart history yet,
+                // wait for the visual loop to draw the spike.
+                
+            } else {
+                // Smooth movement based on speed slider
+                const stepSize = 0.1 * (this.speed / 10); 
+                this.time += stepSize;
+            }
+        }
+    }
+
+    processMarker(marker) {
+        marker.processed = true;
+        
+        if (marker.type === 'start') {
+            this.currentLoad++;
+        } else {
+            this.currentLoad--;
+        }
+
+        if (this.currentLoad > this.maxLoad) this.maxLoad = this.currentLoad;
+
+        this.capacityHistory.push({ t: this.time, val: this.currentLoad });
+        this.updateUI();
+    }
+
+    updateUI() {
+        document.getElementById('phase-display').innerText = `PHASE: ${this.phase}`;
+        document.getElementById('data-readout').innerText = `T: ${this.time.toFixed(1)}`;
+        document.getElementById('counter-display').innerText = `CURRENT: ${this.currentLoad} | MAX: ${this.maxLoad}`;
+    }
+
+    // --- RENDER LOOP ---
+
+    loop(timestamp) {
+        if (this.isRunning) {
+            this.advanceLogic();
+        }
+
+        this.drawTimeline();
+        this.drawQueue();
+        this.drawMonitor();
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    // --- DRAWING FUNCTIONS ---
+
+    getX(t, width) {
+        // Map 0-100 time to canvas width with padding
+        const padding = 40;
+        const usableWidth = width - (padding * 2);
+        return padding + (t / 100) * usableWidth;
+    }
+
+    drawTimeline() {
+        const { ctx, width, height } = this.canvases.timeline;
+        const dpr = window.devicePixelRatio || 1;
+        const w = width / dpr;
+        const h = height / dpr;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Grid lines
+        ctx.strokeStyle = '#003300';
+        ctx.lineWidth = 1;
+        for(let i=0; i<=100; i+=10) {
+            let x = this.getX(i, w);
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        }
+
+        // Draw Events
+        const rowHeight = h / (EVENTS.length + 1);
+        
+        EVENTS.forEach((e, i) => {
+            const y = (i + 1) * rowHeight;
+            const xStart = this.getX(e.start, w);
+            const xEnd = this.getX(e.end, w);
+            const barW = xEnd - xStart;
+            
+            // Logic: Is this event active under the sweep line?
+            const isActive = (this.phase === 'SWEEP' && this.time >= e.start && this.time < e.end);
+            const isProcessed = (this.phase === 'SWEEP' && this.time >= e.end);
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = THEME.green;
+            
+            if (isActive) {
+                // Active: Solid Green
+                ctx.fillStyle = THEME.green;
+                ctx.fillRect(xStart, y - 5, barW, 10);
+            } else if (isProcessed) {
+                // Processed: Dither Pattern
+                ctx.fillStyle = this.ditherPattern;
+                ctx.fillRect(xStart, y - 5, barW, 10);
+                ctx.strokeRect(xStart, y - 5, barW, 10);
+            } else {
+                // Inactive: Outline
+                ctx.strokeRect(xStart, y - 5, barW, 10);
+            }
+
+            // Labels
+            ctx.fillStyle = THEME.green;
+            ctx.font = "10px monospace";
+            ctx.fillText(e.id, 10, y + 4);
+        });
+
+        // Sweep Line Overlay
+        if (this.phase === 'SWEEP') {
+            const sx = this.getX(this.time, w);
+            ctx.strokeStyle = THEME.green;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(sx, 0);
+            ctx.lineTo(sx, h);
+            ctx.stroke();
+        }
+    }
+
+    drawQueue() {
+        const { ctx, width, height } = this.canvases.queue;
+        const dpr = window.devicePixelRatio || 1;
+        const w = width / dpr;
+        const h = height / dpr;
+
+        ctx.clearRect(0, 0, w, h);
+        
+        // Track line
+        const trackY = h / 2;
+        Graphics.drawLine(ctx, 0, trackY, w, trackY, true);
+
+        // Markers
+        this.sortedMarkers.forEach((m, i) => {
+            let mx, my;
+            
+            if (this.phase === 'DECOMPOSITION') {
+                // Floating down from top
+                const targetX = this.getX(m.t, w);
+                mx = targetX;
+                my = (this.time / 100) * trackY; // Animate down
+            } else {
+                // Sorted Position
+                mx = this.getX(m.t, w);
+                my = trackY;
+                
+                // Visual overlap logic for Time 40 Edge Case
+                // If collision, offset Start (▲) up, End (▼) down
+                // Check neighbors in sorted array
+                const isCollision = this.sortedMarkers.some(other => other !== m && other.t === m.t);
+                
+                if (isCollision) {
+                    if (m.type === 'start') my -= 8; // Float Up
+                    if (m.type === 'end') my += 8;   // Float Down
+                }
+            }
+
+            // Highlight active being processed
+            const isActive = (m.processed || (Math.abs(m.t - this.time) < 0.5 && this.phase === 'SWEEP'));
+            
+            Graphics.drawMarker(ctx, mx, my, m.type, m.processed);
+
+            // Connect marker to sweep line if close
+            if (this.phase === 'SWEEP' && Math.abs(mx - this.getX(this.time, w)) < 1) {
+                ctx.strokeStyle = THEME.green;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, 0); ctx.stroke();
+            }
+        });
+    }
+
+    drawMonitor() {
+        const { ctx, width, height } = this.canvases.monitor;
+        const dpr = window.devicePixelRatio || 1;
+        const w = width / dpr;
+        const h = height / dpr;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const bottomY = h - 20;
+        const stepY = (h - 40) / 4; // Max capacity 4 assumed
+
+        // Draw Capacity History
+        if (this.capacityHistory.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(this.getX(0, w), bottomY);
+
+            // Draw Step Line
+            for (let i = 0; i < this.capacityHistory.length; i++) {
+                const point = this.capacityHistory[i];
+                const x = this.getX(point.t, w);
+                const y = bottomY - (point.val * stepY);
+                
+                // Step logic: horizontal then vertical
+                if (i > 0) {
+                    const prev = this.capacityHistory[i-1];
+                    const prevY = bottomY - (prev.val * stepY);
+                    ctx.lineTo(x, prevY); // Horizontal to new time
+                    ctx.lineTo(x, y);     // Vertical to new val
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            // Continue to current sweep time
+            const currentX = this.getX(this.time, w);
+            const currentY = bottomY - (this.currentLoad * stepY);
+            // Draw last step
+            const last = this.capacityHistory[this.capacityHistory.length-1];
+            const lastY = bottomY - (last.val * stepY);
+            
+            ctx.lineTo(currentX, lastY); // Horizontal
+            
+            // We want to visualize the "instant" change at T=40
+            // If we are currently on a marker, we draw the vertical line based on current load
+            ctx.lineTo(currentX, currentY);
+
+            ctx.strokeStyle = THEME.green;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Fill with dither
+            ctx.lineTo(currentX, bottomY);
+            ctx.lineTo(this.getX(0, w), bottomY);
+            ctx.fillStyle = this.ditherPattern;
+            ctx.fill();
+        }
+
+        // Draw Max Peak Line
+        const maxY = bottomY - (this.maxLoad * stepY);
+        ctx.beginPath();
+        ctx.setLineDash([2, 4]);
+        ctx.moveTo(0, maxY);
+        ctx.lineTo(w, maxY);
+        ctx.strokeStyle = THEME.green;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = THEME.green;
+        ctx.fillText(`MAX_CAPACITY: ${this.maxLoad}`, w - 120, maxY - 5);
+    }
+}
+
+// Init
+window.onload = () => {
+    const app = new App();
+};
+
+</script>
+</body>
+</html>

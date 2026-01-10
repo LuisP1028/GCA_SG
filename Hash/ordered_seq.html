@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordered Sequential Covering Flow // DITHERPUNK</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #39FF14; /* Neon Green */
+            --accent: #FFB000; /* Amber for special events */
+            --font-main: 'Courier New', Courier, monospace;
+            --border-width: 2px;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- DITHER PATTERNS & TEXTURES --- */
+        
+        /* Simulates a dim gray using a checkerboard of black and green */
+        .dither-dim {
+            background-image: repeating-conic-gradient(var(--fg) 0% 25%, transparent 0% 50%);
+            background-size: 2px 2px;
+            color: var(--bg);
+        }
+
+        /* Diagonal striping for backgrounds */
+        .dither-bg {
+            background-image: repeating-linear-gradient(45deg, var(--fg) 25%, transparent 25%, transparent 50%, var(--fg) 50%, var(--fg) 75%, transparent 75%, transparent 100%);
+            background-size: 4px 4px;
+        }
+
+        /* Error/Broken pattern */
+        .dither-error {
+            background-image: repeating-linear-gradient(135deg, var(--fg) 0px, var(--fg) 2px, transparent 2px, transparent 6px);
+            background-size: 8px 8px;
+        }
+
+        /* --- LAYOUT ZONES --- */
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            border-bottom: var(--border-width) solid var(--fg);
+            margin: 0;
+            padding-bottom: 5px;
+            letter-spacing: 2px;
+        }
+
+        /* ZONE A: THE STREAM */
+        #zone-a {
+            flex: 2;
+            border: var(--border-width) solid var(--fg);
+            position: relative;
+            overflow-x: auto;
+            overflow-y: hidden;
+            display: flex;
+            align-items: center;
+            background: var(--bg);
+            /* Custom Scrollbar styling */
+            scrollbar-width: thin;
+            scrollbar-color: var(--fg) var(--bg);
+        }
+        
+        #stream-content {
+            display: flex;
+            padding: 0 50vw 0 20px; /* Padding to allow scrolling */
+            align-items: center;
+            position: relative;
+            min-height: 150px;
+        }
+
+        /* SVG Overlay Layer */
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .word-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 25px;
+            position: relative;
+            z-index: 5;
+            transition: none; /* No smooth transition for retro feel */
+        }
+
+        .word-index {
+            font-size: 0.7rem;
+            margin-bottom: 4px;
+            opacity: 1;
+        }
+
+        .word-text {
+            border: 1px solid var(--fg);
+            padding: 8px 12px;
+            font-weight: bold;
+            background: var(--bg);
+        }
+
+        /* Keyword Tint (Dithered) */
+        .is-keyword .word-text {
+            background-image: radial-gradient(var(--fg) 10%, transparent 10%);
+            background-size: 3px 3px;
+        }
+
+        /* Active Scanner */
+        .word-block.active .word-text {
+            background: var(--fg);
+            color: var(--bg);
+            box-shadow: 4px 4px 0 var(--accent);
+        }
+
+        /* Global Best Range Highlight */
+        .word-block.gold-border .word-text {
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+        }
+
+        /* ZONE B: TRACKER */
+        #zone-b {
+            flex: 1;
+            border: var(--border-width) solid var(--fg);
+            padding: 10px;
+            overflow: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        th, td {
+            border: 1px solid var(--fg);
+            padding: 8px;
+        }
+
+        th {
+            background: var(--fg);
+            color: var(--bg);
+            text-transform: uppercase;
+        }
+
+        .cell-flash {
+            background: var(--fg) !important;
+            color: var(--bg) !important;
+        }
+
+        .cell-error {
+            background-image: repeating-linear-gradient(45deg, var(--fg) 0, var(--fg) 1px, transparent 1px, transparent 4px);
+            color: var(--fg);
+        }
+
+        /* ZONE C: RESULT */
+        #zone-c {
+            flex: 0 0 80px;
+            border: var(--border-width) solid var(--fg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .result-label {
+            margin-right: 20px;
+            font-size: 1rem;
+        }
+
+        #global-min-display {
+            color: var(--accent);
+            text-shadow: 2px 2px 0 var(--fg);
+        }
+
+        /* CONTROL PANEL */
+        #controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border: var(--border-width) solid var(--fg);
+            padding: 10px;
+        }
+
+        button {
+            background: var(--bg);
+            color: var(--fg);
+            border: 1px solid var(--fg);
+            padding: 10px 20px;
+            font-family: var(--font-main);
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 var(--fg);
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        button:disabled {
+            border-style: dashed;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .slider-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--fg);
+        }
+
+        /* NARRATOR BOX */
+        #narrator {
+            height: 60px;
+            border: var(--border-width) solid var(--fg);
+            padding: 10px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .cursor-blink::after {
+            content: "█";
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Ordered Sequential Covering Flow</h1>
+        </header>
+
+        <!-- ZONE A: The Stream -->
+        <div id="zone-a">
+            <div id="stream-content">
+                <svg id="svg-layer"></svg>
+                <!-- Words injected by JS -->
+            </div>
+        </div>
+
+        <!-- ZONE B: The Tracker -->
+        <div id="zone-b">
+            <table id="tracker-table">
+                <thead>
+                    <tr id="tracker-header">
+                        <th>Metric</th>
+                        <!-- Keyword headers injected by JS -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="row-idx">
+                        <td>Latest Index</td>
+                    </tr>
+                    <tr id="row-len">
+                        <td>Chain Length</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ZONE C: Result -->
+        <div id="zone-c">
+            <span class="result-label">GLOBAL MINIMUM FOUND:</span>
+            <span id="global-min-display">∞</span>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls">
+            <button id="btn-play">Play</button>
+            <button id="btn-pause">Pause</button>
+            <button id="btn-step">Step</button>
+            <div class="slider-container">
+                <label>SPEED</label>
+                <input type="range" id="speed-slider" min="100" max="2000" step="100" value="1000">
+            </div>
+            <button id="btn-reset">Reset</button>
+        </div>
+
+        <!-- Narrator -->
+        <div id="narrator">
+            <span id="narrator-text" class="cursor-blink">System Ready. Awaiting Command...</span>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIGURATION ---
+    const inputText = "the big black cat sat on the warm mat and the cat sat with a hat";
+    const keywords = ["cat", "sat", "mat"];
+    const words = inputText.split(" ");
+    
+    // --- STATE ---
+    let currentIndex = 0;
+    let isRunning = false;
+    let timer = null;
+    let speed = 1000; // ms
+    
+    // Algorithm State
+    let latestOccurrence = new Array(keywords.length).fill(-1);
+    let shortestLengthUpTo = new Array(keywords.length).fill(Infinity);
+    let globalMin = Infinity;
+    let globalMinRange = null; // {start, end}
+
+    // --- DOM ELEMENTS ---
+    const streamContent = document.getElementById('stream-content');
+    const svgLayer = document.getElementById('svg-layer');
+    const trackerHeader = document.getElementById('tracker-header');
+    const rowIdx = document.getElementById('row-idx');
+    const rowLen = document.getElementById('row-len');
+    const globalMinDisplay = document.getElementById('global-min-display');
+    const narratorText = document.getElementById('narrator-text');
+    
+    const btnPlay = document.getElementById('btn-play');
+    const btnPause = document.getElementById('btn-pause');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const slider = document.getElementById('speed-slider');
+
+    // --- INITIALIZATION ---
+
+    function init() {
+        // 1. Render Stream
+        streamContent.innerHTML = '<svg id="svg-layer"></svg>'; // Reset content keeping SVG
+        words.forEach((word, index) => {
+            const block = document.createElement('div');
+            block.className = 'word-block';
+            block.id = `word-${index}`;
+            
+            const isKw = keywords.includes(word);
+            if(isKw) block.classList.add('is-keyword');
+
+            block.innerHTML = `
+                <div class="word-index">${index}</div>
+                <div class="word-text">${word}</div>
+            `;
+            streamContent.appendChild(block);
+        });
+
+        // 2. Render Tracker Table
+        // Clear existing keyword cells (keep first "Metric" cell)
+        while(trackerHeader.children.length > 1) trackerHeader.removeChild(trackerHeader.lastChild);
+        while(rowIdx.children.length > 1) rowIdx.removeChild(rowIdx.lastChild);
+        while(rowLen.children.length > 1) rowLen.removeChild(rowLen.lastChild);
+
+        keywords.forEach((kw, k) => {
+            // Header
+            const th = document.createElement('th');
+            th.innerText = kw;
+            trackerHeader.appendChild(th);
+
+            // Row 1 (Index)
+            const tdIdx = document.createElement('td');
+            tdIdx.id = `cell-idx-${k}`;
+            tdIdx.innerText = '-';
+            rowIdx.appendChild(tdIdx);
+
+            // Row 2 (Length)
+            const tdLen = document.createElement('td');
+            tdLen.id = `cell-len-${k}`;
+            tdLen.innerText = '∞';
+            rowLen.appendChild(tdLen);
+        });
+
+        // 3. Reset State
+        currentIndex = 0;
+        latestOccurrence.fill(-1);
+        shortestLengthUpTo.fill(Infinity);
+        globalMin = Infinity;
+        globalMinRange = null;
+        globalMinDisplay.innerText = "∞";
+        narrate("System Initialized. Ready to scan.");
+        updateSVGDimensions();
+    }
+
+    // --- UTILITIES ---
+
+    function narrate(text) {
+        narratorText.innerText = text;
+    }
+
+    function updateSVGDimensions() {
+        const svg = document.getElementById('svg-layer');
+        svg.setAttribute('width', streamContent.scrollWidth);
+        svg.setAttribute('height', streamContent.scrollHeight);
+    }
+
+    function scrollStream(index) {
+        const el = document.getElementById(`word-${index}`);
+        if(el) {
+            el.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+        }
+    }
+
+    function drawConnection(fromIndex, toIndex, isError) {
+        const svg = document.getElementById('svg-layer');
+        updateSVGDimensions();
+
+        const fromEl = document.getElementById(`word-${fromIndex}`).querySelector('.word-text');
+        const toEl = document.getElementById(`word-${toIndex}`).querySelector('.word-text');
+
+        // Calculate positions relative to the container
+        const containerRect = streamContent.getBoundingClientRect();
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+
+        const x1 = (fromRect.left - containerRect.left) + fromRect.width / 2;
+        const y1 = (fromRect.top - containerRect.top) + fromRect.height; // bottom of box
+        const x2 = (toRect.left - containerRect.left) + toRect.width / 2;
+        const y2 = (toRect.top - containerRect.top) + toRect.height; 
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        
+        // Arc math
+        const controlY = y1 + 60; // Curve depth
+        const d = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${controlY} ${x2} ${y2}`;
+
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", isError ? "var(--accent)" : "var(--fg)");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("stroke-dasharray", isError ? "4 2" : "none");
+        
+        // Remove old temporary paths
+        const oldPaths = svg.querySelectorAll('.temp-path');
+        oldPaths.forEach(p => p.remove());
+
+        path.classList.add('temp-path');
+        svg.appendChild(path);
+    }
+
+    function flashCell(id, isError = false) {
+        const cell = document.getElementById(id);
+        if(cell) {
+            // Remove classes to re-trigger
+            cell.classList.remove('cell-flash', 'cell-error');
+            void cell.offsetWidth; // Force reflow
+            if (isError) cell.classList.add('cell-error');
+            else cell.classList.add('cell-flash');
+            
+            setTimeout(() => {
+                cell.classList.remove('cell-flash');
+                if(!isError) cell.classList.remove('cell-error'); // Keep error persistent until next update if needed? No, prompt says flash.
+            }, 500);
+        }
+    }
+
+    function highlightRange(start, end, isBest) {
+        // Clear previous golds
+        document.querySelectorAll('.gold-border').forEach(el => el.classList.remove('gold-border'));
+        
+        for(let i = start; i <= end; i++) {
+            const el = document.getElementById(`word-${i}`);
+            if(isBest) el.classList.add('gold-border');
+        }
+    }
+
+    // --- CORE LOGIC ---
+
+    function step() {
+        if (currentIndex >= words.length) {
+            narrate("Sequence Complete.");
+            stop();
+            return;
+        }
+
+        // 1. UI: Move Scanner
+        document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+        const currentBlock = document.getElementById(`word-${currentIndex}`);
+        currentBlock.classList.add('active');
+        scrollStream(currentIndex);
+
+        const currentWord = words[currentIndex];
+        const k = keywords.indexOf(currentWord);
+
+        if (k === -1) {
+            // Non-keyword
+            narrate(`Scanning index ${currentIndex}: "${currentWord}"...`);
+        } else {
+            // Is Keyword
+            latestOccurrence[k] = currentIndex;
+            
+            // Update Tracker UI (Index)
+            const idxCellId = `cell-idx-${k}`;
+            const idxCell = document.getElementById(idxCellId);
+            idxCell.innerText = currentIndex;
+            flashCell(idxCellId);
+
+            if (k === 0) {
+                // First keyword in chain
+                shortestLengthUpTo[0] = 1;
+                
+                // Update Tracker UI (Length)
+                const lenCellId = `cell-len-${0}`;
+                const lenCell = document.getElementById(lenCellId);
+                lenCell.innerText = "1";
+                flashCell(lenCellId);
+
+                narrate(`Found START anchor "${currentWord}". Chain init.`);
+            } else {
+                // Subsequent keyword
+                const prevIndex = latestOccurrence[k-1];
+                
+                if (prevIndex === -1) {
+                    // Broken Chain
+                    narrate(`Found "${currentWord}", but previous link missing. Chain broken.`);
+                    flashCell(`cell-len-${k}`, true); // Red/Error flash
+                    shortestLengthUpTo[k] = Infinity;
+                    document.getElementById(`cell-len-${k}`).innerText = "∞";
+                } else {
+                    // Valid Chain Link
+                    const dist = currentIndex - prevIndex;
+                    const newLength = dist + shortestLengthUpTo[k-1];
+                    shortestLengthUpTo[k] = newLength;
+
+                    // Update Tracker UI (Length)
+                    const lenCellId = `cell-len-${k}`;
+                    const lenCell = document.getElementById(lenCellId);
+                    lenCell.innerText = newLength;
+                    flashCell(lenCellId);
+
+                    // Visual Arc
+                    drawConnection(prevIndex, currentIndex, false);
+
+                    narrate(`Linked "${currentWord}" to "${keywords[k-1]}". Dist: ${dist}, Total: ${newLength}.`);
+
+                    // Check Result if it's the last keyword
+                    if (k === keywords.length - 1) {
+                        if (newLength < globalMin) {
+                            globalMin = newLength;
+                            globalMinDisplay.innerText = globalMin;
+                            
+                            // Calculate range start
+                            // To find the exact start index of this chain, we'd need to backtrack. 
+                            // But for this simplified vis, we know the chain ends here and length is newLength.
+                            // However, strictly finding the start index requires storing parent pointers.
+                            // Simplified approach for Vis: Draw box around relevant area visually?
+                            // Or just highlight from current back to k-2 back to k-1...
+                            
+                            // Let's approximate the range visuals by highlighting from the first keyword's latest occurrence
+                            // Note: This works for Ordered Sequential Covering.
+                            let rangeStart = latestOccurrence[0];
+                            highlightRange(rangeStart, currentIndex, true);
+                            narrate(`NEW GLOBAL MINIMUM: ${globalMin}! Range highlighted.`);
+                        } else {
+                            narrate(`Chain Complete (Len: ${newLength}). Not better than ${globalMin}.`);
+                        }
+                    }
+                }
+            }
+        }
+
+        currentIndex++;
+    }
+
+    // --- CONTROLLER ---
+
+    function start() {
+        if(isRunning) return;
+        isRunning = true;
+        btnPlay.disabled = true;
+        btnPause.disabled = false;
+        btnStep.disabled = true;
+        
+        timer = setInterval(step, 2100 - speed); // Invert logic for slider
+    }
+
+    function stop() {
+        isRunning = false;
+        clearInterval(timer);
+        btnPlay.disabled = false;
+        btnPause.disabled = true;
+        btnStep.disabled = false;
+    }
+
+    // Event Listeners
+    btnPlay.addEventListener('click', start);
+    btnPause.addEventListener('click', stop);
+    btnStep.addEventListener('click', () => {
+        stop();
+        step();
+    });
+    btnReset.addEventListener('click', () => {
+        stop();
+        init();
+    });
+    
+    slider.addEventListener('input', (e) => {
+        speed = parseInt(e.target.value);
+        if(isRunning) {
+            stop();
+            start();
+        }
+    });
+
+    // Handle resize for SVG lines
+    window.addEventListener('resize', () => {
+        updateSVGDimensions();
+    });
+
+    // Boot
+    init();
+
+</script>
+</body>
+</html>

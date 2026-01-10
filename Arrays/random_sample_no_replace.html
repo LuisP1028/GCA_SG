@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Partial Shuffle // Ditherpunk</title>
+    
+    <!-- Import Retro Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- CSS VARIABLES & RESET --- */
+        :root {
+            --color-bg: #111111;
+            --color-fg: #00FF41;
+            --color-dim: #003B00;
+            --font-stack: 'VT323', monospace;
+            --cell-size: 60px;
+            --glow: 0 0 10px rgba(0, 255, 65, 0.5);
+            --scanline-color: rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--color-bg);
+            color: var(--color-fg);
+            font-family: var(--font-stack);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            text-shadow: 0 0 4px var(--color-dim);
+        }
+
+        /* --- SCANLINES & CRT EFFECTS --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 999;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+            opacity: 0.98;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+
+        /* --- LAYOUT STRUCTURE --- */
+        #app {
+            display: flex;
+            flex-direction: column;
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            border: 2px solid var(--color-fg);
+            padding: 20px;
+            position: relative;
+            background: var(--color-bg);
+            box-shadow: 0 0 20px var(--color-dim);
+        }
+
+        header {
+            border-bottom: 2px solid var(--color-fg);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            background: black;
+            color: var(--color-fg);
+            border: 1px solid var(--color-fg);
+            font-family: var(--font-stack);
+            font-size: 1.2rem;
+            padding: 5px 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--color-fg);
+            color: black;
+            box-shadow: var(--glow);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-style: dashed;
+        }
+
+        /* --- VISUALIZATION AREA --- */
+        #viz-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        #status-label {
+            font-size: 1.4rem;
+            margin-bottom: 30px;
+            text-align: center;
+            min-height: 1.5em;
+        }
+
+        /* The Array Row */
+        .array-row {
+            display: flex;
+            gap: 10px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        /* SVG Overlay for Lines */
+        #connector-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            overflow: visible;
+        }
+        
+        line {
+            stroke: var(--color-fg);
+            stroke-width: 2;
+            stroke-dasharray: 5;
+            animation: dash 1s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+
+        /* --- CELL STYLES --- */
+        .cell-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: var(--cell-size);
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bounce effect */
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: 2px solid var(--color-fg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            position: relative;
+            background-color: black;
+            z-index: 2;
+        }
+
+        .index-label {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        /* 1. SELECTION (LOCKED) STATE: Inverted Green */
+        .cell.selected {
+            background-color: var(--color-fg);
+            color: black;
+            box-shadow: var(--glow);
+        }
+
+        /* 2. POOL STATE: Dithered Texture */
+        .cell.pool {
+            /* Dither pattern using radial gradient */
+            background-image: radial-gradient(var(--color-dim) 20%, transparent 20%);
+            background-size: 4px 4px;
+            color: var(--color-fg);
+        }
+
+        /* 3. DISCARDED STATE: Dimmed */
+        .cell.discarded {
+            opacity: 0.3;
+            border-style: dotted;
+        }
+
+        /* 4. CURRENT (i) TARGET: Pulsing Border */
+        .cell.target {
+            border: 4px double var(--color-fg);
+            animation: pulse-border 0.8s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            from { box-shadow: 0 0 2px var(--color-fg); transform: scale(1); }
+            to { box-shadow: 0 0 15px var(--color-fg); transform: scale(1.05); }
+        }
+
+        /* 5. RANDOM (r) SOURCE: Strobe/Glitch */
+        .cell.source {
+            animation: strobe 0.1s infinite;
+        }
+
+        @keyframes strobe {
+            0% { background-color: var(--color-fg); color: black; }
+            50% { background-color: black; color: var(--color-fg); }
+            100% { background-color: var(--color-fg); color: black; }
+        }
+
+        /* --- BRACKET MARKER --- */
+        .boundary-marker {
+            position: absolute;
+            top: -30px;
+            font-size: 1rem;
+            text-align: center;
+            width: 100%;
+            height: 20px;
+            pointer-events: none;
+        }
+        
+        .boundary-text {
+            position: absolute;
+            transition: left 0.5s ease;
+            white-space: nowrap;
+        }
+
+        /* --- LOG TERMINAL --- */
+        #console-log {
+            height: 150px;
+            border-top: 2px solid var(--color-fg);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse; /* Newest at bottom visually if we prepend, but sticking to standard append */
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        .log-entry::before {
+            content: "> ";
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CRT Overlay -->
+    <div class="scanlines"></div>
+
+    <div id="app" class="crt-flicker">
+        <header>
+            <div>
+                <h1>PARTIAL_SHUFFLE_ALG</h1>
+                <small style="opacity: 0.7">STATUS: <span id="sys-status">IDLE</span></small>
+            </div>
+            <div class="controls">
+                <button id="btn-step">STEP_SEQ</button>
+                <button id="btn-auto">AUTO_RUN</button>
+                <button id="btn-reset">RESET</button>
+            </div>
+        </header>
+
+        <div id="viz-container">
+            <!-- Dynamic Status Text -->
+            <div id="status-label">INITIALIZED. WAITING FOR INPUT.</div>
+            
+            <div style="position: relative; padding-top: 40px;">
+                <!-- Boundary Marker Text -->
+                <div class="boundary-marker">
+                    <span id="boundary-indicator" class="boundary-text">▼ BOUNDARY</span>
+                </div>
+
+                <!-- Array Elements -->
+                <div class="array-row" id="array-root">
+                    <!-- JS will populate this -->
+                </div>
+                
+                <!-- SVG Layer for drawing lines between swaps -->
+                <svg id="connector-svg"></svg>
+            </div>
+        </div>
+
+        <div id="console-log">
+            <!-- Logs go here -->
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & CONFIG ---
+        const N = 10;
+        const K = 5;
+        const SPEED = 1200; // ms per action
+
+        // --- STATE ---
+        let array = [];
+        let currentIndex = 0; // i
+        let isRunning = false;
+        let isAuto = false;
+        let autoInterval = null;
+        let state = 'IDLE'; // IDLE, PICK, SWAP, LOCK, DONE
+
+        // --- DOM ELEMENTS ---
+        const domRoot = document.getElementById('array-root');
+        const logContainer = document.getElementById('console-log');
+        const statusLabel = document.getElementById('status-label');
+        const sysStatus = document.getElementById('sys-status');
+        const btnStep = document.getElementById('btn-step');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
+        const boundaryInd = document.getElementById('boundary-indicator');
+        const svgLayer = document.getElementById('connector-svg');
+
+        // --- INITIALIZATION ---
+        function init() {
+            array = Array.from({length: N}, (_, i) => i);
+            currentIndex = 0;
+            state = 'IDLE';
+            isRunning = false;
+            isAuto = false;
+            clearInterval(autoInterval);
+            
+            renderArray();
+            updateBoundary();
+            log("SYSTEM INITIALIZED. DATA LOADED.");
+            log(`Params: N=${N}, K=${K}. Goal: Randomize first ${K} elements.`);
+            sysStatus.innerText = "IDLE";
+            statusLabel.innerText = "READY.";
+            
+            btnStep.disabled = false;
+            btnAuto.disabled = false;
+            
+            // Clear SVG
+            svgLayer.innerHTML = '';
+        }
+
+        // --- CORE RENDERING ---
+        function renderArray() {
+            domRoot.innerHTML = '';
+            
+            array.forEach((val, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'cell-wrapper';
+                wrapper.id = `wrap-${idx}`; // ID based on position
+
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.innerText = val;
+                
+                // Styling Logic
+                if (idx < currentIndex) {
+                    cell.classList.add('selected'); // 0 to i-1
+                } else {
+                    cell.classList.add('pool'); // i to n-1
+                }
+
+                // If finished, discard the rest
+                if (state === 'DONE' && idx >= K) {
+                    cell.classList.add('discarded');
+                    cell.classList.remove('pool');
+                }
+
+                const label = document.createElement('div');
+                label.className = 'index-label';
+                label.innerText = idx;
+
+                wrapper.appendChild(cell);
+                wrapper.appendChild(label);
+                domRoot.appendChild(wrapper);
+            });
+        }
+
+        function updateBoundary() {
+            // Move the boundary text indicator
+            // Calculation assumes 60px cell + 10px gap.
+            // Center of gap before index i is: (i * 70) - 5.
+            const px = (currentIndex * 70) - 5;
+            boundaryInd.style.left = `${px}px`;
+            
+            if (currentIndex === 0) boundaryInd.style.left = "-10px";
+            if (currentIndex >= K) boundaryInd.innerText = "COMPLETE";
+            else boundaryInd.innerText = "▼ BOUNDARY";
+        }
+
+        // --- LOGGING ---
+        function log(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // --- ALGORITHM STEPS ---
+        
+        async function performStep() {
+            if (state === 'DONE') return;
+
+            btnStep.disabled = true;
+            if (!isAuto) sysStatus.innerText = "EXECUTING...";
+
+            // 1. PICK (State A)
+            // Select random index r from [i, n-1]
+            const r = Math.floor(Math.random() * (N - currentIndex)) + currentIndex;
+            
+            // Update Visuals for Selection
+            const cellI = document.querySelector(`#wrap-${currentIndex} .cell`);
+            const cellR = document.querySelector(`#wrap-${r} .cell`);
+            
+            cellI.classList.add('target'); // The cursor (i)
+            cellR.classList.add('source'); // The picked element (r)
+
+            statusLabel.innerText = `Current Index [${currentIndex}] | Selected Random [${r}]`;
+            log(`Iter ${currentIndex}: Randomly selected index ${r} from pool.`);
+
+            // Draw Connector Line
+            drawConnector(currentIndex, r);
+
+            await wait(SPEED);
+
+            // 2. SWAP ANIMATION (State B)
+            statusLabel.innerText = "Swapping values...";
+            log(`Swapping values ${array[currentIndex]} <-> ${array[r]}...`);
+
+            if (currentIndex !== r) {
+                await animateSwap(currentIndex, r);
+            } else {
+                log("Self-swap (No movement needed).");
+                await wait(SPEED / 2);
+            }
+
+            // 3. LOCK & UPDATE (State C)
+            // Perform Logic Swap
+            [array[currentIndex], array[r]] = [array[r], array[currentIndex]];
+            
+            // Re-render to clear styles and lock selection
+            currentIndex++;
+            state = (currentIndex === K) ? 'DONE' : 'IDLE';
+            
+            // Clear SVG
+            svgLayer.innerHTML = '';
+            
+            renderArray(); // Re-builds DOM, applying 'Selected' style to new currentIndex-1
+            updateBoundary();
+
+            if (state === 'DONE') {
+                log("PROCESS COMPLETE. UNIFORM SAMPLE GENERATED.");
+                statusLabel.innerText = "HALTED.";
+                sysStatus.innerText = "COMPLETE";
+                btnAuto.disabled = true;
+                btnStep.disabled = true;
+                clearInterval(autoInterval);
+            } else {
+                log(`Index ${currentIndex-1} locked. Pool size: ${N - currentIndex}.`);
+                btnStep.disabled = false;
+                if (!isAuto) sysStatus.innerText = "WAITING";
+            }
+        }
+
+        // --- ANIMATION UTILS ---
+        
+        function drawConnector(idx1, idx2) {
+            if (idx1 === idx2) return; // No line needed
+
+            const rect1 = document.getElementById(`wrap-${idx1}`).getBoundingClientRect();
+            const rect2 = document.getElementById(`wrap-${idx2}`).getBoundingClientRect();
+            const containerRect = document.getElementById('viz-container').getBoundingClientRect();
+
+            // Calculate centers relative to SVG container
+            const x1 = rect1.left + rect1.width/2 - containerRect.left;
+            const y1 = rect1.top - containerRect.top - 20; // Above boxes
+            const x2 = rect2.left + rect2.width/2 - containerRect.left;
+            const y2 = rect2.top - containerRect.top - 20;
+
+            // Create SVG path (Arc)
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            // Curve logic: M x1 y1 Q controlPointX controlPointY x2 y2
+            const cpY = y1 - 60; // Control point height
+            const cpX = (x1 + x2) / 2;
+            
+            const d = `M ${x1} ${y1+20} Q ${cpX} ${cpY} ${x2} ${y2+20}`;
+            
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "#00FF41");
+            path.setAttribute("stroke-width", "2");
+            path.setAttribute("stroke-dasharray", "5,5"); // Dashed styling
+
+            // Add animation class
+            const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
+            animate.setAttribute("attributeName", "stroke-dashoffset");
+            animate.setAttribute("from", "50");
+            animate.setAttribute("to", "0");
+            animate.setAttribute("dur", "1s");
+            animate.setAttribute("repeatCount", "indefinite");
+
+            path.appendChild(animate);
+            svgLayer.appendChild(path);
+        }
+
+        async function animateSwap(idx1, idx2) {
+            const el1 = document.getElementById(`wrap-${idx1}`);
+            const el2 = document.getElementById(`wrap-${idx2}`);
+
+            // Get positions
+            const rect1 = el1.getBoundingClientRect();
+            const rect2 = el2.getBoundingClientRect();
+
+            // Calculate translation distance
+            const dist1 = rect2.left - rect1.left;
+            const dist2 = rect1.left - rect2.left;
+
+            // Apply Transform
+            el1.style.transform = `translateX(${dist1}px)`;
+            el2.style.transform = `translateX(${dist2}px)`;
+
+            // Wait for transition
+            await wait(SPEED);
+            
+            // Reset (The actual logic swap happens after this function returns)
+            el1.style.transform = '';
+            el2.style.transform = '';
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // --- EVENT HANDLERS ---
+        
+        btnStep.addEventListener('click', () => {
+            if (state !== 'DONE') performStep();
+        });
+
+        btnAuto.addEventListener('click', () => {
+            if (isAuto) return;
+            isAuto = true;
+            btnAuto.disabled = true;
+            btnStep.disabled = true;
+            sysStatus.innerText = "AUTO_RUN";
+            
+            // Recursive approach to handle async/await in loop
+            const runLoop = async () => {
+                if (state !== 'DONE' && isAuto) {
+                    await performStep();
+                    // Small pause between steps for readability
+                    setTimeout(runLoop, 200); 
+                }
+            };
+            runLoop();
+        });
+
+        btnReset.addEventListener('click', () => {
+            isAuto = false;
+            init();
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

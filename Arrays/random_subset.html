@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DITHERPUNK_SHUFFLE // SPARSE_MAP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- DITHERPUNK CORE STYLES --- */
+        :root {
+            --c-black: #000000;
+            --c-green: #00FF41;
+            --c-green-dim: #003b0f;
+            --font-main: 'VT323', monospace;
+            --grid-unit: 20px;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--c-black);
+            color: var(--c-green);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+        }
+
+        /* Scanline Overlay */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(0, 255, 65, 0) 50%,
+                rgba(0, 0, 0, 0.2) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* --- DITHER PATTERNS --- */
+        .bg-grid {
+            background-image: 
+                linear-gradient(var(--c-green-dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--c-green-dim) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .dither-checkers {
+            background-image: linear-gradient(45deg, var(--c-green) 25%, transparent 25%), 
+                              linear-gradient(-45deg, var(--c-green) 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, var(--c-green) 75%), 
+                              linear-gradient(-45deg, transparent 75%, var(--c-green) 75%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 0, 2px -2px, 0px 2px;
+        }
+
+        .dither-sparse {
+            background-image: radial-gradient(var(--c-green) 1px, transparent 1px);
+            background-size: 4px 4px;
+        }
+
+        /* --- LAYOUT --- */
+        header {
+            border-bottom: 2px solid var(--c-green);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--c-black);
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label { font-size: 0.8rem; opacity: 0.8; }
+        
+        input[type="number"] {
+            background: var(--c-black);
+            border: 1px solid var(--c-green);
+            color: var(--c-green);
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            width: 80px;
+            padding: 0.2rem;
+        }
+
+        button {
+            background: var(--c-black);
+            border: 2px solid var(--c-green);
+            color: var(--c-green);
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--c-green-dim);
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--c-green-dim);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-primary {
+            background: var(--c-green);
+            color: var(--c-black);
+        }
+
+        .status-panel {
+            text-align: right;
+            border-left: 1px solid var(--c-green);
+            padding-left: 1rem;
+            font-size: 1rem;
+            line-height: 1.2;
+        }
+
+        /* --- MAIN STAGE --- */
+        main {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #canvas-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* --- VIRTUAL ARRAY --- */
+        .array-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .slot-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .separator {
+            font-size: 2rem;
+            letter-spacing: 5px;
+            animation: blink 2s infinite steps(2);
+        }
+
+        .slot {
+            width: 60px;
+            height: 80px;
+            border: 2px solid var(--c-green);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            position: relative;
+            background: var(--c-black);
+            transition: transform 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1);
+        }
+
+        /* Default State (Val == Index) */
+        .slot.default .slot-fill {
+            width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0;
+            opacity: 0.2;
+            z-index: 0;
+        }
+        
+        /* Overridden State (In Hash Map) */
+        .slot.mapped {
+            background: var(--c-green);
+            color: var(--c-black);
+            border: 2px double var(--c-black);
+            outline: 2px solid var(--c-green);
+        }
+
+        .slot-index {
+            font-size: 0.8rem;
+            z-index: 1;
+        }
+
+        .slot-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        .slot-label {
+            position: absolute;
+            top: -20px;
+            font-size: 0.8rem;
+            color: var(--c-green);
+        }
+
+        /* Animation States */
+        .slot.active-i {
+            box-shadow: 0 0 10px var(--c-green), inset 0 0 10px var(--c-green);
+            animation: glitch-box 0.2s infinite;
+        }
+
+        .slot.active-r {
+            background-image: repeating-linear-gradient(45deg, var(--c-green) 0, var(--c-green) 2px, transparent 2px, transparent 4px);
+        }
+
+        /* --- HASH MAP PANEL --- */
+        .hashmap-panel {
+            height: 35%;
+            border-top: 4px solid var(--c-green);
+            background: #050505;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px dashed var(--c-green-dim);
+            padding-bottom: 0.5rem;
+        }
+
+        .memory-bar-container {
+            width: 300px;
+            height: 16px;
+            border: 1px solid var(--c-green);
+            position: relative;
+        }
+        
+        .memory-bar-fill {
+            height: 100%;
+            background: repeating-linear-gradient(90deg, var(--c-green), var(--c-green) 2px, transparent 2px, transparent 4px);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 1rem;
+            padding-top: 1rem;
+        }
+
+        .map-entry {
+            border: 1px solid var(--c-green);
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            position: relative;
+            background: var(--c-black);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 4px 0 rgba(0, 255, 65, 0.2);
+            animation: entry-pop 0.3s steps(3);
+        }
+
+        .map-entry::before {
+            content: "ADDR:" attr(data-key);
+            font-size: 0.7rem;
+            opacity: 0.7;
+            border-bottom: 1px solid var(--c-green-dim);
+            margin-bottom: 4px;
+        }
+        
+        .map-entry .val {
+            font-size: 1.2rem;
+            text-align: right;
+        }
+
+        /* --- UTILS & ANIMATIONS --- */
+        .hidden { display: none !important; }
+        .blink { animation: blink 1s infinite; }
+        .flash { animation: flash-screen 0.1s; }
+
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        @keyframes flash-screen {
+            0% { filter: invert(0); }
+            50% { filter: invert(1); }
+            100% { filter: invert(0); }
+        }
+
+        @keyframes glitch-box {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        @keyframes entry-pop {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--c-black); border-left: 1px solid var(--c-green); }
+        ::-webkit-scrollbar-thumb { background: var(--c-green); border: 2px solid var(--c-black); }
+
+    </style>
+</head>
+<body class="bg-grid">
+
+    <header>
+        <div class="controls">
+            <div class="input-group">
+                <label>N (Total)</label>
+                <input type="number" id="inp-n" value="1000000">
+            </div>
+            <div class="input-group">
+                <label>K (Samples)</label>
+                <input type="number" id="inp-k" value="8">
+            </div>
+            <button id="btn-start" class="btn-primary">INIT_SEQ</button>
+            <button id="btn-step" disabled>STEP</button>
+            <button id="btn-auto" disabled>AUTO</button>
+        </div>
+
+        <div class="status-panel">
+            <div id="status-main">READY</div>
+            <div>i: <span id="stat-i" class="blink">--</span> | r: <span id="stat-r">--</span></div>
+            <div>Phase: <span id="stat-phase">IDLE</span></div>
+        </div>
+    </header>
+
+    <main>
+        <canvas id="canvas-layer"></canvas>
+
+        <div class="array-container" id="array-view">
+            <!-- Dynamic Slots will be injected here -->
+            <div class="separator">DATA STREAM EMPTY</div>
+        </div>
+
+        <!-- [EDIT A] Added id="hashmap-panel" -->
+        <div class="hashmap-panel" id="hashmap-panel">
+            <div class="panel-header">
+                <span>HEAP_DUMP (Hash Map)</span>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label>MEM_USAGE:</label>
+                    <div class="memory-bar-container">
+                        <div class="memory-bar-fill" id="mem-bar"></div>
+                    </div>
+                    <span id="mem-text">0 / 0</span>
+                </div>
+            </div>
+            <div class="map-grid" id="map-grid">
+                <!-- Map entries go here -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        /* --- CONFIG & STATE --- */
+        const C = {
+            GREEN: '#00FF41',
+            BLACK: '#000000'
+        };
+
+        const STATE = {
+            n: 1000000,
+            k: 8,
+            i: 0,
+            r: null,
+            map: new Map(), // The sparse storage
+            isRunning: false,
+            isAuto: false,
+            delay: 800,
+            phase: 'IDLE', // IDLE, SELECT, LOOKUP, SWAP, COMMIT
+            animFrame: null
+        };
+
+        const DOM = {
+            inpN: document.getElementById('inp-n'),
+            inpK: document.getElementById('inp-k'),
+            btnStart: document.getElementById('btn-start'),
+            btnStep: document.getElementById('btn-step'),
+            btnAuto: document.getElementById('btn-auto'),
+            statusMain: document.getElementById('status-main'),
+            statI: document.getElementById('stat-i'),
+            statR: document.getElementById('stat-r'),
+            statPhase: document.getElementById('stat-phase'),
+            arrayView: document.getElementById('array-view'),
+            mapGrid: document.getElementById('map-grid'),
+            memBar: document.getElementById('mem-bar'),
+            memText: document.getElementById('mem-text'),
+            canvas: document.getElementById('canvas-layer'),
+            // [EDIT B] Added DOM reference for hashmapPanel
+            hashmapPanel: document.getElementById('hashmap-panel')
+        };
+
+        const CTX = DOM.canvas.getContext('2d');
+
+        /* --- LOGIC: SPARSE FISHER-YATES --- */
+        
+        // Helper to get value from map or return index
+        const getVal = (idx) => STATE.map.has(idx) ? STATE.map.get(idx) : idx;
+
+        function initShuffle() {
+            STATE.n = parseInt(DOM.inpN.value) || 1000;
+            STATE.k = parseInt(DOM.inpK.value) || 10;
+            STATE.i = 0;
+            STATE.map.clear();
+            STATE.isRunning = true;
+            STATE.phase = 'SELECT';
+            
+            updateUIControls(true);
+            renderArray();
+            renderMap();
+            log("SEQUENCE INITIATED");
+        }
+
+        async function stepLogic() {
+            if (STATE.i >= STATE.k) {
+                finish();
+                return;
+            }
+
+            switch(STATE.phase) {
+                case 'SELECT':
+                    // 1. Pick random R
+                    STATE.r = Math.floor(Math.random() * (STATE.n - STATE.i)) + STATE.i;
+                    log(`INDEX ${STATE.i}: TARGETING ${STATE.r}`);
+                    renderArray(); // Re-render to ensure R is visible if needed
+                    STATE.phase = 'LOOKUP';
+                    break;
+
+                case 'LOOKUP':
+                    // 2. Visualize where data comes from (default or map)
+                    // (Handled visually in the draw loop, logical pause here)
+                    STATE.phase = 'SWAP';
+                    break;
+
+                case 'SWAP':
+                    // 3. Perform Swap in Data
+                    const valI = getVal(STATE.i);
+                    const valR = getVal(STATE.r);
+                    
+                    STATE.map.set(STATE.i, valR);
+                    STATE.map.set(STATE.r, valI);
+                    
+                    STATE.phase = 'COMMIT';
+                    break;
+
+                case 'COMMIT':
+                    // 4. Update UI, Flash, Increment
+                    document.body.classList.add('flash');
+                    setTimeout(() => document.body.classList.remove('flash'), 100);
+                    
+                    STATE.i++;
+                    if (STATE.i >= STATE.k) {
+                        finish();
+                    } else {
+                        STATE.phase = 'SELECT';
+                        renderArray(); // Prepare next view
+                    }
+                    renderMap();
+                    break;
+            }
+
+            updateStatus();
+        }
+
+        function finish() {
+            STATE.isRunning = false;
+            STATE.isAuto = false;
+            STATE.phase = 'COMPLETE';
+            STATE.r = null;
+            updateUIControls(false);
+            updateStatus();
+            renderArray();
+            log("SHUFFLE COMPLETE");
+        }
+
+        /* --- RENDERING: DOM --- */
+
+        // Generates the visual slots based on current i and r
+        function renderArray() {
+            DOM.arrayView.innerHTML = '';
+            
+            // Logic: Show 0..i (processed), show i, show r, show some context
+            // Since N is huge, we construct a "view" list of indices to render
+            
+            const indicesToShow = new Set();
+            
+            // Always show 0 to k (the result zone)
+            for(let j=0; j <= STATE.k; j++) indicesToShow.add(j);
+            
+            // Show R and neighbors if active
+            if (STATE.r !== null) {
+                indicesToShow.add(STATE.r);
+                if(STATE.r + 1 < STATE.n) indicesToShow.add(STATE.r + 1);
+            }
+            
+            // Add end for scale context
+            indicesToShow.add(STATE.n - 1);
+
+            // Convert to sorted array
+            const sortedIndices = Array.from(indicesToShow).sort((a,b) => a - b);
+
+            let lastIdx = -1;
+
+            sortedIndices.forEach(idx => {
+                // If gap, insert separator
+                if (idx > lastIdx + 1) {
+                    const sep = document.createElement('div');
+                    sep.className = 'separator';
+                    sep.innerText = '...';
+                    DOM.arrayView.appendChild(sep);
+                }
+
+                // Create Slot
+                const el = document.createElement('div');
+                el.className = 'slot';
+                el.id = `slot-${idx}`;
+                
+                // Visual state logic
+                const isMapped = STATE.map.has(idx);
+                const val = getVal(idx);
+                
+                if (isMapped) el.classList.add('mapped');
+                else el.classList.add('default'); // has dither bg
+
+                // Highlight active actors
+                if (STATE.phase !== 'IDLE' && STATE.phase !== 'COMPLETE') {
+                    if (idx === STATE.i) {
+                        el.classList.add('active-i');
+                        const lbl = document.createElement('div');
+                        lbl.className = 'slot-label';
+                        lbl.innerText = 'CURR';
+                        el.appendChild(lbl);
+                    }
+                    if (idx === STATE.r) {
+                        el.classList.add('active-r');
+                        const lbl = document.createElement('div');
+                        lbl.className = 'slot-label';
+                        lbl.innerText = 'RND';
+                        el.appendChild(lbl);
+                    }
+                }
+
+                // Content
+                const ditherFill = document.createElement('div');
+                ditherFill.className = 'slot-fill dither-sparse';
+                el.appendChild(ditherFill);
+
+                const idxDiv = document.createElement('div');
+                idxDiv.className = 'slot-index';
+                idxDiv.innerText = idx;
+                
+                const valDiv = document.createElement('div');
+                valDiv.className = 'slot-val';
+                valDiv.innerText = val;
+
+                el.appendChild(idxDiv);
+                el.appendChild(valDiv);
+                
+                DOM.arrayView.appendChild(el);
+
+                lastIdx = idx;
+            });
+        }
+
+        function renderMap() {
+            DOM.mapGrid.innerHTML = '';
+            
+            // Memory Bar
+            const size = STATE.map.size;
+            const pct = Math.min(100, (size / STATE.k) * 100);
+            DOM.memBar.style.width = `${pct}%`;
+            DOM.memText.innerText = `${size} ENTRIES / N=${STATE.n}`;
+
+            // Map Entries
+            STATE.map.forEach((val, key) => {
+                const entry = document.createElement('div');
+                entry.className = 'map-entry';
+                entry.setAttribute('data-key', key);
+                entry.id = `map-entry-${key}`; // ID for canvas connecting
+                
+                const vSpan = document.createElement('div');
+                vSpan.className = 'val';
+                vSpan.innerText = val;
+                
+                entry.appendChild(vSpan);
+                DOM.mapGrid.appendChild(entry);
+            });
+            
+            // Scroll to bottom
+            // [EDIT C] Fixed syntax error: DOM.hashmap-panel -> DOM.hashmapPanel
+            if(DOM.hashmapPanel) {
+                DOM.hashmapPanel.scrollTop = DOM.hashmapPanel.scrollHeight;
+            }
+        }
+
+        function updateStatus() {
+            DOM.statI.innerText = STATE.i;
+            DOM.statR.innerText = STATE.r === null ? '--' : STATE.r;
+            DOM.statPhase.innerText = STATE.phase;
+        }
+
+        function updateUIControls(active) {
+            DOM.btnStart.disabled = active;
+            DOM.inpN.disabled = active;
+            DOM.inpK.disabled = active;
+            DOM.btnStep.disabled = !active;
+            DOM.btnAuto.disabled = !active;
+            if(!active) DOM.btnAuto.innerText = "AUTO";
+        }
+
+        function log(msg) {
+            DOM.statusMain.innerText = `>> ${msg}`;
+        }
+
+        /* --- CANVAS & ANIMATION LOOP --- */
+        
+        function resizeCanvas() {
+            DOM.canvas.width = window.innerWidth;
+            DOM.canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawJaggedLine(x1, y1, x2, y2) {
+            CTX.beginPath();
+            CTX.moveTo(x1, y1);
+            
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            
+            // Add some "noise" to the line
+            const noise = 10;
+            const steps = 5;
+            
+            let cx = x1, cy = y1;
+            const dx = (x2 - x1) / steps;
+            const dy = (y2 - y1) / steps;
+
+            for(let s=1; s<steps; s++) {
+                cx += dx;
+                cy += dy;
+                CTX.lineTo(cx + (Math.random() - 0.5) * noise, cy + (Math.random() - 0.5) * noise);
+            }
+            
+            CTX.lineTo(x2, y2);
+            CTX.stroke();
+            
+            // Draw terminator rects
+            CTX.fillRect(x1 - 2, y1 - 2, 4, 4);
+            CTX.fillRect(x2 - 2, y2 - 2, 4, 4);
+        }
+
+        function getCenter(el) {
+            const rect = el.getBoundingClientRect();
+            return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+        }
+
+        function animate() {
+            CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+            
+            if (STATE.isRunning) {
+                CTX.strokeStyle = C.GREEN;
+                CTX.fillStyle = C.GREEN;
+                CTX.lineWidth = 1;
+
+                // 1. Draw Connectors for LOOKUP phase
+                // Connect Slots to Hash Map Entries if they exist
+                if (STATE.phase === 'LOOKUP' || STATE.phase === 'SWAP') {
+                    const indices = [STATE.i, STATE.r];
+                    indices.forEach(idx => {
+                        if (STATE.map.has(idx)) {
+                            const slotEl = document.getElementById(`slot-${idx}`);
+                            const mapEl = document.getElementById(`map-entry-${idx}`);
+                            
+                            if (slotEl && mapEl) {
+                                const p1 = getCenter(slotEl);
+                                const p2 = getCenter(mapEl);
+                                // Draw connection
+                                CTX.setLineDash([4, 4]); // Dotted
+                                drawJaggedLine(p1.x, p1.y + 40, p2.x, p2.y - 15);
+                                CTX.setLineDash([]);
+                            }
+                        }
+                    });
+                }
+
+                // 2. Draw Swap Trails
+                if (STATE.phase === 'SWAP') {
+                    const sI = document.getElementById(`slot-${STATE.i}`);
+                    const sR = document.getElementById(`slot-${STATE.r}`);
+                    
+                    if (sI && sR) {
+                        const p1 = getCenter(sI);
+                        const p2 = getCenter(sR);
+                        
+                        // Arc logic
+                        CTX.beginPath();
+                        CTX.moveTo(p1.x, p1.y);
+                        CTX.quadraticCurveTo((p1.x + p2.x)/2, p1.y - 100, p2.x, p2.y);
+                        CTX.strokeStyle = C.GREEN;
+                        CTX.lineWidth = 2;
+                        CTX.stroke();
+
+                        // Particles on arc
+                        const t = (Date.now() % 500) / 500;
+                        const bx = (1-t)*(1-t)*p1.x + 2*(1-t)*t*((p1.x+p2.x)/2) + t*t*p2.x;
+                        const by = (1-t)*(1-t)*p1.y + 2*(1-t)*t*(p1.y-100) + t*t*p2.y;
+                        
+                        CTX.fillRect(bx-4, by-4, 8, 8);
+                        CTX.fillText("SWAPPING", bx + 10, by);
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        /* --- INTERACTION --- */
+        
+        DOM.btnStart.addEventListener('click', initShuffle);
+        
+        DOM.btnStep.addEventListener('click', () => {
+            if (STATE.isAuto) {
+                STATE.isAuto = false;
+                DOM.btnAuto.innerText = "AUTO";
+            }
+            stepLogic();
+        });
+
+        DOM.btnAuto.addEventListener('click', () => {
+            STATE.isAuto = !STATE.isAuto;
+            DOM.btnAuto.innerText = STATE.isAuto ? "STOP" : "AUTO";
+            if (STATE.isAuto) autoPlayLoop();
+        });
+
+        function autoPlayLoop() {
+            if (!STATE.isAuto || !STATE.isRunning) return;
+            stepLogic();
+            setTimeout(() => {
+                requestAnimationFrame(autoPlayLoop);
+            }, STATE.delay);
+        }
+
+    </script>
+</body>
+</html>
