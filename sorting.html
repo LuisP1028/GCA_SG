@@ -316,18 +316,16 @@
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
+                        <button class="eye-btn" style="border-color: orange; color: orange;" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'sorting/GAP.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
                     </span>
                     <p>Find the smallest positive integer that cannot be formed as the sum of a subset.</p>
                     <ol>
-                        <li><strong>Sort:</strong> Ascending order.</li>
-                        <li><strong>Invariant:</strong> <code>max_constructible</code> (starts at 0).</li>
-                        <li><strong>Gapping:</strong> If <code>current_coin > max_constructible + 1</code>, we have gapped. The answer is <code>max_constructible + 1</code>.</li>
-                        <li><strong>Expanding:</strong> Otherwise, <code>max_constructible += current_coin</code>.</li>
-                    </ol>
-                </div>
-
-            </div>
-        </details>
+                        <li><strong
 
         <!-- ============================================== -->
         <!-- SECTION 4: SORTING THEORY -->
