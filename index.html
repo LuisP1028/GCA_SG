@@ -322,45 +322,23 @@
     </details>
 
     <!-- ============================================== -->
-    <!-- PART II: SEARCHING -->
+    <!-- PART II: HASH OPERATIONS -->
     <!-- ============================================== -->
     <details class="part">
-        <summary>Part II: Searching</summary>
-        <div class="part-content" id="container-searching">
-            <span class="focus-line">Focus: Binary Search, K-th Element, Caching</span>
+        <summary>Part II: Hash Operations</summary>
+        <div class="part-content" id="container-hash">
+            <span class="focus-line">Focus: Sliding Windows, Caching, Design</span>
             <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
         </div>
     </details>
 
     <!-- ============================================== -->
-    <!-- PART III: GREEDY -->
+    <!-- PART III: SORTING -->
     <!-- ============================================== -->
     <details class="part">
-        <summary>Part III: Greedy Algorithms</summary>
-        <div class="part-content" id="container-greedy">
-            <span class="focus-line">Focus: Intervals, Invariants, Optimization</span>
-            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
-        </div>
-    </details>
-
-    <!-- ============================================== -->
-    <!-- PART IV: RECURSION -->
-    <!-- ============================================== -->
-    <details class="part">
-        <summary>Part IV: Recursion</summary>
-        <div class="part-content" id="container-recursion">
-            <span class="focus-line">Focus: Backtracking, Divide & Conquer, DP</span>
-            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
-        </div>
-    </details>
-
-    <!-- ============================================== -->
-    <!-- PART V: STRINGS -->
-    <!-- ============================================== -->
-    <details class="part">
-        <summary>Part V: Strings</summary>
-        <div class="part-content" id="container-strings">
-            <span class="focus-line">Focus: Palindromes, Parsing, Substrings</span>
+        <summary>Part III: Sorting</summary>
+        <div class="part-content" id="container-sorting">
+            <span class="focus-line">Focus: Intervals, Partitioning, Merging</span>
             <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
         </div>
     </details>
@@ -398,15 +376,18 @@
             const doc = parser.parseFromString(text, 'text/html');
             
             // Extract the inner HTML of the .part-content div from the external file
+            // Note: We expect the external file to have a <div class="part-content"> wrapper
             const remoteContent = doc.querySelector('.part-content');
             
             if (remoteContent) {
                 // Keep the 'focus-line' from the shell, append the new content
+                // Or simply replace the "Loading" text with the new content
                 const existingHeader = container.querySelector('.focus-line');
                 container.innerHTML = ''; // Clear loading text
                 if (existingHeader) container.appendChild(existingHeader);
                 
                 // Append the children of the remote content
+                // We convert HTMLCollection to array to iterate safely while appending
                 Array.from(remoteContent.children).forEach(child => {
                     container.appendChild(child);
                 });
@@ -420,13 +401,13 @@
         }
     }
 
-    // Load all parts
+    // Load the three parts
+    // Note: This requires the files to be hosted (GitHub Pages works perfectly)
+    // Local file:// protocol will block this due to CORS
     document.addEventListener("DOMContentLoaded", () => {
         loadPart('arrays.html', 'container-arrays');
-        loadPart('searching.html', 'container-searching');
-        loadPart('greedy.html', 'container-greedy');
-        loadPart('recursion.html', 'container-recursion');
-        loadPart('strings.html', 'container-strings');
+        loadPart('hash.html', 'container-hash');
+        loadPart('sorting.html', 'container-sorting');
     });
 
 
