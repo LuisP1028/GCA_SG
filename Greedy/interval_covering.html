@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greedy Interval Scheduling // Ditherpunk</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --phos-color: #33ff33;
+            --phos-dim: #1a801a;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--phos-color);
+            font-family: var(--font-stack);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* CRT Overlay Effects */
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        .crt-glow {
+            text-shadow: 0 0 4px var(--phos-color);
+        }
+
+        /* Main Layout */
+        #visualization-container {
+            flex-grow: 1;
+            position: relative;
+            width: 90%;
+            margin: 20px auto;
+            border: 2px solid var(--phos-color);
+            box-sizing: border-box;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Control Panel / Terminal */
+        #terminal {
+            height: 150px;
+            width: 90%;
+            margin: 0 auto 20px auto;
+            border: 1px solid var(--phos-dim);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 14px;
+            background: #050505;
+        }
+
+        #log-window {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed var(--phos-dim);
+            padding-bottom: 5px;
+            font-family: var(--font-stack);
+            white-space: pre-wrap;
+        }
+
+        .log-entry { margin-bottom: 4px; }
+        .log-entry::before { content: ">> "; color: var(--phos-dim); }
+
+        #controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--phos-color);
+            color: var(--phos-color);
+            font-family: var(--font-stack);
+            font-size: 16px;
+            padding: 5px 15px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 5px var(--phos-color);
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            background: var(--phos-color);
+            color: var(--bg-color);
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+
+        .status-pill {
+            margin-left: auto;
+            border: 1px solid var(--phos-color);
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div id="visualization-container" class="crt-glow">
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <div id="terminal" class="crt-glow">
+        <div id="log-window">Initializing system...<br>Awaiting input...</div>
+        <div id="controls">
+            <button id="btn-run">[ RUN ]</button>
+            <button id="btn-speed">[ SPEED: SLOW ]</button>
+            <div class="status-pill" id="visit-counter">VISITS: 0</div>
+        </div>
+    </div>
+
+<script>
+/**
+ * DITHERPUNK INTERVAL SCHEDULING VISUALIZATION
+ * 
+ * Logic:
+ * 1. Generate Intervals
+ * 2. Sort by Right Endpoint (Ascending)
+ * 3. Iterate: Find first uncovered task -> Drop Laser at End -> Mark overlaps
+ */
+
+// --- CONFIGURATION ---
+const COLOR_BG = '#000000';
+const COLOR_FG = '#33ff33';
+const TASK_HEIGHT_RATIO = 0.8; // Percentage of height for tasks
+const TIMELINE_PADDING = 50;
+
+// --- STATE MANAGEMENT ---
+const STATE = {
+    IDLE: 0,
+    SORTING: 1,
+    SCANNING: 2,
+    DROPPING_LASER: 3,
+    CHECKING_OVERLAP: 4,
+    FINISHED: 5
+};
+
+let appState = STATE.IDLE;
+let intervals = [];
+let visits = []; // X-coordinates of visits
+let scanIndex = 0; // Current index in loop
+let activeInterval = null; // The one dictating the visit
+let lastVisitX = -1;
+let animationSpeed = 1; // 1 = Slow, 5 = Fast
+let lastFrameTime = 0;
+let logicTimer = 0;
+
+// Canvas & Context
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+// Disable smoothing for crisp pixel look
+ctx.imageSmoothingEnabled = false;
+
+// DOM Elements
+const logWindow = document.getElementById('log-window');
+const btnRun = document.getElementById('btn-run');
+const btnSpeed = document.getElementById('btn-speed');
+const visitDisplay = document.getElementById('visit-counter');
+
+// --- PATTERN GENERATION (Dithering) ---
+
+function createPattern(type) {
+    const patCanvas = document.createElement('canvas');
+    const patCtx = patCanvas.getContext('2d');
+    
+    if (type === 'noise') {
+        // Sparse Noise (Pending State)
+        patCanvas.width = 4;
+        patCanvas.height = 4;
+        patCtx.fillStyle = COLOR_BG;
+        patCtx.fillRect(0,0,4,4);
+        patCtx.fillStyle = COLOR_FG;
+        // Random sparse pixels
+        patCtx.fillRect(0, 0, 1, 1);
+        patCtx.fillRect(2, 2, 1, 1);
+        patCtx.fillRect(3, 1, 1, 1);
+    } 
+    else if (type === 'hatch') {
+        // Diagonal Hatch (Covered State)
+        patCanvas.width = 8;
+        patCanvas.height = 8;
+        patCtx.fillStyle = COLOR_BG;
+        patCtx.fillRect(0,0,8,8);
+        patCtx.strokeStyle = COLOR_FG;
+        patCtx.lineWidth = 1;
+        patCtx.beginPath();
+        patCtx.moveTo(0, 8);
+        patCtx.lineTo(8, 0);
+        patCtx.stroke();
+    }
+    else if (type === 'solid') {
+        // Solid (Active Anchor)
+        patCanvas.width = 2;
+        patCanvas.height = 2;
+        patCtx.fillStyle = COLOR_FG;
+        patCtx.fillRect(0,0,2,2);
+    }
+    else if (type === 'grid') {
+        // Background Grid
+        patCanvas.width = 20;
+        patCanvas.height = 20;
+        patCtx.fillStyle = '#0a2a0a'; // Very dim green
+        patCtx.fillRect(0,0,20,1);
+        patCtx.fillRect(0,0,1,20);
+    }
+
+    return ctx.createPattern(patCanvas, 'repeat');
+}
+
+const patterns = {
+    noise: createPattern('noise'),
+    hatch: createPattern('hatch'),
+    solid: createPattern('solid'),
+    bg: createPattern('grid')
+};
+
+// --- DATA STRUCTURES ---
+
+class Interval {
+    constructor(id, start, end) {
+        this.id = id;
+        this.start = start; // 0-100 scale
+        this.end = end;     // 0-100 scale
+        this.status = 'PENDING'; // PENDING, ACTIVE, COVERED
+        
+        // Visualization coords (normalized 0-1)
+        this.yPos = 0; 
+        this.targetY = 0;
+    }
+}
+
+// --- LOGIC FUNCTIONS ---
+
+function log(msg) {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerText = msg;
+    logWindow.appendChild(div);
+    logWindow.scrollTop = logWindow.scrollHeight;
+}
+
+function generateData() {
+    intervals = [];
+    visits = [];
+    lastVisitX = -1;
+    visitDisplay.innerText = "VISITS: 0";
+    
+    const count = 12; // Number of tasks
+    for(let i=0; i<count; i++) {
+        // Generate random start/end
+        let s = Math.random() * 80;
+        let length = 5 + Math.random() * 15;
+        let e = Math.min(s + length, 100);
+        
+        let interval = new Interval(i, s, e);
+        // Initially spread vertically based on creation order
+        interval.yPos = i / count;
+        interval.targetY = interval.yPos;
+        intervals.push(interval);
+    }
+    log("Generated " + count + " random intervals.");
+}
+
+function startSort() {
+    appState = STATE.SORTING;
+    log("SORTING DATA: By Right Endpoint (Ascending)...");
+    
+    // Logic: Sort the array
+    intervals.sort((a, b) => a.end - b.end);
+    
+    // Assign new target Y positions based on sorted order
+    intervals.forEach((inv, index) => {
+        inv.targetY = index / intervals.length;
+    });
+}
+
+function checkNext() {
+    // Find next pending
+    let found = false;
+    for(let i=0; i<intervals.length; i++) {
+        if(intervals[i].status === 'PENDING') {
+            activeInterval = intervals[i];
+            activeInterval.status = 'ACTIVE';
+            scanIndex = i;
+            appState = STATE.DROPPING_LASER;
+            log(`ANALYZING: Interval ${activeInterval.id} ends earliest.`);
+            found = true;
+            break;
+        }
+    }
+    
+    if(!found) {
+        appState = STATE.FINISHED;
+        log("OPTIMAL SOLUTION FOUND. All tasks covered.");
+        btnRun.innerText = "[ RESTART ]";
+    }
+}
+
+function performVisit() {
+    // The greedy choice: Visit at the end of the active interval
+    let visitTime = activeInterval.end;
+    visits.push(visitTime);
+    lastVisitX = visitTime;
+    
+    visitDisplay.innerText = `VISITS: ${visits.length}`;
+    log(`GREEDY CHOICE: Visit added at time ${visitTime.toFixed(1)}`);
+    
+    appState = STATE.CHECKING_OVERLAP;
+}
+
+function checkOverlaps() {
+    let newlyCovered = 0;
+    
+    // Check all pending intervals to see if they contain the visit time
+    intervals.forEach(inv => {
+        if(inv.status === 'PENDING' || inv.status === 'ACTIVE') {
+            // Logic: Does the visit time fall after start (and naturally before end)?
+            // Since we sorted by end, and picked the earliest end, visitTime <= inv.end is guaranteed for the active one.
+            // But we specifically need to check if inv.start <= visitTime.
+            
+            if(inv.start <= lastVisitX) {
+                inv.status = 'COVERED';
+                newlyCovered++;
+            }
+        }
+    });
+    
+    log(`RESULT: Covered ${newlyCovered} overlapping tasks.`);
+    activeInterval = null;
+    appState = STATE.SCANNING; // Go back to find next
+}
+
+// --- RENDER LOOP ---
+
+function draw() {
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // 1. Clear & Background
+    ctx.fillStyle = COLOR_BG;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Draw Grid Pattern
+    ctx.fillStyle = patterns.bg;
+    ctx.fillRect(0,0,w,h);
+
+    // 2. Draw Axis
+    const chartBottom = h - 30;
+    const chartTop = 20;
+    const chartHeight = chartBottom - chartTop;
+    const chartWidth = w - (TIMELINE_PADDING * 2);
+    const startX = TIMELINE_PADDING;
+    
+    ctx.strokeStyle = COLOR_FG;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(startX, chartBottom);
+    ctx.lineTo(startX + chartWidth, chartBottom); // X Axis
+    ctx.stroke();
+
+    // 3. Draw Visits (Vertical Lines)
+    ctx.strokeStyle = '#ff3333'; // Red-ish for visits? Or kept to Mono Green? 
+    // Let's stick to Ditherpunk logic: High contrast or Blinking.
+    // We will use a Dashed Green line.
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = COLOR_FG;
+
+    visits.forEach(vx => {
+        let xPos = startX + (vx / 100) * chartWidth;
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartTop);
+        ctx.lineTo(xPos, chartBottom);
+        ctx.stroke();
+        
+        // Draw Pin Head
+        ctx.fillStyle = COLOR_FG;
+        ctx.fillRect(xPos - 3, chartTop - 3, 6, 6);
+    });
+    
+    ctx.setLineDash([]); // Reset
+
+    // 4. Draw Intervals
+    const barHeight = (chartHeight / intervals.length) * 0.6;
+    
+    intervals.forEach(inv => {
+        // Logic for Y-Interpolation (Animation)
+        let diff = inv.targetY - inv.yPos;
+        if(Math.abs(diff) > 0.001) {
+            inv.yPos += diff * 0.1; // Ease in
+        } else {
+            inv.yPos = inv.targetY;
+        }
+
+        let x = startX + (inv.start / 100) * chartWidth;
+        let width = ((inv.end - inv.start) / 100) * chartWidth;
+        let y = chartTop + (inv.yPos * chartHeight);
+        
+        // Select Pattern based on state
+        if (inv.status === 'COVERED') {
+            ctx.fillStyle = patterns.hatch;
+            ctx.strokeStyle = '#1a801a'; // Dim border
+        } else if (inv.status === 'ACTIVE') {
+            // Blink effect
+            if (Date.now() % 500 < 250) {
+                ctx.fillStyle = patterns.solid; 
+            } else {
+                ctx.fillStyle = patterns.noise;
+            }
+            ctx.strokeStyle = COLOR_FG;
+        } else {
+            // PENDING
+            ctx.fillStyle = patterns.noise;
+            ctx.strokeStyle = COLOR_FG;
+        }
+
+        // Draw Bar
+        ctx.fillRect(x, y, width, barHeight);
+        ctx.strokeRect(x, y, width, barHeight);
+
+        // Label ID (Tiny)
+        if(w > 600) {
+            ctx.fillStyle = COLOR_FG;
+            ctx.font = "10px monospace";
+            ctx.fillText(inv.id, x - 15, y + barHeight/2 + 3);
+        }
+    });
+
+    // 5. State Specific Visuals
+    
+    // Draw Current Laser Beam (Before it becomes permanent)
+    if(appState === STATE.DROPPING_LASER || appState === STATE.CHECKING_OVERLAP) {
+        if(activeInterval) {
+            let laserX = startX + (activeInterval.end / 100) * chartWidth;
+            ctx.strokeStyle = COLOR_FG;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(laserX, chartTop);
+            ctx.lineTo(laserX, chartBottom);
+            ctx.stroke();
+            
+            // Draw "Scanner" text
+            ctx.fillText("SCANNING DEADLINE...", laserX + 5, chartBottom - 5);
+        }
+    }
+
+}
+
+// --- MAIN LOOP ---
+
+function update(dt) {
+    logicTimer += dt;
+    const threshold = 1000 / animationSpeed; // Logic step delay
+
+    if (logicTimer > threshold) {
+        logicTimer = 0;
+        
+        switch (appState) {
+            case STATE.SORTING:
+                // Check if animation is roughly done
+                let isSettled = intervals.every(i => Math.abs(i.targetY - i.yPos) < 0.01);
+                if(isSettled) {
+                    appState = STATE.SCANNING;
+                    log("Sort complete.");
+                }
+                break;
+                
+            case STATE.SCANNING:
+                checkNext();
+                break;
+                
+            case STATE.DROPPING_LASER:
+                performVisit();
+                break;
+                
+            case STATE.CHECKING_OVERLAP:
+                checkOverlaps();
+                break;
+        }
+    }
+}
+
+function loop(timestamp) {
+    let dt = timestamp - lastFrameTime;
+    lastFrameTime = timestamp;
+    
+    update(dt);
+    draw();
+    
+    requestAnimationFrame(loop);
+}
+
+// --- INTERACTION ---
+
+function resize() {
+    canvas.width = document.getElementById('visualization-container').clientWidth;
+    canvas.height = document.getElementById('visualization-container').clientHeight;
+}
+
+window.addEventListener('resize', resize);
+
+btnRun.addEventListener('click', () => {
+    if(appState === STATE.FINISHED || appState === STATE.IDLE) {
+        generateData();
+        startSort();
+        btnRun.innerText = "[ RESTART ]";
+    } else {
+        // Reset mid-run
+        generateData();
+        startSort();
+    }
+});
+
+btnSpeed.addEventListener('click', () => {
+    if(animationSpeed === 1) {
+        animationSpeed = 4;
+        btnSpeed.innerText = "[ SPEED: FAST ]";
+    } else {
+        animationSpeed = 1;
+        btnSpeed.innerText = "[ SPEED: SLOW ]";
+    }
+});
+
+// Init
+resize();
+generateData();
+log("System Ready.");
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

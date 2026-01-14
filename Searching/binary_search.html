@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binary Search: Ditherpunk Visualization</title>
+    <!-- Import Pixel Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --c-black: #050505;
+            --c-green: #33ff00;
+            --c-dim-green: #0d4200;
+            --font-main: 'VT323', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--c-black);
+            color: var(--c-green);
+            font-family: var(--font-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: clamp(16px, 2vw, 24px);
+        }
+
+        /* --- CRT SCANLINE EFFECT --- */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 10;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* --- LAYOUT --- */
+        header {
+            border-bottom: 2px solid var(--c-green);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .hud-group {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .hud-item label {
+            display: block;
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-bottom: 0.2rem;
+        }
+
+        .hud-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--c-green);
+        }
+
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* --- ARRAY STAGE --- */
+        .array-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            max-width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        .cell {
+            width: 3.5rem;
+            height: 4.5rem; /* Tall enough for value + pointers */
+            border: 1px solid var(--c-green);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            position: relative;
+            transition: all 0.3s steps(4);
+        }
+
+        .cell-index {
+            font-size: 0.7em;
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            opacity: 0.6;
+        }
+
+        .cell-value {
+            font-size: 1.5em;
+            margin-top: 0.5rem;
+            font-weight: bold;
+            z-index: 2;
+        }
+
+        /* --- STATES & DITHERING --- */
+        /* Active State */
+        .cell.active {
+            background-color: var(--c-green);
+            color: var(--c-black);
+            box-shadow: 0 0 10px var(--c-green);
+        }
+        
+        /* Eliminated State - CSS Dither Pattern */
+        .cell.eliminated {
+            border-color: var(--c-dim-green);
+            color: var(--c-dim-green);
+            /* Checkerboard Dither */
+            background-image: 
+                linear-gradient(45deg, var(--c-dim-green) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--c-dim-green) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--c-dim-green) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--c-dim-green) 75%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 0, 2px -2px, 0px 2px;
+            background-color: black;
+            opacity: 0.5;
+        }
+
+        /* Midpoint Highlight */
+        .cell.midpoint {
+            animation: pulse 1s infinite;
+            border: 2px solid #fff;
+        }
+
+        .cell.found {
+            background-color: #fff !important;
+            color: #000 !important;
+            border-color: #fff !important;
+            animation: flash 0.5s;
+        }
+
+        /* --- POINTERS --- */
+        .pointers {
+            position: absolute;
+            bottom: 2px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            height: 1.2rem;
+        }
+
+        .pointer {
+            position: absolute;
+            transition: left 0.3s;
+        }
+
+        .ptr-l { left: 5%; content: "[ L"; color: var(--c-black); }
+        .ptr-u { right: 5%; content: "U ]"; color: var(--c-black); }
+        .ptr-m { 
+            bottom: -1.5rem; /* Float below the box */
+            color: var(--c-green);
+            font-size: 1.2rem;
+            text-align: center;
+            width: 100%;
+        }
+        
+        /* Inside active cell, pointers need to be black */
+        .cell.active .ptr-l, .cell.active .ptr-u { color: var(--c-black); }
+        /* Inside inactive cell (shouldn't happen for L/U usually), green */
+        .cell:not(.active) .ptr-l, .cell:not(.active) .ptr-u { color: var(--c-green); }
+
+        .m-marker {
+            display: block;
+            text-align: center;
+        }
+
+        /* --- CONTROLS & CONSOLE --- */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            z-index: 20;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--c-green);
+            color: var(--c-green);
+            font-family: var(--font-main);
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px var(--c-green);
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        button:disabled {
+            border-color: var(--c-dim-green);
+            color: var(--c-dim-green);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .console {
+            width: 100%;
+            height: 150px;
+            border-top: 2px solid var(--c-green);
+            background: #001100;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            display: flex;
+            flex-direction: column-reverse; /* Newest at bottom visually, or manage via JS */
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--c-green);
+            padding-left: 0.5rem;
+        }
+
+        .log-entry.math { opacity: 0.8; font-style: italic; }
+        .log-entry.error { border-color: red; color: #ff3333; }
+        .log-entry.success { border-color: #fff; color: #fff; background: #004400; }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(51, 255, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(51, 255, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(51, 255, 0, 0); }
+        }
+        @keyframes flash {
+            0%, 100% { background-color: #fff; }
+            50% { background-color: var(--c-black); }
+        }
+
+        /* Comparison Overlay */
+        .comparison-overlay {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--c-black);
+            border: 2px solid var(--c-green);
+            padding: 1rem 2rem;
+            font-size: 2rem;
+            z-index: 50;
+            display: none;
+            box-shadow: 10px 10px 0 #000;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="hud-group">
+            <div class="hud-item">
+                <label>SYSTEM STATUS</label>
+                <div id="status-text" class="hud-value">IDLE</div>
+            </div>
+        </div>
+        <div class="hud-group">
+            <div class="hud-item">
+                <label>TARGET (t)</label>
+                <div id="target-display" class="hud-value">--</div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div id="comparison-display" class="comparison-overlay"></div>
+        
+        <div class="array-container" id="array-stage">
+            <!-- Array Generated by JS -->
+        </div>
+
+        <div class="controls">
+            <button id="btn-reset">Reset / New Data</button>
+            <button id="btn-step">Step Forward</button>
+            <button id="btn-auto">Auto Play</button>
+        </div>
+    </main>
+
+    <div class="console" id="console-log">
+        <!-- Logs go here -->
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const ARRAY_SIZE = 18;
+        const DELAY_MS = 1000;
+
+        // --- STATE ---
+        let data = [];
+        let target = 0;
+        let L = 0;
+        let U = 0;
+        let M = -1;
+        let state = 'INIT'; // INIT, CALC, COMPARE, ELIMINATE, SUCCESS, FAIL
+        let autoPlayInterval = null;
+
+        // --- DOM ELEMENTS ---
+        const stage = document.getElementById('array-stage');
+        const statusText = document.getElementById('status-text');
+        const targetDisplay = document.getElementById('target-display');
+        const consoleLog = document.getElementById('console-log');
+        const compDisplay = document.getElementById('comparison-display');
+        const btnStep = document.getElementById('btn-step');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Stop any running animation
+            stopAutoPlay();
+            
+            // 1. Generate sorted random data
+            data = [];
+            let current = Math.floor(Math.random() * 10);
+            for(let i=0; i<ARRAY_SIZE; i++) {
+                current += Math.floor(Math.random() * 5) + 1;
+                data.push(current);
+            }
+
+            // 2. Pick target (80% chance to be in array)
+            if (Math.random() > 0.2) {
+                target = data[Math.floor(Math.random() * data.length)];
+            } else {
+                target = data[data.length-1] + 10; // Not found
+            }
+
+            // 3. Reset Pointers
+            L = 0;
+            U = data.length - 1;
+            M = -1;
+            state = 'CALC'; // Ready to start
+
+            // 4. Update UI
+            targetDisplay.innerText = target;
+            statusText.innerText = "READY";
+            log("System initialized. Range: 0 to " + (data.length - 1), "");
+            render();
+            compDisplay.style.display = 'none';
+        }
+
+        // --- RENDER LOGIC ---
+        function render() {
+            stage.innerHTML = '';
+            
+            data.forEach((val, i) => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                
+                // Logic for visual states
+                const isEliminated = i < L || i > U;
+                const isActive = !isEliminated;
+                const isMid = (i === M);
+                const isFound = (state === 'SUCCESS' && i === M);
+
+                if (isEliminated) cell.classList.add('eliminated');
+                if (isActive) cell.classList.add('active');
+                if (isMid) cell.classList.add('midpoint');
+                if (isFound) cell.classList.add('found');
+
+                // Content
+                const indexSpan = document.createElement('span');
+                indexSpan.className = 'cell-index';
+                indexSpan.innerText = i;
+                
+                const valSpan = document.createElement('span');
+                valSpan.className = 'cell-value';
+                valSpan.innerText = val;
+
+                cell.appendChild(indexSpan);
+                cell.appendChild(valSpan);
+
+                // Pointers
+                const ptrContainer = document.createElement('div');
+                ptrContainer.className = 'pointers';
+
+                if (i === L && isActive && state !== 'FAIL') {
+                    const pl = document.createElement('span');
+                    pl.innerText = "[ L";
+                    pl.style.position = "absolute";
+                    pl.style.left = "4px";
+                    ptrContainer.appendChild(pl);
+                }
+                
+                if (i === U && isActive && state !== 'FAIL') {
+                    const pu = document.createElement('span');
+                    pu.innerText = "U ]";
+                    pu.style.position = "absolute";
+                    pu.style.right = "4px";
+                    ptrContainer.appendChild(pu);
+                }
+
+                if (i === M) {
+                    const pm = document.createElement('div');
+                    pm.className = 'ptr-m';
+                    pm.innerHTML = '&#9650;'; // Up arrow
+                    // For the layout, we append this to the stage or absolute, 
+                    // but to keep it simple with wrap, we append to cell
+                    pm.style.position = 'absolute';
+                    pm.style.bottom = '-1.5rem';
+                    pm.style.left = '0';
+                    pm.style.width = '100%';
+                    pm.innerText = 'M';
+                    // Let's use an SVG or character for the arrow
+                    pm.innerHTML = '<div style="font-size:1rem; line-height:1">M</div><div style="font-size:1rem; line-height:0.5">▲</div>';
+                    cell.appendChild(pm);
+                }
+
+                cell.appendChild(ptrContainer);
+                stage.appendChild(cell);
+            });
+        }
+
+        function log(msg, type='') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerText = `> ${msg}`;
+            consoleLog.prepend(entry); // Newest on top if column-reverse not used, but using prepend matches console feel
+        }
+
+        function showComparison(operator, val) {
+            compDisplay.style.display = 'block';
+            compDisplay.innerHTML = `A[M] ${operator} t<br>${val} ${operator} ${target}`;
+        }
+
+        function hideComparison() {
+            compDisplay.style.display = 'none';
+        }
+
+        // --- ALGORITHM STEPPER ---
+        function nextStep() {
+            if (state === 'SUCCESS' || state === 'FAIL') return;
+
+            // Loop Invariant Check
+            if (L > U) {
+                state = 'FAIL';
+                statusText.innerText = "NOT FOUND";
+                log("L > U. Search space exhausted. Target not found.", "error");
+                render();
+                return;
+            }
+
+            switch (state) {
+                case 'CALC':
+                    // Safe Midpoint Formula
+                    // M = L + Math.floor((U - L) / 2)
+                    let oldM = M;
+                    M = L + Math.floor((U - L) / 2);
+                    
+                    statusText.innerText = "CALCULATING MID";
+                    log(`M = L + (U - L)//2 = ${L} + (${U}-${L})//2 = ${M}`, "math");
+                    
+                    state = 'COMPARE';
+                    render();
+                    break;
+
+                case 'COMPARE':
+                    statusText.innerText = "COMPARING";
+                    const midVal = data[M];
+                    
+                    if (midVal === target) {
+                        showComparison('==', midVal);
+                        state = 'SUCCESS';
+                        setTimeout(() => {
+                            hideComparison();
+                            statusText.innerText = "TARGET FOUND";
+                            log(`A[${M}] == ${target}. Target Found!`, "success");
+                            render();
+                            stopAutoPlay();
+                        }, DELAY_MS/2);
+                    } else if (midVal < target) {
+                        showComparison('<', midVal);
+                        state = 'ELIM_LEFT';
+                        log(`A[${M}] (${midVal}) < ${target}. Eliminate Left.`, "");
+                    } else {
+                        showComparison('>', midVal);
+                        state = 'ELIM_RIGHT';
+                        log(`A[${M}] (${midVal}) > ${target}. Eliminate Right.`, "");
+                    }
+                    render();
+                    break;
+
+                case 'ELIM_LEFT':
+                    hideComparison();
+                    statusText.innerText = "UPDATING BOUNDS";
+                    L = M + 1;
+                    log(`L updated to M + 1 = ${L}`);
+                    state = 'CALC'; // Loop back
+                    render();
+                    break;
+
+                case 'ELIM_RIGHT':
+                    hideComparison();
+                    statusText.innerText = "UPDATING BOUNDS";
+                    U = M - 1;
+                    log(`U updated to M - 1 = ${U}`);
+                    state = 'CALC'; // Loop back
+                    render();
+                    break;
+            }
+        }
+
+        // --- CONTROLS ---
+        function startAutoPlay() {
+            if (state === 'SUCCESS' || state === 'FAIL') init();
+            btnAuto.innerText = "Pause";
+            btnStep.disabled = true;
+            autoPlayInterval = setInterval(() => {
+                if (state === 'SUCCESS' || state === 'FAIL') {
+                    stopAutoPlay();
+                } else {
+                    nextStep();
+                }
+            }, DELAY_MS);
+        }
+
+        function stopAutoPlay() {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+            btnAuto.innerText = "Auto Play";
+            btnStep.disabled = false;
+        }
+
+        btnStep.addEventListener('click', () => {
+            if (state === 'SUCCESS' || state === 'FAIL') return;
+            nextStep();
+        });
+
+        btnAuto.addEventListener('click', () => {
+            if (autoPlayInterval) stopAutoPlay();
+            else startAutoPlay();
+        });
+
+        btnReset.addEventListener('click', init);
+
+        // --- START ---
+        init();
+
+    </script>
+</body>
+</html>

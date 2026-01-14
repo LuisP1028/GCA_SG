@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staircase Search Algorithm - Ditherpunk Viz</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #00FF00;
+            --grid-size: 6;
+            --cell-gap: 4px;
+        }
+
+        /* --- GLOBAL & TYPOGRAPHY --- */
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        /* --- DITHERING PATTERNS --- */
+        /* Simulates Atkinson Dithering/Retro shading using 1-bit patterns */
+        .dither-bg {
+            background-image: radial-gradient(var(--fg) 15%, transparent 16%),
+                              radial-gradient(var(--fg) 15%, transparent 16%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 2px;
+        }
+
+        .dither-fade {
+            /* Denser pattern for eliminated cells */
+            background-image: 
+                linear-gradient(45deg, var(--fg) 25%, transparent 25%, transparent 75%, var(--fg) 75%),
+                linear-gradient(45deg, var(--fg) 25%, transparent 25%, transparent 75%, var(--fg) 75%);
+            background-position: 0 0, 2px 2px;
+            background-size: 4px 4px;
+        }
+
+        /* --- LAYOUT --- */
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 90vmin;
+            max-width: 600px;
+            position: relative;
+        }
+
+        /* --- HEADER / CONTROL PANEL --- */
+        .hud {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            border: 2px solid var(--fg);
+            padding: 10px;
+            background: var(--bg);
+        }
+
+        .hud-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hud-label {
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--fg);
+            margin-bottom: 5px;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .target-display {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .status-log {
+            grid-column: span 2;
+            height: 60px;
+            border-top: 1px solid var(--fg);
+            padding-top: 5px;
+            font-size: 0.9rem;
+            overflow: hidden;
+            white-space: pre-wrap;
+        }
+
+        .controls {
+            grid-column: span 2;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        button {
+            background: var(--bg);
+            color: var(--fg);
+            border: 2px solid var(--fg);
+            padding: 8px 12px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            flex: 1;
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            background: var(--fg);
+            color: var(--bg);
+        }
+
+        button:disabled {
+            border-color: #004400;
+            color: #004400;
+            cursor: not-allowed;
+            background: var(--bg);
+        }
+
+        /* --- MATRIX GRID --- */
+        .matrix-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        .matrix {
+            display: grid;
+            grid-template-columns: repeat(var(--grid-size), 1fr);
+            grid-template-rows: repeat(var(--grid-size), 1fr);
+            gap: var(--cell-gap);
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--fg);
+            padding: var(--cell-gap);
+            background: var(--bg);
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--fg);
+            font-size: 1.5rem;
+            position: relative;
+            background: var(--bg);
+            transition: transform 0.2s;
+        }
+
+        /* Cell States */
+        .cell.active {
+            background: var(--fg);
+            color: var(--bg);
+            font-weight: bold;
+            z-index: 10;
+            transform: scale(1.1);
+            box-shadow: 4px 4px 0px var(--bg), 4px 4px 0px 2px var(--fg);
+        }
+
+        .cell.eliminated {
+            border-color: #005500;
+            color: #005500;
+        }
+
+        .cell.eliminated::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(#004400 20%, transparent 20%);
+            background-size: 3px 3px;
+        }
+        
+        .cell.eliminated::after {
+            content: 'X';
+            position: absolute;
+            font-size: 2rem;
+            color: var(--fg);
+            opacity: 0.5;
+        }
+
+        .cell.match {
+            background: var(--fg);
+            color: var(--bg);
+            animation: pulse 0.5s infinite alternate;
+        }
+        
+        .cell.match::after {
+            content: '✓';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: var(--bg);
+            color: var(--fg);
+            border: 1px solid var(--fg);
+            width: 20px;
+            height: 20px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Shadow / Logic Hint */
+        .cell.shadow-elim {
+            background-image: linear-gradient(135deg, #003300 25%, transparent 25%, transparent 50%, #003300 50%, #003300 75%, transparent 75%, transparent);
+            background-size: 10px 10px;
+        }
+
+        /* --- OVERLAYS --- */
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* The Tooltip Bubble */
+        .logic-bubble {
+            position: absolute;
+            background: var(--bg);
+            border: 1px solid var(--fg);
+            padding: 5px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -120%);
+            box-shadow: 2px 2px 0 var(--fg);
+        }
+        .logic-bubble.visible {
+            opacity: 1;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 0 var(--fg); }
+            to { transform: scale(1.05); box-shadow: 0 0 10px var(--fg); }
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 500px) {
+            .cell { font-size: 1rem; }
+            .target-display { font-size: 1.5rem; }
+            .hud-label { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- HEADER HUD -->
+        <div class="hud">
+            <div class="hud-box">
+                <span class="hud-label">TARGET [x]</span>
+                <div class="target-display" id="targetValue">--</div>
+            </div>
+            <div class="hud-box" style="align-items: flex-end;">
+                <span class="hud-label">COORDS</span>
+                <div id="coordsDisplay">R: - | C: -</div>
+            </div>
+            
+            <div class="status-log" id="statusLog">> SYSTEM READY_</div>
+
+            <div class="controls">
+                <button id="btnReset">RESET</button>
+                <button id="btnAuto">AUTO-PLAY</button>
+                <button id="btnNext">NEXT STEP</button>
+            </div>
+        </div>
+
+        <!-- MAIN STAGE -->
+        <div class="matrix-wrapper">
+            <!-- SVG Layer for the Path -->
+            <svg class="overlay-canvas">
+                <polyline id="pathTrace" points="" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="square" />
+            </svg>
+            
+            <!-- Comparison Bubble -->
+            <div id="logicBubble" class="logic-bubble"></div>
+
+            <!-- Grid -->
+            <div class="matrix" id="grid">
+                <!-- Cells generated by JS -->
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* 
+     * STAIRCASE SEARCH VISUALIZATION ENGINE
+     * Style: Ditherpunk / Retro
+     */
+
+    const GRID_SIZE = 6;
+    const SPEED_SLOW = 1000;
+    const SPEED_FAST = 400;
+
+    // DOM Elements
+    const gridEl = document.getElementById('grid');
+    const targetDisplay = document.getElementById('targetValue');
+    const coordsDisplay = document.getElementById('coordsDisplay');
+    const statusLog = document.getElementById('statusLog');
+    const logicBubble = document.getElementById('logicBubble');
+    const pathTrace = document.getElementById('pathTrace');
+    
+    const btnNext = document.getElementById('btnNext');
+    const btnAuto = document.getElementById('btnAuto');
+    const btnReset = document.getElementById('btnReset');
+
+    // State Variables
+    let matrix = [];
+    let target = 0;
+    let currentRow = 0;
+    let currentCol = GRID_SIZE - 1;
+    let isSearchActive = false;
+    let isAutoPlaying = false;
+    let autoInterval = null;
+    let searchPath = []; // Stores center coordinates of visited cells
+
+    // --- INITIALIZATION ---
+
+    function init() {
+        generateSortedMatrix();
+        pickTarget();
+        renderGrid();
+        resetSearchState();
+        log("SYSTEM INITIALIZED. MATRIX SORTED.");
+    }
+
+    // Generate a Row-wise and Column-wise sorted matrix
+    function generateSortedMatrix() {
+        matrix = Array.from({ length: GRID_SIZE }, () => new Array(GRID_SIZE).fill(0));
+        
+        // Seed top-left
+        matrix[0][0] = Math.floor(Math.random() * 10) + 1;
+
+        // Fill first row
+        for (let c = 1; c < GRID_SIZE; c++) {
+            matrix[0][c] = matrix[0][c-1] + Math.floor(Math.random() * 5) + 2;
+        }
+
+        // Fill first col
+        for (let r = 1; r < GRID_SIZE; r++) {
+            matrix[r][0] = matrix[r-1][0] + Math.floor(Math.random() * 5) + 2;
+        }
+
+        // Fill the rest ensuring sorted property
+        for (let r = 1; r < GRID_SIZE; r++) {
+            for (let c = 1; c < GRID_SIZE; c++) {
+                // Must be greater than top neighbor and left neighbor
+                const maxPrev = Math.max(matrix[r-1][c], matrix[r][c-1]);
+                matrix[r][c] = maxPrev + Math.floor(Math.random() * 10) + 1;
+            }
+        }
+    }
+
+    function pickTarget() {
+        // 80% chance to pick an existing number, 20% random non-existent
+        if (Math.random() > 0.2) {
+            const r = Math.floor(Math.random() * GRID_SIZE);
+            const c = Math.floor(Math.random() * GRID_SIZE);
+            target = matrix[r][c];
+        } else {
+            target = Math.floor(Math.random() * 100);
+        }
+        targetDisplay.innerText = target;
+    }
+
+    function renderGrid() {
+        gridEl.innerHTML = '';
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.innerText = matrix[r][c];
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                gridEl.appendChild(cell);
+            }
+        }
+    }
+
+    function resetSearchState() {
+        currentRow = 0;
+        currentCol = GRID_SIZE - 1;
+        isSearchActive = true;
+        isAutoPlaying = false;
+        searchPath = [];
+        pathTrace.setAttribute('points', '');
+        
+        // Reset Visuals
+        document.querySelectorAll('.cell').forEach(c => {
+            c.className = 'cell';
+        });
+        updateControls(true);
+        highlightCell(currentRow, currentCol);
+    }
+
+    // --- VISUALIZATION LOGIC ---
+
+    function getCell(r, c) {
+        return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+    }
+
+    function highlightCell(r, c) {
+        if(r >= GRID_SIZE || c < 0) return;
+
+        // Remove previous active
+        document.querySelectorAll('.cell.active').forEach(el => el.classList.remove('active'));
+
+        const cell = getCell(r, c);
+        if(cell) {
+            cell.classList.add('active');
+            coordsDisplay.innerText = `R: ${r} | C: ${c}`;
+            
+            // Add point to SVG path
+            const rect = cell.getBoundingClientRect();
+            const gridRect = gridEl.getBoundingClientRect();
+            // Calculate center relative to grid container
+            const x = cell.offsetLeft + (cell.offsetWidth / 2);
+            const y = cell.offsetTop + (cell.offsetHeight / 2);
+            
+            searchPath.push(`${x},${y}`);
+            pathTrace.setAttribute('points', searchPath.join(' '));
+        }
+    }
+
+    function showBubble(r, c, operator) {
+        const cell = getCell(r, c);
+        if (!cell) return;
+        
+        const cellVal = matrix[r][c];
+        logicBubble.innerText = `${target} ${operator} ${cellVal}`;
+        logicBubble.classList.add('visible');
+
+        // Position bubble
+        const cellRect = cell.getBoundingClientRect();
+        const containerRect = document.querySelector('.matrix-wrapper').getBoundingClientRect();
+        
+        const top = cell.offsetTop;
+        const left = cell.offsetLeft + (cell.offsetWidth/2);
+
+        logicBubble.style.top = `${top}px`;
+        logicBubble.style.left = `${left}px`;
+    }
+
+    function hideBubble() {
+        logicBubble.classList.remove('visible');
+    }
+
+    // --- LOGIC STEP ---
+
+    async function nextStep() {
+        if (!isSearchActive) return;
+
+        // Boundary Check (Not Found)
+        if (currentRow >= GRID_SIZE || currentCol < 0) {
+            endSearch(false);
+            return;
+        }
+
+        const currentVal = matrix[currentRow][currentCol];
+        const cell = getCell(currentRow, currentCol);
+
+        // 1. Compare State
+        btnNext.disabled = true; // prevent double clicks during animation
+        
+        if (currentVal === target) {
+            // MATCH
+            showBubble(currentRow, currentCol, '=');
+            log(`MATCH! ${target} found at [${currentRow},${currentCol}]`);
+            cell.classList.remove('active');
+            cell.classList.add('match');
+            endSearch(true);
+            return;
+        } 
+        else if (target < currentVal) {
+            // MOVE LEFT (Column Elimination)
+            showBubble(currentRow, currentCol, '<');
+            log(`Target ${target} < ${currentVal}. Eliminating Col ${currentCol}.`);
+            
+            // Shadow Logic: Flash cells below
+            for(let r = currentRow + 1; r < GRID_SIZE; r++) {
+                const shadowCell = getCell(r, currentCol);
+                shadowCell.classList.add('shadow-elim');
+            }
+
+            await wait(isAutoPlaying ? SPEED_FAST : SPEED_SLOW);
+
+            // Execute Move
+            eliminateColumn(currentCol);
+            currentCol--;
+            
+            // Move highlight
+            if (currentCol >= 0) {
+                highlightCell(currentRow, currentCol);
+                log("Moving LEFT...");
+            } else {
+                log("Left boundary crossed.");
+            }
+        } 
+        else {
+            // MOVE DOWN (Row Elimination)
+            showBubble(currentRow, currentCol, '>');
+            log(`Target ${target} > ${currentVal}. Eliminating Row ${currentRow}.`);
+
+            // Shadow Logic: Flash cells to the left
+            for(let c = 0; c < currentCol; c++) {
+                const shadowCell = getCell(currentRow, c);
+                shadowCell.classList.add('shadow-elim');
+            }
+
+            await wait(isAutoPlaying ? SPEED_FAST : SPEED_SLOW);
+
+            // Execute Move
+            eliminateRow(currentRow);
+            currentRow++;
+
+            // Move highlight
+            if (currentRow < GRID_SIZE) {
+                highlightCell(currentRow, currentCol);
+                log("Moving DOWN...");
+            } else {
+                log("Bottom boundary crossed.");
+            }
+        }
+
+        hideBubble();
+        btnNext.disabled = false;
+
+        // If auto-playing and active, trigger next
+        if(isSearchActive && isAutoPlaying) {
+             // small delay between steps
+             setTimeout(() => {
+                 if(isAutoPlaying) nextStep();
+             }, 200);
+        }
+    }
+
+    function eliminateColumn(c) {
+        for (let r = 0; r < GRID_SIZE; r++) {
+            const cell = getCell(r, c);
+            cell.classList.remove('active', 'shadow-elim');
+            cell.classList.add('eliminated');
+        }
+    }
+
+    function eliminateRow(r) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const cell = getCell(r, c);
+            cell.classList.remove('active', 'shadow-elim');
+            cell.classList.add('eliminated');
+        }
+    }
+
+    function endSearch(found) {
+        isSearchActive = false;
+        stopAutoPlay();
+        updateControls(false);
+        if(!found) {
+            log("SEARCH COMPLETE. TARGET NOT IN GRID.");
+            document.querySelector('.matrix').style.opacity = '0.5';
+        }
+    }
+
+    // --- UTILS ---
+
+    function log(msg) {
+        // Typewriter effect simulation
+        const line = document.createElement('div');
+        line.innerText = `> ${msg}`;
+        statusLog.innerHTML = ''; // Keep only latest message for cleanliness or append
+        statusLog.appendChild(line);
+        
+        // Simple blinking cursor append
+        const cursor = document.createElement('span');
+        cursor.innerText = '_';
+        cursor.style.animation = 'pulse 1s infinite';
+        statusLog.appendChild(cursor);
+    }
+
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function stopAutoPlay() {
+        isAutoPlaying = false;
+        btnAuto.innerText = "AUTO-PLAY";
+        btnAuto.classList.remove('active');
+    }
+
+    function updateControls(active) {
+        btnNext.disabled = !active;
+        btnAuto.disabled = !active;
+    }
+
+    // --- EVENT LISTENERS ---
+
+    btnNext.addEventListener('click', () => {
+        stopAutoPlay();
+        nextStep();
+    });
+
+    btnAuto.addEventListener('click', () => {
+        if (isAutoPlaying) {
+            stopAutoPlay();
+        } else {
+            isAutoPlaying = true;
+            btnAuto.innerText = "STOP AUTO";
+            nextStep(); // Start loop
+        }
+    });
+
+    btnReset.addEventListener('click', () => {
+        stopAutoPlay();
+        document.querySelector('.matrix').style.opacity = '1';
+        init();
+    });
+
+    // Window resize handling to update SVG path coordinates
+    window.addEventListener('resize', () => {
+        // Clear path visual on resize to prevent misalignment (simple fix)
+        // Ideally, we recalculate positions based on grid indices
+        if(searchPath.length > 0) {
+            pathTrace.setAttribute('points', ''); 
+            // Quick re-trace logic could go here, but for simplicity we clear
+        }
+    });
+
+    // Boot
+    init();
+
+</script>
+</body>
+</html>

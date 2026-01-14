@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DITHERPUNK QUICKSELECT</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Courier New', Courier, monospace; /* Fallback */
+            cursor: crosshair;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="crt"></canvas>
+
+<script>
+/**
+ * DITHERPUNK QUICKSELECT VISUALIZER
+ * Style: 1-bit Monochrome (Hex Green #00FF00 / Black #000000)
+ * Logic: QuickSelect (Descending)
+ */
+
+const canvas = document.getElementById('crt');
+const ctx = canvas.getContext('2d');
+
+// --- CONSTANTS & CONFIG ---
+const COLORS = {
+    BLACK: '#000000',
+    GREEN: '#00FF00'
+};
+
+const CFG = {
+    barCount: 40,
+    animSpeed: 50, // Base delay in ms
+    swapDelay: 200,
+    pruneDelay: 800,
+    resetDelay: 2000,
+    padding: 60,   // Vertical padding for HUD/Brackets
+    bottomPad: 20
+};
+
+// --- STATE MANAGEMENT ---
+let width, height;
+let patterns = {};
+let array = []; // Objects: { value, originalIndex }
+let state = {
+    phase: 'IDLE', // PARTITIONING, PRUNING, FOUND
+    left: 0,
+    right: 0,
+    k: 0,          // The target index (k-1)
+    kDisplay: 0,   // The 1-based k
+    pivotIdx: -1,
+    compareIdx: -1,
+    storeIdx: -1,
+    foundIdx: -1,
+    discardedLeft: false,
+    discardedRight: false
+};
+let isRunning = false;
+let globalFrame = 0; // For flashing animations
+
+// --- PATTERN GENERATION (DITHERING) ---
+// We create offscreen canvases to generate repeat patterns
+function createPattern(w, h, drawFn) {
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = w;
+    pCanvas.height = h;
+    const pCtx = pCanvas.getContext('2d');
+    pCtx.fillStyle = COLORS.GREEN;
+    drawFn(pCtx, w, h);
+    return ctx.createPattern(pCanvas, 'repeat');
+}
+
+function initPatterns() {
+    // 1. Neutral Bar: Medium density ordered dither (Checkerboard)
+    patterns.neutral = createPattern(4, 4, (c, w, h) => {
+        c.fillRect(0, 0, 2, 2);
+        c.fillRect(2, 2, 2, 2);
+    });
+
+    // 2. Larger Set (Left): Heavy Diagonal Hatching
+    patterns.larger = createPattern(8, 8, (c, w, h) => {
+        c.lineWidth = 2;
+        c.strokeStyle = COLORS.GREEN;
+        c.beginPath();
+        c.moveTo(0, 8); c.lineTo(8, 0);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(-2, 2); c.lineTo(2, -2); // Edge fill
+        c.stroke();
+        c.beginPath();
+        c.moveTo(6, 10); c.lineTo(10, 6); // Edge fill
+        c.stroke();
+    });
+
+    // 3. Smaller Set (Right): Light dot stippling / sparse noise
+    patterns.smaller = createPattern(6, 6, (c, w, h) => {
+        c.fillRect(1, 1, 1, 1);
+        c.fillRect(4, 4, 1, 1);
+    });
+
+    // 4. CRT Scanline Overlay
+    patterns.scanline = createPattern(1, 4, (c, w, h) => {
+        // Transparent gap, then black line
+        c.fillStyle = 'rgba(0, 20, 0, 0.2)'; // Faint glow
+        c.fillRect(0,0,1,2);
+        c.fillStyle = 'rgba(0,0,0,0.5)'; // Dark line
+        c.fillRect(0,2,1,2);
+    });
+}
+
+// --- UTILS ---
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    initPatterns();
+}
+
+// --- CORE ALGORITHM (ASYNC) ---
+
+async function resetAndStart() {
+    if(isRunning) return;
+    isRunning = true;
+
+    // Reset State
+    state.phase = 'SETUP';
+    state.discardedLeft = false;
+    state.discardedRight = false;
+    state.pivotIdx = -1;
+    state.compareIdx = -1;
+    state.foundIdx = -1;
+
+    // Generate Array
+    array = [];
+    for(let i=0; i<CFG.barCount; i++) {
+        array.push({
+            value: Math.floor(Math.random() * 90) + 10,
+            status: 'neutral' // neutral, larger, smaller
+        });
+    }
+
+    // Pick Target K
+    state.k = Math.floor(Math.random() * CFG.barCount);
+    state.kDisplay = state.k + 1;
+    
+    // Initial Window
+    state.left = 0;
+    state.right = CFG.barCount - 1;
+
+    await sleep(1000);
+
+    // Start Recursive QuickSelect
+    await quickSelect(0, CFG.barCount - 1, state.k);
+
+    // Reset Sequence
+    await sleep(CFG.resetDelay);
+    isRunning = false;
+    resetAndStart(); // Loop forever
+}
+
+// The recursive logic implemented iteratively/async for visualization
+async function quickSelect(left, right, kIndex) {
+    state.left = left;
+    state.right = right;
+    
+    // Reset patterns within current window to neutral
+    for(let i=left; i<=right; i++) {
+        array[i].status = 'neutral';
+    }
+
+    state.phase = 'PARTITIONING';
+
+    // 1. Pick Pivot
+    let pivotIdx = left + Math.floor(Math.random() * (right - left + 1));
+    state.pivotIdx = pivotIdx;
+    let pivotValue = array[pivotIdx].value;
+    
+    await sleep(CFG.swapDelay);
+
+    // 2. Move Pivot to End (Right)
+    swap(pivotIdx, right);
+    state.pivotIdx = right; // Pivot is now at R
+    await sleep(CFG.swapDelay);
+
+    // 3. Partition Loop
+    state.storeIdx = left;
+    
+    for (let i = left; i < right; i++) {
+        state.compareIdx = i; // Visual highlight
+        await sleep(CFG.animSpeed);
+
+        // DESCENDING ORDER LOGIC: Large values go LEFT
+        if (array[i].value > pivotValue) {
+            array[i].status = 'larger';
+            swap(i, state.storeIdx);
+            state.storeIdx++;
+        } else {
+            array[i].status = 'smaller';
+        }
+    }
+    state.compareIdx = -1;
+
+    // 4. Restore Pivot
+    swap(right, state.storeIdx);
+    state.pivotIdx = state.storeIdx;
+    
+    await sleep(CFG.swapDelay);
+
+    // 5. Check & Prune
+    state.phase = 'PRUNING';
+    
+    if (state.storeIdx === kIndex) {
+        // TARGET FOUND
+        state.phase = 'TARGET FOUND';
+        state.foundIdx = state.storeIdx;
+        return; // Done
+    } 
+    else if (state.storeIdx > kIndex) {
+        // Pivot index is too high. Target is in the Left part (Larger numbers).
+        // Prune Right side
+        state.phase = 'PRUNING RIGHT';
+        await sleep(CFG.pruneDelay);
+        state.discardedRight = true; // Visual Flag
+        await quickSelect(left, state.storeIdx - 1, kIndex);
+    } 
+    else {
+        // Pivot index is too low. Target is in the Right part (Smaller numbers).
+        // Prune Left side
+        state.phase = 'PRUNING LEFT';
+        await sleep(CFG.pruneDelay);
+        state.discardedLeft = true; // Visual Flag
+        await quickSelect(state.storeIdx + 1, right, kIndex);
+    }
+}
+
+function swap(i, j) {
+    let temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+    // Update tracked indices if they moved
+    if(state.pivotIdx === i) state.pivotIdx = j;
+    else if(state.pivotIdx === j) state.pivotIdx = i;
+}
+
+
+// --- RENDER LOOP ---
+
+function draw() {
+    // 1. Clear Screen
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0, 0, width, height);
+
+    if (array.length === 0) return;
+
+    // 2. HUD Text
+    ctx.fillStyle = COLORS.GREEN;
+    ctx.font = '20px monospace';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    
+    const lineHeight = 25;
+    let yText = 20;
+    
+    ctx.fillText(`ALGORITHM: QUICKSELECT (DESCENDING)`, 20, yText);
+    yText += lineHeight;
+    ctx.fillText(`TARGET:    ${state.kDisplay}-th LARGEST VALUE`, 20, yText);
+    yText += lineHeight;
+    
+    // Status Text Blinking effect
+    if (Math.floor(globalFrame / 20) % 2 === 0 || state.phase === 'TARGET FOUND') {
+        ctx.fillText(`STATUS:    [ ${state.phase} ]`, 20, yText);
+    } else {
+        ctx.fillText(`STATUS:    [ ${state.phase} ]`, 20, yText); // Draw anyway for steady UI, or omit for blink
+    }
+
+
+    // 3. Calculate Layout
+    const usableHeight = height - CFG.padding - CFG.bottomPad;
+    const barWidth = (width - 40) / CFG.barCount;
+    const maxVal = 100; // Assuming random generation max
+
+    // 4. Draw Array Bars
+    for (let i = 0; i < array.length; i++) {
+        const val = array[i].value;
+        const h = (val / maxVal) * usableHeight;
+        const x = 20 + i * barWidth;
+        const y = height - CFG.bottomPad - h;
+        
+        // Determine Visual Style based on State
+        let isDiscarded = false;
+        
+        // Check "Global" visual discard state based on recursion depth
+        if (i < state.left || i > state.right) {
+            isDiscarded = true;
+        }
+
+        if (isDiscarded) {
+            // Pruned/Discarded: Empty with faint dashed outline
+            ctx.strokeStyle = COLORS.GREEN;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 4]); // Dashed
+            ctx.strokeRect(x + 2, y, barWidth - 4, h);
+            ctx.setLineDash([]); // Reset
+        } else {
+            // Active Window Area
+            let fill = patterns.neutral; // Default
+
+            // Logic State Coloring
+            if (i === state.pivotIdx) {
+                // Pivot is Solid Green
+                ctx.fillStyle = COLORS.GREEN;
+                ctx.fillRect(x + 1, y, barWidth - 2, h);
+                
+                // Inverted Text for Pivot
+                ctx.fillStyle = COLORS.BLACK;
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText("P", x + barWidth/2, y + 10);
+            } 
+            else if (i === state.foundIdx) {
+                 // Target Found: Rapid Flash
+                 if (globalFrame % 10 < 5) {
+                    ctx.fillStyle = COLORS.GREEN;
+                    ctx.fillRect(x + 1, y, barWidth - 2, h);
+                 } else {
+                    ctx.fillStyle = COLORS.BLACK;
+                    ctx.fillRect(x + 1, y, barWidth - 2, h);
+                    ctx.strokeStyle = COLORS.GREEN;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x + 1, y, barWidth - 2, h);
+                 }
+            }
+            else {
+                // Normal Comparison States
+                if (array[i].status === 'larger') fill = patterns.larger;
+                if (array[i].status === 'smaller') fill = patterns.smaller;
+                
+                ctx.fillStyle = fill;
+                ctx.fillRect(x + 1, y, barWidth - 2, h);
+                
+                // Outline
+                ctx.strokeStyle = COLORS.GREEN;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 1, y, barWidth - 2, h);
+            }
+        }
+
+        // Highlight "Comparing" Bar (Scanner)
+        if (i === state.compareIdx) {
+            ctx.strokeStyle = COLORS.GREEN;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x - 1, y - 1, barWidth + 2, h + 2);
+        }
+    }
+
+    // 5. Draw Target Line (K)
+    const kX = 20 + state.k * barWidth + (barWidth/2);
+    ctx.beginPath();
+    ctx.strokeStyle = COLORS.GREEN;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.moveTo(kX, CFG.padding);
+    ctx.lineTo(kX, height - CFG.bottomPad);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Label K
+    ctx.fillStyle = COLORS.GREEN;
+    ctx.textAlign = 'center';
+    ctx.fillText("k", kX, CFG.padding + 10);
+
+    // 6. Draw Brackets [ L ... R ]
+    // Only if phase is active
+    if (state.phase !== 'TARGET FOUND') {
+        const lx = 20 + state.left * barWidth;
+        const rx = 20 + (state.right + 1) * barWidth;
+        const by = CFG.padding + 40; // Bracket Y
+
+        ctx.strokeStyle = COLORS.GREEN;
+        ctx.lineWidth = 2;
+        
+        // L Bracket
+        ctx.beginPath();
+        ctx.moveTo(lx + 10, by - 10);
+        ctx.lineTo(lx, by - 10);
+        ctx.lineTo(lx, by + 10); // Down
+        ctx.stroke();
+        ctx.fillText("L", lx, by - 25);
+
+        // R Bracket
+        ctx.beginPath();
+        ctx.moveTo(rx - 10, by - 10);
+        ctx.lineTo(rx, by - 10);
+        ctx.lineTo(rx, by + 10);
+        ctx.stroke();
+        ctx.fillText("R", rx, by - 25);
+    }
+
+    // 7. Scanline Overlay (The Final Touch)
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = patterns.scanline;
+    ctx.fillRect(0, 0, width, height);
+
+    globalFrame++;
+    requestAnimationFrame(draw);
+}
+
+// --- INITIALIZATION ---
+window.addEventListener('resize', resize);
+resize(); // Trigger pattern gen
+resetAndStart();
+draw();
+
+</script>
+</body>
+</html>

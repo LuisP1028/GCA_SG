@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ditherpunk Algorithm Visualization</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --primary: #33ff33; /* Terminal Green */
+            --primary-dim: #1a801a;
+            --red: #ff3333;
+            --orange: #ffcc00;
+            --blue: #33ccff;
+            --bright-green: #ccffcc;
+            --scanline: rgba(0, 0, 0, 0.5);
+            --font-main: 'VT323', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--primary);
+            font-family: var(--font-main);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- CRT / Dither Effects --- */
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            background: 
+                /* Scanlines */
+                linear-gradient(
+                    to bottom,
+                    rgba(255,255,255,0),
+                    rgba(255,255,255,0) 50%,
+                    rgba(0,0,0,0.2) 50%,
+                    rgba(0,0,0,0.2)
+                ),
+                /* Vignette */
+                radial-gradient(
+                    circle,
+                    rgba(0,0,0,0) 60%,
+                    rgba(0,0,0,0.6) 100%
+                );
+            background-size: 100% 4px, 100% 100%;
+        }
+
+        .crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.02; }
+            50% { opacity: 0.05; }
+            100% { opacity: 0.02; }
+        }
+
+        /* --- Zones --- */
+        
+        /* Zone A: Header */
+        header {
+            flex: 0 0 15vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-dim);
+            padding: 10px;
+            text-shadow: 0 0 8px var(--primary);
+            z-index: 5;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #instruction {
+            font-size: 1.5rem;
+            color: var(--blue);
+            margin-top: 10px;
+            min-height: 1.5rem;
+        }
+
+        /* Zone B: Stage */
+        #stage {
+            flex: 1;
+            position: relative;
+            background-image: 
+                radial-gradient(var(--primary-dim) 1px, transparent 0);
+            background-size: 4px 4px; /* Dithering pattern */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Zone C: Dashboard */
+        footer {
+            flex: 0 0 20vh;
+            border-top: 2px solid var(--primary-dim);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 15px;
+            gap: 15px;
+            background: #000;
+            z-index: 5;
+        }
+
+        .dash-box {
+            border: 1px solid var(--primary);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 5px var(--primary-dim);
+            position: relative;
+        }
+
+        .dash-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            background: var(--primary);
+            color: #000;
+            width: 100%;
+            text-align: center;
+        }
+
+        .counter-val {
+            font-size: 2.5rem;
+            color: var(--orange);
+            text-shadow: 2px 2px 0px rgba(255, 204, 0, 0.3);
+        }
+
+        .formula-text {
+            font-size: 1.1rem;
+            padding: 0 10px;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            font-family: var(--font-main);
+            font-size: 1.5rem;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 0 5px var(--primary);
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        button:disabled {
+            border-color: #333;
+            color: #333;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            #instruction { font-size: 1rem; }
+            footer { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); height: 35vh; }
+            .dash-box { flex-direction: row; justify-content: space-between; padding: 0 20px; }
+            .dash-box h3 { width: auto; background: none; color: var(--primary); margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <!-- Zone A -->
+    <header>
+        <h1 id="phase-indicator">PHASE 1: FILTER</h1>
+        <div id="instruction">Initializing...</div>
+    </header>
+
+    <!-- Zone B -->
+    <div id="stage">
+        <canvas id="algoCanvas"></canvas>
+    </div>
+
+    <!-- Zone C -->
+    <footer>
+        <div class="dash-box">
+            <h3>'a' COUNT</h3>
+            <span id="a-count" class="counter-val">0</span>
+        </div>
+        <div class="dash-box">
+            <h3>LENGTH FORMULA</h3>
+            <span id="formula-display" class="formula-text">Len = Current + Count</span>
+        </div>
+        <div class="dash-box controls">
+            <button id="btn-start">START</button>
+            <button id="btn-reset">RESET</button>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * DITHERPUNK ALGORITHM VISUALIZER
+         * Two-Pass Replace and Remove
+         */
+
+        // --- Config & State ---
+        const canvas = document.getElementById('algoCanvas');
+        const ctx = canvas.getContext('2d');
+        const phaseText = document.getElementById('phase-indicator');
+        const instrText = document.getElementById('instruction');
+        const countDisplay = document.getElementById('a-count');
+        const formulaDisplay = document.getElementById('formula-display');
+        const btnStart = document.getElementById('btn-start');
+        const btnReset = document.getElementById('btn-reset');
+
+        const COLORS = {
+            bg: '#050505',
+            main: '#33ff33',
+            red: '#ff3333',
+            orange: '#ffcc00',
+            blue: '#33ccff',
+            brightGreen: '#ccffcc',
+            dim: '#1a801a'
+        };
+
+        const INITIAL_DATA = ['a', 'c', 'b', 'a', 'c'];
+        const TOTAL_CAPACITY = 10; // Extra buffer
+        
+        let state = {
+            data: [],
+            readPtr: 0,
+            writePtr: 0,
+            aCount: 0,
+            phase: 'IDLE', // IDLE, PHASE1, TRANSITION, PHASE2, FINISHED
+            animating: false,
+            stepQueue: [],
+            currentStep: null,
+            time: 0,
+            pointers: { read: 0, write: 0 }, // Visual interpolated positions
+            particles: []
+        };
+
+        // --- Resize Logic ---
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+
+        // --- Initialization ---
+        function init() {
+            state.data = [...INITIAL_DATA, ...Array(TOTAL_CAPACITY - INITIAL_DATA.length).fill(null)];
+            state.readPtr = 0;
+            state.writePtr = 0;
+            state.aCount = 0;
+            state.phase = 'IDLE';
+            state.animating = false;
+            state.stepQueue = [];
+            state.currentStep = null;
+            state.pointers.read = 0;
+            state.pointers.write = 0;
+            state.particles = [];
+
+            phaseText.innerText = "READY";
+            phaseText.style.color = COLORS.main;
+            instrText.innerText = "Press START to begin sequence.";
+            countDisplay.innerText = "0";
+            formulaDisplay.innerText = "Waiting...";
+            
+            btnStart.disabled = false;
+            resize();
+        }
+
+        // --- Drawing Helpers ---
+        function drawCell(index, char, x, y, size, colorOverride = null, ghost = false) {
+            ctx.strokeStyle = ghost ? COLORS.dim : COLORS.main;
+            ctx.lineWidth = 2;
+            
+            if (colorOverride) {
+                ctx.fillStyle = colorOverride;
+                ctx.globalAlpha = 0.2;
+                ctx.fillRect(x, y, size, size);
+                ctx.globalAlpha = 1.0;
+                ctx.strokeStyle = colorOverride;
+            }
+
+            ctx.strokeRect(x, y, size, size);
+
+            if (char) {
+                ctx.fillStyle = ghost ? COLORS.dim : (colorOverride || COLORS.main);
+                ctx.font = `${size * 0.6}px VT323`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(char.toUpperCase(), x + size/2, y + size/2);
+            }
+            
+            // Index Number
+            ctx.fillStyle = COLORS.dim;
+            ctx.font = `${size * 0.25}px monospace`;
+            ctx.fillText(index, x + size/2, y + size + 15);
+        }
+
+        function drawPointer(indexVal, type, cellSize, startX, startY) {
+            const x = startX + indexVal * cellSize + (indexVal * 10); // 10 is gap
+            const isRead = type === 'read';
+            const color = isRead ? COLORS.blue : COLORS.main; // Write pointer uses main green usually
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            
+            if (isRead) {
+                // Pointing Down
+                const y = startY - 20;
+                ctx.moveTo(x + cellSize/2, y + 10);
+                ctx.lineTo(x + cellSize/2 - 10, y - 10);
+                ctx.lineTo(x + cellSize/2 + 10, y - 10);
+            } else {
+                // Pointing Up
+                const y = startY + cellSize + 30; // Below index
+                ctx.moveTo(x + cellSize/2, y - 10);
+                ctx.lineTo(x + cellSize/2 - 10, y + 10);
+                ctx.lineTo(x + cellSize/2 + 10, y + 10);
+            }
+            ctx.fill();
+
+            // Label
+            ctx.font = "14px monospace";
+            ctx.fillText(isRead ? "R" : "W", x + cellSize/2, isRead ? startY - 35 : startY + cellSize + 55);
+        }
+
+        function drawParticles() {
+            state.particles.forEach((p, i) => {
+                ctx.fillStyle = COLORS.orange;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if(p.life <= 0) state.particles.splice(i, 1);
+            });
+        }
+
+        // --- Main Render Loop ---
+        function draw() {
+            // Clear
+            ctx.fillStyle = COLORS.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const cellCount = TOTAL_CAPACITY;
+            // Calculate layout
+            const padding = 20;
+            const availableWidth = canvas.width - (padding * 2);
+            const gap = 10;
+            const cellSize = Math.min(60, (availableWidth - (gap * (cellCount-1))) / cellCount);
+            
+            const totalTapeWidth = (cellSize * cellCount) + (gap * (cellCount - 1));
+            const startX = (canvas.width - totalTapeWidth) / 2;
+            const startY = canvas.height / 2 - cellSize / 2;
+
+            // Draw Cells
+            state.data.forEach((char, i) => {
+                let color = null;
+                
+                // Highlight logic based on current active step
+                if (state.currentStep) {
+                    if (state.phase === 'PHASE1') {
+                        if (i === Math.floor(state.pointers.read) && state.currentStep.highlight === 'read') color = COLORS.blue;
+                        if (i === Math.floor(state.pointers.read) && state.currentStep.action === 'delete') color = COLORS.red;
+                        if (i === Math.floor(state.pointers.read) && state.currentStep.action === 'count') color = COLORS.orange;
+                    } else if (state.phase === 'PHASE2') {
+                        if (i === Math.floor(state.pointers.write) && state.currentStep.action === 'expand') color = COLORS.brightGreen;
+                    }
+                    
+                    if (state.phase === 'FINISHED') {
+                        if (i < state.data.indexOf(null)) color = COLORS.main;
+                    }
+                }
+
+                drawCell(i, char, startX + i*(cellSize+gap), startY, cellSize, color);
+            });
+
+            // Draw Pointers (Interpolated)
+            drawPointer(state.pointers.read, 'read', cellSize, startX, startY);
+            drawPointer(state.pointers.write, 'write', cellSize, startX, startY);
+
+            // Particles
+            drawParticles();
+
+            // Safety Buffer Highlighting (Transition Phase)
+            if (state.phase === 'TRANSITION') {
+                ctx.strokeStyle = COLORS.red;
+                ctx.setLineDash([5, 5]);
+                const buffStart = state.readPtr + 1; // End of actual data
+                const buffEnd = state.writePtr; // End of new capacity
+                
+                if (buffEnd > buffStart) {
+                    const x1 = startX + buffStart * (cellSize + gap);
+                    const width = (buffEnd - buffStart + 1) * (cellSize + gap) - gap;
+                    ctx.strokeRect(x1 - 5, startY - 5, width + 10, cellSize + 10);
+                    ctx.font = "12px monospace";
+                    ctx.fillStyle = COLORS.red;
+                    ctx.fillText("SAFETY BUFFER", x1 + width/2, startY - 15);
+                }
+                ctx.setLineDash([]);
+            }
+        }
+
+        // --- Logic & Animation Control ---
+
+        function createParticle(startX, startY, destElementId) {
+            // Simplified particle logic just for visual flair
+            // In a real scenario, we'd map DOM rect to Canvas coords, but here we just shoot up/down
+            state.particles.push({
+                x: startX,
+                y: startY,
+                vx: (Math.random() - 0.5) * 5,
+                vy: 5, // Fall down towards counter
+                life: 60
+            });
+        }
+
+        function queueStep(action, delay = 800, details = {}) {
+            state.stepQueue.push({ action, delay, ...details });
+        }
+
+        function lerp(start, end, amt) {
+            return (1 - amt) * start + amt * end;
+        }
+
+        function runLoop() {
+            if (!state.animating) return;
+
+            // Pointer Smoothing
+            state.pointers.read = lerp(state.pointers.read, state.readPtr, 0.1);
+            state.pointers.write = lerp(state.pointers.write, state.writePtr, 0.1);
+
+            // Animation Step Processor
+            if (!state.currentStep && state.stepQueue.length > 0) {
+                state.currentStep = state.stepQueue.shift();
+                
+                // Execute Logic for Step
+                const s = state.currentStep;
+                
+                if (s.msg) instrText.innerText = s.msg;
+                if (s.phaseLabel) phaseText.innerText = s.phaseLabel;
+
+                // Instant logic updates happen here, visual transition happens over delay
+                if (s.logic) s.logic();
+
+                setTimeout(() => {
+                    state.currentStep = null;
+                    if (state.stepQueue.length === 0 && state.phase === 'FINISHED') {
+                        state.animating = false;
+                        btnStart.disabled = false;
+                        btnStart.innerText = "RESTART";
+                        btnStart.onclick = init;
+                    }
+                }, s.delay);
+            }
+
+            draw();
+            requestAnimationFrame(runLoop);
+        }
+
+        // --- Algorithm Script Generation ---
+
+        function buildAlgorithmSteps() {
+            // 1. SETUP PHASE 1
+            queueStep('setup', 1000, { 
+                phaseLabel: "PHASE 1: FILTER & COUNT",
+                msg: "Scanning Left -> Right. Remove 'b', Count 'a'."
+            });
+
+            let r = 0;
+            let w = 0;
+            let count = 0;
+            const tempArr = [...INITIAL_DATA]; 
+            // We simulate logic to queue steps, but we must update state in the callback
+            
+            // PHASE 1 LOOP
+            while (r < INITIAL_DATA.length) {
+                const char = tempArr[r];
+                
+                if (char === 'b') {
+                    // Delete case
+                    queueStep('delete', 1200, {
+                        msg: `Index ${r}: Found 'b'. Deleting.`,
+                        action: 'delete',
+                        logic: () => {
+                            state.readPtr++; // Only increment read
+                        }
+                    });
+                } else if (char === 'a') {
+                    // Count case
+                    queueStep('count', 1200, {
+                        msg: `Index ${r}: Found 'a'. Increment Count & Copy.`,
+                        action: 'count',
+                        logic: () => {
+                            // Visual particle
+                            // (We approximate X pos based on ReadPtr for particle origin)
+                            state.aCount++;
+                            countDisplay.innerText = state.aCount;
+                            
+                            state.data[state.writePtr] = 'a';
+                            state.readPtr++;
+                            state.writePtr++;
+                        }
+                    });
+                    count++;
+                } else {
+                    // Normal copy
+                    queueStep('copy', 800, {
+                        msg: `Index ${r}: Found '${char}'. Copying.`,
+                        action: 'copy',
+                        logic: () => {
+                            state.data[state.writePtr] = state.data[state.readPtr];
+                            state.readPtr++;
+                            state.writePtr++;
+                        }
+                    });
+                }
+                
+                // Update simulation vars for the loop logic
+                if (char !== 'b') w++;
+                r++;
+            }
+
+            // TRANSITION
+            const validDataLength = w;
+            const finalLength = validDataLength + count;
+            
+            queueStep('transition', 2000, {
+                phaseLabel: "TRANSITION",
+                msg: `Calc Length: ${validDataLength} + ${count}('a') = ${finalLength}`,
+                logic: () => {
+                    state.phase = 'TRANSITION';
+                    formulaDisplay.innerText = `Len = ${validDataLength} + ${count} = ${finalLength}`;
+                    // Setup pointers for backward pass
+                    // Read points to last valid char of compacted data
+                    state.readPtr = validDataLength - 1;
+                    // Write points to end of new theoretical length
+                    state.writePtr = finalLength - 1;
+                }
+            });
+
+            // PHASE 2 SETUP
+            queueStep('phase2-start', 1000, {
+                phaseLabel: "PHASE 2: BACKWARD EXPANSION",
+                msg: "Scanning Right -> Left. Replace 'a' with 'dd'.",
+                logic: () => {
+                    state.phase = 'PHASE2';
+                }
+            });
+
+            // PHASE 2 LOOP
+            // Simulation
+            let simRead = validDataLength - 1;
+            let simWrite = finalLength - 1;
+            // Need a temp copy of compacted state to know what we are reading
+            // We can reconstruct it or just peek at live state.data inside logic? 
+            // Better to rely on live state data in logic callbacks, 
+            // but we need to know HOW MANY steps to generate.
+            // Let's create a temp simulation array.
+            let simArr = [];
+            for(let i=0; i<validDataLength; i++) {
+                if(INITIAL_DATA[i] === 'b') continue; // Wait, initial data logic is tricky here.
+                // Let's just hardcode the logic based on result of Phase 1.
+                // Phase 1 Result of [a,c,b,a,c] -> [a,c,a,c]
+            }
+            // Actually, we can just look at what Phase 1 produced in our simulation vars:
+            // The simulation produced w=4. The array effectively has valid data at 0..3
+            // Valid data is: a, c, a, c.
+            
+            // We need to iterate backwards based on the known compacted data.
+            // We can just query the DOM/State data in real-time? No, must queue steps.
+            // Let's reconstruct the Phase 1 output array for simulation:
+            const phase1Output = INITIAL_DATA.filter(c => c !== 'b');
+            
+            for (let i = phase1Output.length - 1; i >= 0; i--) {
+                const char = phase1Output[i];
+                
+                if (char === 'a') {
+                    queueStep('expand', 1500, {
+                        msg: `Read 'a': Replace with 'dd' at ${simWrite}, ${simWrite-1}`,
+                        action: 'expand',
+                        logic: () => {
+                            state.data[state.writePtr] = 'd';
+                            state.data[state.writePtr - 1] = 'd';
+                            state.readPtr--;
+                            state.writePtr -= 2;
+                        }
+                    });
+                    simWrite -= 2;
+                } else {
+                    queueStep('move', 800, {
+                        msg: `Read '${char}': Move to ${simWrite}`,
+                        action: 'move',
+                        logic: () => {
+                            state.data[state.writePtr] = state.data[state.readPtr];
+                            state.readPtr--;
+                            state.writePtr--;
+                        }
+                    });
+                    simWrite--;
+                }
+            }
+
+            // FINISH
+            queueStep('finish', 1000, {
+                phaseLabel: "SEQUENCE COMPLETE",
+                msg: "Final Result: " + "ddcddc".toUpperCase(),
+                logic: () => {
+                    state.phase = 'FINISHED';
+                    // Reset pointers for aesthetics
+                    state.readPtr = 0;
+                    state.writePtr = 0;
+                }
+            });
+        }
+
+        // --- Controls ---
+        btnStart.addEventListener('click', () => {
+            if(state.animating) return;
+            state.animating = true;
+            btnStart.disabled = true;
+            state.phase = 'PHASE1';
+            buildAlgorithmSteps();
+            runLoop();
+        });
+
+        btnReset.addEventListener('click', () => {
+            state.animating = false; // Stop loop
+            init(); // Reset state
+            draw(); // Draw clean state
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Optimization // DITHERPUNK</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #00FF00;
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- ZONE A: DASHBOARD --- */
+        .dashboard {
+            height: 15vh;
+            border-bottom: 2px solid var(--fg);
+            display: grid;
+            grid-template-columns: 2fr 3fr;
+            padding: 10px;
+            box-sizing: border-box;
+            gap: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+
+        .stat-box {
+            border: 1px dashed var(--fg);
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .stat-label { font-size: 0.7em; opacity: 0.8; }
+        .stat-value { font-size: 1.2em; font-weight: bold; }
+
+        .log-console {
+            border: 1px solid var(--fg);
+            padding: 8px;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent 0px,
+                    transparent 2px,
+                    #00FF0011 3px
+                );
+        }
+
+        /* --- ZONE B: CANVAS --- */
+        .canvas-wrapper {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* Essential for crisp dither */
+        }
+
+        /* --- ZONE C: CONTROLS --- */
+        .controls {
+            height: 12vh;
+            border-top: 2px solid var(--fg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: var(--bg);
+            color: var(--fg);
+            border: 2px solid var(--fg);
+            padding: 10px 20px;
+            font-family: var(--font-stack);
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 2px 2px 0px var(--fg);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0;
+        }
+
+        button:disabled {
+            border-style: dotted;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 200px;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 10px;
+            background: var(--fg);
+            cursor: pointer;
+            margin-top: -8px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: var(--fg);
+            border: 1px solid var(--fg);
+        }
+
+        /* Utilities */
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- ZONE A: DASHBOARD -->
+    <div class="dashboard">
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="stat-label">MAX WATER (RECORD)</span>
+                <span class="stat-value" id="val-max">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">CURRENT AREA</span>
+                <span class="stat-value" id="val-area">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">POINTER L (i)</span>
+                <span class="stat-value" id="val-left">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">POINTER R (j)</span>
+                <span class="stat-value" id="val-right">0</span>
+            </div>
+        </div>
+        <div class="log-console" id="log-display">
+            > SYSTEM INITIALIZED...<br>
+            > WAITING FOR INPUT...<span class="blink">_</span>
+        </div>
+    </div>
+
+    <!-- ZONE B: VISUALIZATION -->
+    <div class="canvas-wrapper" id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <!-- ZONE C: CONTROLS -->
+    <div class="controls">
+        <div class="btn-group">
+            <button id="btn-start" onclick="togglePlay()">START</button>
+            <button id="btn-reset" onclick="resetSim()">RESET</button>
+        </div>
+        <div class="slider-group">
+            <label for="speed-slider">CLOCK SPEED</label>
+            <input type="range" id="speed-slider" min="50" max="1000" value="500" step="50">
+        </div>
+    </div>
+
+<script>
+/**
+ * DITHERPUNK VISUALIZER CORE
+ * Style: 1-Bit Atkinson/Ordered Dither Simulation
+ */
+
+// --- CONFIGURATION ---
+const THEME = {
+    bg: '#000000',
+    fg: '#00FF00',
+    grid: 30 // Number of bars
+};
+
+// --- STATE MANAGEMENT ---
+let state = {
+    heights: [],
+    i: 0,
+    j: 0,
+    maxArea: 0,
+    bestPair: {i: -1, j: -1}, // Stores indices of best pair
+    currentArea: 0,
+    running: false,
+    finished: false,
+    lastTick: 0,
+    delay: 500
+};
+
+// --- DOM ELEMENTS ---
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimization
+const container = document.getElementById('canvas-container');
+const ui = {
+    max: document.getElementById('val-max'),
+    area: document.getElementById('val-area'),
+    left: document.getElementById('val-left'),
+    right: document.getElementById('val-right'),
+    log: document.getElementById('log-display'),
+    btnStart: document.getElementById('btn-start'),
+    speed: document.getElementById('speed-slider')
+};
+
+// --- DITHER PATTERNS (GENERATED PROGRAMMATICALLY) ---
+let patterns = {};
+
+function initPatterns() {
+    // 1. Water Pattern (Checkerboard / Bayer-ish)
+    const p1 = document.createElement('canvas');
+    p1.width = 4; p1.height = 4;
+    const c1 = p1.getContext('2d');
+    c1.fillStyle = THEME.bg;
+    c1.fillRect(0,0,4,4);
+    c1.fillStyle = THEME.fg;
+    c1.fillRect(0,0,1,1);
+    c1.fillRect(2,2,1,1);
+    patterns.water = ctx.createPattern(p1, 'repeat');
+
+    // 2. Eliminated Pattern (Diagonal Hatch)
+    const p2 = document.createElement('canvas');
+    p2.width = 6; p2.height = 6;
+    const c2 = p2.getContext('2d');
+    c2.fillStyle = THEME.bg;
+    c2.fillRect(0,0,6,6);
+    c2.strokeStyle = THEME.fg;
+    c2.lineWidth = 1;
+    c2.beginPath();
+    c2.moveTo(0,6); c2.lineTo(6,0);
+    c2.stroke();
+    patterns.eliminated = ctx.createPattern(p2, 'repeat');
+    
+    // 3. Max Record Pattern (Dense Dots)
+    const p3 = document.createElement('canvas');
+    p3.width = 2; p3.height = 2;
+    const c3 = p3.getContext('2d');
+    c3.fillStyle = THEME.bg;
+    c3.fillRect(0,0,2,2);
+    c3.fillStyle = THEME.fg;
+    c3.fillRect(0,0,1,1);
+    patterns.record = ctx.createPattern(p3, 'repeat');
+}
+
+// --- CORE FUNCTIONS ---
+
+function log(msg) {
+    ui.log.innerHTML += `> ${msg}<br>`;
+    ui.log.scrollTop = ui.log.scrollHeight;
+}
+
+function resize() {
+    // Handle High DPI displays
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    ctx.scale(dpr, dpr);
+    
+    // Store logic dimensions for drawing
+    state.w = rect.width;
+    state.h = rect.height;
+    
+    draw();
+}
+
+function initData() {
+    state.heights = [];
+    for(let k=0; k<THEME.grid; k++) {
+        // Random height between 10% and 90%
+        state.heights.push(Math.floor(Math.random() * 80) + 10);
+    }
+    state.i = 0;
+    state.j = state.heights.length - 1;
+    state.maxArea = 0;
+    state.bestPair = {i: -1, j: -1};
+    state.currentArea = 0;
+    state.finished = false;
+    
+    // Reset UI
+    ui.max.innerText = "0";
+    ui.area.innerText = "0";
+    ui.left.innerText = "0";
+    ui.right.innerText = "0";
+    ui.log.innerHTML = "> SYSTEM READY.<br>";
+    ui.btnStart.innerText = "START";
+    ui.btnStart.disabled = false;
+    
+    draw();
+}
+
+function resetSim() {
+    state.running = false;
+    initData();
+}
+
+function togglePlay() {
+    if (state.finished) {
+        resetSim();
+        state.running = true;
+        animate();
+        return;
+    }
+    state.running = !state.running;
+    ui.btnStart.innerText = state.running ? "PAUSE" : "RESUME";
+    if (state.running) animate();
+}
+
+// --- LOGIC STEP ---
+
+function step() {
+    if (state.i >= state.j) {
+        state.running = false;
+        state.finished = true;
+        log("OPTIMIZATION COMPLETE.");
+        ui.btnStart.innerText = "DONE";
+        ui.btnStart.disabled = true;
+        draw();
+        return;
+    }
+
+    const hLeft = state.heights[state.i];
+    const hRight = state.heights[state.j];
+    const width = state.j - state.i;
+    const hMin = Math.min(hLeft, hRight);
+    
+    state.currentArea = width * hMin;
+    
+    let actionMsg = "";
+    
+    // Update Max
+    if (state.currentArea > state.maxArea) {
+        state.maxArea = state.currentArea;
+        state.bestPair = {i: state.i, j: state.j};
+        actionMsg = `NEW RECORD: ${state.maxArea}`;
+    }
+
+    // Update UI Stats
+    ui.max.innerText = state.maxArea;
+    ui.area.innerText = state.currentArea;
+    ui.left.innerText = state.i;
+    ui.right.innerText = state.j;
+
+    // Decision Logic
+    if (hLeft < hRight) {
+        if(!actionMsg) actionMsg = `Left (${hLeft}) < Right (${hRight}). Moving Left.`;
+        state.i++;
+    } else {
+        if(!actionMsg) actionMsg = `Right (${hRight}) <= Left (${hLeft}). Moving Right.`;
+        state.j--;
+    }
+    
+    log(actionMsg);
+    draw();
+}
+
+// --- RENDER LOOP ---
+
+function draw() {
+    if (!state.w) return; // Not ready
+    
+    // 1. Background Clear
+    ctx.fillStyle = THEME.bg;
+    ctx.fillRect(0, 0, state.w, state.h);
+
+    const barWidth = (state.w / state.heights.length);
+    const maxBarHeight = state.h * 0.85; // Leave room at top
+    const baseY = state.h;
+
+    // 2. Draw "Ghost" of Best Record (Behind everything)
+    if (state.bestPair.i !== -1) {
+        const bestL = state.bestPair.i;
+        const bestR = state.bestPair.j;
+        const bestH = Math.min(state.heights[bestL], state.heights[bestR]);
+        
+        const x = bestL * barWidth;
+        const w = (bestR - bestL + 1) * barWidth; // +1 to cover the right bar width
+        const hPix = (bestH / 100) * maxBarHeight;
+
+        ctx.save();
+        ctx.strokeStyle = THEME.fg;
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + (barWidth/2), baseY - hPix, (bestR - bestL) * barWidth, hPix);
+        ctx.restore();
+    }
+
+    // 3. Draw Water (Current)
+    if (!state.finished) {
+        const curH = Math.min(state.heights[state.i], state.heights[state.j]);
+        const startX = state.i * barWidth + (barWidth/2);
+        const endX = state.j * barWidth + (barWidth/2);
+        const waterW = endX - startX;
+        const waterH = (curH / 100) * maxBarHeight;
+
+        ctx.fillStyle = patterns.water;
+        ctx.fillRect(startX, baseY - waterH, waterW, waterH);
+        
+        // Water Top Line
+        ctx.fillStyle = THEME.fg;
+        ctx.fillRect(startX, baseY - waterH, waterW, 2); 
+    }
+
+    // 4. Draw Bars
+    state.heights.forEach((h, idx) => {
+        const hPix = (h / 100) * maxBarHeight;
+        const x = idx * barWidth;
+        const y = baseY - hPix;
+        const w = barWidth - 4; // Gap
+
+        // Style Logic
+        if (idx === state.i || idx === state.j) {
+            // Active Pointers
+            ctx.fillStyle = THEME.fg;
+            ctx.fillRect(x + 2, y, w, hPix);
+            
+            // Draw Indicator Arrow below
+            ctx.fillStyle = THEME.fg;
+            ctx.fillText(idx === state.i ? "i" : "j", x + (w/2), baseY - 5);
+        } 
+        else if (idx < state.i || idx > state.j) {
+            // Eliminated
+            ctx.fillStyle = patterns.eliminated;
+            ctx.fillRect(x + 2, y, w, hPix);
+            ctx.strokeStyle = THEME.fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 2, y, w, hPix);
+        } 
+        else {
+            // Unexplored / Candidate (Hollow)
+            ctx.strokeStyle = THEME.fg;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 2, y, w, hPix);
+        }
+    });
+}
+
+function animate(time) {
+    if (!state.running) return;
+
+    // Speed Control
+    const speedVal = 1050 - parseInt(ui.speed.value); // Invert: Higher val = lower delay
+    
+    if (time - state.lastTick > speedVal) {
+        step();
+        state.lastTick = time;
+    }
+
+    requestAnimationFrame(animate);
+}
+
+// --- INITIALIZATION ---
+
+window.addEventListener('resize', resize);
+// Generate patterns before first draw
+initPatterns();
+// Initial setup
+initData();
+resize(); // Force fit
+log("READY.");
+
+</script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missing IP: Turbo Search Visualization</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            overflow: hidden;
+            font-family: 'VT323', monospace;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* CRT Scanline & Flicker Effects */
+        #crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            z-index: 2;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100vh); }
+            100% { transform: translateY(100vh); }
+        }
+
+        #scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 255, 0, 0.1);
+            animation: scanline 6s linear infinite;
+            pointer-events: none;
+            z-index: 3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="crt-overlay"></div>
+    <div id="scan-line"></div>
+    <canvas id="terminal"></canvas>
+
+<script>
+/**
+ * ------------------------------------------------------------------
+ * CONSTANTS & CONFIG
+ * ------------------------------------------------------------------
+ */
+const COLORS = {
+    BG: '#000000',
+    FG: '#00FF00',
+    DIM: '#002200',
+    HIGHLIGHT: '#CCFFCC'
+};
+
+const SCENE = {
+    SETUP: 0,
+    PASS_1: 1,      // Bucketing
+    PIGEONHOLE: 2,  // Analysis
+    RESET: 3,       // Transition
+    PASS_2: 4,      // Bit Vector (Fast)
+    DISCOVERY: 5    // Found it
+};
+
+// Simulation Params
+const BUCKET_COUNT = 32;
+const TARGET_BUCKET = 12; // The magic bucket
+const GRID_DIM = 16;      // 16x16 grid = 256 bits
+const MISSING_CELL = 142; // The magic missing index
+
+/**
+ * ------------------------------------------------------------------
+ * STATE
+ * ------------------------------------------------------------------
+ */
+const state = {
+    scene: SCENE.SETUP,
+    timer: 0,
+    w: window.innerWidth,
+    h: window.innerHeight,
+    // Dynamic Layout Unit
+    u: 0, 
+    
+    // Data structures
+    buckets: [],
+    grid: new Array(GRID_DIM * GRID_DIM).fill(0),
+    packets: [],
+    particles: [],
+    
+    // UI Text
+    logText: "SYSTEM BOOT...",
+    phaseText: "INIT",
+    
+    // Animation Controls
+    pass1Progress: 0,
+    pass2Progress: 0,
+    glitch: 0
+};
+
+const canvas = document.getElementById('terminal');
+const ctx = canvas.getContext('2d');
+
+/**
+ * ------------------------------------------------------------------
+ * CORE FUNCTIONS
+ * ------------------------------------------------------------------
+ */
+
+function resize() {
+    state.w = window.innerWidth;
+    state.h = window.innerHeight;
+    canvas.width = state.w;
+    canvas.height = state.h;
+    // 'u' is a responsive unit (1% of the smaller dimension)
+    state.u = Math.min(state.w, state.h) / 100;
+    
+    // Re-calc buckets on resize
+    initBuckets();
+}
+
+function initBuckets() {
+    state.buckets = [];
+    const margin = state.w * 0.1;
+    const widthAvailable = state.w - (margin * 2);
+    const bucketW = widthAvailable / BUCKET_COUNT;
+    
+    for(let i=0; i<BUCKET_COUNT; i++) {
+        state.buckets.push({
+            i: i,
+            h: 0,
+            maxH: state.h * 0.25, // Max height is 25% of screen
+            x: margin + (i * bucketW),
+            y: state.h * 0.6,
+            w: bucketW - 2, // gap
+            isTarget: i === TARGET_BUCKET
+        });
+    }
+}
+
+// Checkered Dither Drawing
+function ditherRect(x, y, w, h, density = 2) {
+    ctx.fillStyle = COLORS.FG;
+    for(let i=0; i<w; i+=density) {
+        for(let j=0; j<h; j+=density) {
+            if (((i/density) + (j/density)) % 2 === 0) {
+                ctx.fillRect(Math.floor(x+i), Math.floor(y+j), density, density);
+            }
+        }
+    }
+    // Border
+    ctx.strokeStyle = COLORS.FG;
+    ctx.strokeRect(x, y, w, h);
+}
+
+function drawText(str, x, y, align="left", sizeMult=1, bg=false) {
+    const fontSize = Math.max(14, state.u * 2.5 * sizeMult);
+    ctx.font = `${fontSize}px 'VT323', monospace`;
+    ctx.textAlign = align;
+    
+    if (bg) {
+        const m = ctx.measureText(str);
+        ctx.fillStyle = COLORS.BG;
+        ctx.fillRect(x - (align==="center"?m.width/2:0)-2, y-fontSize+2, m.width+4, fontSize+2);
+    }
+    
+    ctx.fillStyle = COLORS.FG;
+    ctx.fillText(str, x, y);
+}
+
+/**
+ * ------------------------------------------------------------------
+ * OBJECTS
+ * ------------------------------------------------------------------
+ */
+
+class Packet {
+    constructor(type) {
+        this.type = type; // 'prefix' (pass 1), 'suffix' (pass 2), 'junk'
+        this.w = state.u * 3;
+        this.h = state.u * 1.5;
+        this.y = state.h * 0.85; // Stream area
+        this.x = -this.w;
+        this.speed = state.w * 0.015 + Math.random() * 5;
+        if (state.scene === SCENE.PASS_2) this.speed *= 2.5; // High speed in phase 2
+        this.dead = false;
+    }
+
+    update() {
+        this.x += this.speed;
+        
+        // Pass 1 Logic: Fly up to buckets
+        if (state.scene === SCENE.PASS_1 && this.x > state.w * 0.5 && !this.dead) {
+            this.dead = true;
+            spawnParticle(this.x, this.y, null);
+        }
+
+        // Pass 2 Logic: Hit Filter
+        if (state.scene === SCENE.PASS_2 && this.x > state.w * 0.3 && !this.dead) {
+            this.dead = true;
+            if (this.type === 'suffix') {
+                spawnParticle(this.x, this.y, 'grid');
+                state.glitch = 2; // Screen shake on match
+            } else {
+                // Bounce effect for mismatches
+                spawnParticle(this.x, this.y, 'bounce');
+            }
+        }
+
+        if (this.x > state.w) this.dead = true;
+    }
+
+    draw() {
+        if(this.dead) return;
+        
+        // Visual: Split block
+        ctx.fillStyle = this.type === 'junk' ? COLORS.DIM : COLORS.FG;
+        ctx.fillRect(this.x, this.y, this.w/2, this.h);
+        ctx.strokeStyle = COLORS.FG;
+        ctx.strokeRect(this.x + this.w/2, this.y, this.w/2, this.h);
+    }
+}
+
+class Particle {
+    constructor(sx, sy, tx, ty, mode) {
+        this.x = sx;
+        this.y = sy;
+        this.tx = tx;
+        this.ty = ty;
+        this.mode = mode; // 'bucket', 'grid', 'bounce'
+        this.life = 1.0;
+        this.vx = (Math.random() - 0.5) * 5;
+        this.vy = (Math.random() - 0.5) * 5;
+    }
+
+    update() {
+        if (this.mode === 'bounce') {
+            this.x -= 5; // Fly back left
+            this.y += this.vy;
+            this.life -= 0.1;
+        } else {
+            // Lerp to target
+            this.x += (this.tx - this.x) * 0.2;
+            this.y += (this.ty - this.y) * 0.2;
+            
+            // Snap check
+            const dist = Math.abs(this.x - this.tx) + Math.abs(this.y - this.ty);
+            if (dist < 5) this.life = 0;
+        }
+    }
+
+    draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = COLORS.FG;
+        ctx.fillRect(this.x, this.y, state.u/2, state.u/2);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function spawnParticle(x, y, intent) {
+    if (state.scene === SCENE.PASS_1) {
+        // Find random bucket geometry
+        const bIdx = Math.floor(Math.random() * BUCKET_COUNT);
+        const b = state.buckets[bIdx];
+        state.particles.push(new Particle(x, y, b.x + b.w/2, b.y - b.h, 'bucket'));
+    } else if (state.scene === SCENE.PASS_2 && intent === 'grid') {
+        // Fly towards grid center (approx)
+        state.particles.push(new Particle(x, y, state.w * 0.65, state.h * 0.5, 'grid'));
+    } else if (intent === 'bounce') {
+        state.particles.push(new Particle(x, y, 0, 0, 'bounce'));
+    }
+}
+
+/**
+ * ------------------------------------------------------------------
+ * LOGIC LOOP
+ * ------------------------------------------------------------------
+ */
+
+function update() {
+    state.timer++;
+    
+    // Packet Spawning
+    if (state.scene === SCENE.PASS_1 || state.scene === SCENE.PASS_2) {
+        // Much higher spawn rate in Pass 2
+        const rate = state.scene === SCENE.PASS_2 ? 0.3 : 0.1; 
+        const count = state.scene === SCENE.PASS_2 ? 3 : 1; 
+        
+        if (Math.random() < rate) {
+            for(let i=0; i<count; i++) {
+                // In pass 2, occasional 'suffix' matches, mostly 'junk'
+                let type = 'prefix';
+                if(state.scene === SCENE.PASS_2) type = Math.random() > 0.7 ? 'suffix' : 'junk';
+                state.packets.push(new Packet(type));
+            }
+        }
+    }
+
+    // Entities
+    state.packets.forEach(p => p.update());
+    state.packets = state.packets.filter(p => !p.dead);
+    
+    state.particles.forEach(p => p.update());
+    state.particles = state.particles.filter(p => p.life > 0);
+
+    // Glitch decay
+    if(state.glitch > 0) state.glitch *= 0.8;
+
+    // --- STATE MACHINE ---
+    switch(state.scene) {
+        case SCENE.SETUP:
+            state.phaseText = "PHASE 0: ANALYSIS";
+            state.logText = "DETECTING 4B INTEGERS... SPLITTING PREFIX/SUFFIX";
+            if (state.timer > 100) transition(SCENE.PASS_1);
+            break;
+
+        case SCENE.PASS_1:
+            state.phaseText = "PHASE 1: BUCKETING";
+            state.logText = "COUNTING PREFIXES (64KB BLOCKS)...";
+            state.pass1Progress += 0.005;
+            
+            // Fill buckets
+            state.buckets.forEach(b => {
+                let growSpeed = Math.random() * state.h * 0.005;
+                // Target bucket stops growing early
+                if (b.isTarget && b.h > b.maxH * 0.7) growSpeed = 0;
+                // Others cap at max
+                if (!b.isTarget && b.h > b.maxH * 1.1) growSpeed = 0;
+                b.h += growSpeed;
+            });
+
+            if (state.pass1Progress >= 1.0) transition(SCENE.PIGEONHOLE);
+            break;
+
+        case SCENE.PIGEONHOLE:
+            state.phaseText = "ANALYSIS COMPLETE";
+            state.logText = "ANOMALY DETECTED IN BUCKET [0x0C]. COUNT < CAP.";
+            if (state.timer > 150) transition(SCENE.RESET);
+            break;
+
+        case SCENE.RESET:
+            state.phaseText = "RECONFIGURING";
+            state.logText = "INITIALIZING BIT VECTOR FOR PREFIX 0x0C...";
+            if (state.timer > 100) transition(SCENE.PASS_2);
+            break;
+
+        case SCENE.PASS_2:
+            state.phaseText = "PHASE 2: FAST FILL";
+            state.logText = "STREAMING SUFFIXES -> BIT GRID...";
+            
+            // --- TURBO FILL LOGIC ---
+            // Instead of waiting for particles, we statistically fill empty spots rapidly
+            const emptyIndices = state.grid.map((v, i) => v === 0 ? i : -1).filter(i => i !== -1 && i !== MISSING_CELL);
+            
+            if (emptyIndices.length > 0) {
+                // Fill up to 5 cells per frame for speed
+                const fillCount = Math.min(emptyIndices.length, 5);
+                for(let k=0; k<fillCount; k++) {
+                    const r = Math.floor(Math.random() * emptyIndices.length);
+                    state.grid[emptyIndices[r]] = 1;
+                }
+            } else {
+                // Grid full (except missing cell)
+                transition(SCENE.DISCOVERY);
+            }
+            break;
+
+        case SCENE.DISCOVERY:
+            state.phaseText = "TARGET ACQUIRED";
+            state.logText = `MISSING IP FOUND: 12.${MISSING_CELL}`;
+            break;
+    }
+}
+
+function transition(newScene) {
+    state.scene = newScene;
+    state.timer = 0;
+}
+
+/**
+ * ------------------------------------------------------------------
+ * RENDER
+ * ------------------------------------------------------------------
+ */
+
+function drawUI() {
+    // HUD Line
+    ctx.strokeStyle = COLORS.FG;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, state.h * 0.15);
+    ctx.lineTo(state.w, state.h * 0.15);
+    ctx.stroke();
+
+    // Top Bar Info
+    drawText(state.phaseText, 20, state.h * 0.08, "left", 1.5);
+    drawText(state.logText, state.w - 20, state.h * 0.08, "right", 1.2);
+
+    // Stream Separator
+    ctx.beginPath();
+    ctx.setLineDash([2, 4]);
+    ctx.moveTo(0, state.h * 0.75);
+    ctx.lineTo(state.w, state.h * 0.75);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawGrid() {
+    // Responsive Positioning
+    let cellSize = state.u * 2; // Relative cell size
+    if (state.scene === SCENE.DISCOVERY) cellSize = state.u * 3; // Zoom
+
+    // Center the grid
+    const gridW = GRID_DIM * cellSize;
+    // In Phase 2, grid is on right. In Discovery, center.
+    let offX = state.scene === SCENE.DISCOVERY ? (state.w/2 - gridW/2) : (state.w * 0.65); 
+    let offY = state.scene === SCENE.DISCOVERY ? (state.h/2 - gridW/2) : (state.h * 0.3);
+
+    for (let i = 0; i < GRID_DIM * GRID_DIM; i++) {
+        const x = (i % GRID_DIM) * cellSize + offX;
+        const y = Math.floor(i / GRID_DIM) * cellSize + offY;
+
+        if (state.grid[i] === 1) {
+            ctx.fillStyle = COLORS.FG;
+            ctx.fillRect(x, y, cellSize-1, cellSize-1);
+        } else {
+            ctx.strokeStyle = COLORS.DIM;
+            ctx.strokeRect(x, y, cellSize-1, cellSize-1);
+        }
+
+        // Highlight Missing in Discovery
+        if (state.scene === SCENE.DISCOVERY && i === MISSING_CELL) {
+            if (Math.floor(Date.now() / 200) % 2 === 0) {
+                ctx.fillStyle = COLORS.BG;
+                ctx.fillRect(x, y, cellSize, cellSize);
+                ctx.strokeStyle = COLORS.FG;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, cellSize, cellSize);
+            }
+        }
+    }
+}
+
+function drawSceneElements() {
+    // 1. SETUP: IP Split Animation
+    if (state.scene === SCENE.SETUP) {
+        const cx = state.w / 2;
+        const cy = state.h / 4;
+        const sep = Math.min(state.w * 0.1, state.timer * 2);
+        
+        // Prefix
+        ditherRect(cx - state.u*10 - sep, cy, state.u*10, state.u*5);
+        drawText("PREFIX", cx - state.u*5 - sep, cy + state.u*8, "center");
+        
+        // Suffix
+        ctx.strokeStyle = COLORS.FG;
+        ctx.strokeRect(cx + sep, cy, state.u*10, state.u*5);
+        drawText("SUFFIX", cx + state.u*5 + sep, cy + state.u*8, "center");
+    }
+
+    // 2. PASS 1 & PIGEONHOLE: Buckets
+    if (state.scene === SCENE.PASS_1 || state.scene === SCENE.PIGEONHOLE || state.scene === SCENE.RESET) {
+        // Fade out in RESET
+        if(state.scene === SCENE.RESET) ctx.globalAlpha = 0.3;
+
+        state.buckets.forEach(b => {
+            // Draw bar fill
+            let isDim = (state.scene === SCENE.PIGEONHOLE && !b.isTarget);
+            ctx.fillStyle = isDim ? COLORS.DIM : COLORS.FG;
+            
+            // Draw from bottom up
+            if (isDim) {
+                ctx.fillRect(b.x, b.y - b.h, b.w, b.h);
+            } else {
+                ditherRect(b.x, b.y - b.h, b.w, b.h, 3);
+            }
+
+            // Draw Capacity Line
+            ctx.fillStyle = COLORS.BG;
+            ctx.fillRect(b.x, b.y - b.maxH, b.w, 2);
+            
+            // Highlight Target
+            if (state.scene === SCENE.PIGEONHOLE && b.isTarget) {
+                 ctx.strokeStyle = COLORS.HIGHLIGHT;
+                 ctx.lineWidth = 2;
+                 ctx.strokeRect(b.x - 2, b.y - b.maxH - 5, b.w + 4, b.maxH + 10);
+            }
+        });
+        
+        // Label
+        drawText("MAX CAP", state.w - 50, state.h * 0.6 - state.h * 0.25, "right", 0.8, true);
+
+        ctx.globalAlpha = 1.0;
+    }
+
+    // 3. PASS 2: Filter & Grid
+    if (state.scene === SCENE.PASS_2 || state.scene === SCENE.DISCOVERY) {
+        // Draw Filter (Pass 2 only)
+        if (state.scene === SCENE.PASS_2) {
+            const fx = state.w * 0.3;
+            const fy = state.h * 0.4;
+            ctx.fillStyle = COLORS.BG;
+            ctx.strokeStyle = COLORS.FG;
+            ctx.fillRect(fx, fy, state.u*4, state.u*8);
+            ctx.strokeRect(fx, fy, state.u*4, state.u*8);
+            drawText("FILTER", fx + state.u*2, fy - 10, "center");
+            
+            // Connection Line
+            ctx.beginPath();
+            ctx.setLineDash([5,5]);
+            ctx.moveTo(fx + state.u*4, fy + state.u*4);
+            ctx.lineTo(state.w * 0.65, state.h * 0.3 + (GRID_DIM*state.u*2)/2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        drawGrid();
+    }
+}
+
+function draw() {
+    // Clear
+    ctx.fillStyle = COLORS.BG;
+    ctx.fillRect(0, 0, state.w, state.h);
+
+    // Camera Shake (Glitch)
+    ctx.save();
+    if(state.glitch > 0.1) {
+        ctx.translate((Math.random()-0.5)*state.glitch*10, (Math.random()-0.5)*state.glitch*10);
+    }
+
+    drawUI();
+    drawSceneElements();
+
+    // Draw Stream Objects (Packets/Particles)
+    if(state.scene !== SCENE.SETUP && state.scene !== SCENE.DISCOVERY) {
+        state.packets.forEach(p => p.draw());
+        state.particles.forEach(p => p.draw());
+    }
+
+    ctx.restore();
+
+    requestAnimationFrame(() => {
+        update();
+        draw();
+    });
+}
+
+// Bootstrap
+window.addEventListener('resize', resize);
+resize();
+draw();
+
+</script>
+</body>
+</html>

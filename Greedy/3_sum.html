@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3-SUM VISUALIZER // DITHERPUNK</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --main-green: #00FF41;
+            --dim-green: #003B00;
+            --alert-green: #CCFFCC;
+            --scan-line-color: rgba(0, 20, 0, 0.5);
+            --font-stack: 'VT323', 'Courier New', monospace;
+        }
+
+        /* --- GLOBAL RESET & AESTHETICS --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--main-green);
+            font-family: var(--font-stack);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            text-transform: uppercase;
+            font-size: clamp(14px, 2vh, 24px);
+        }
+
+        /* --- CRT & DITHER FX --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .dither-bg {
+            background-image: radial-gradient(var(--dim-green) 15%, transparent 16%);
+            background-size: 4px 4px;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        /* --- LAYOUT ZONES --- */
+        
+        /* ZONE A: DASHBOARD */
+        .dashboard {
+            flex: 0 0 20%;
+            border-bottom: 2px solid var(--main-green);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .target-display {
+            font-size: 2em;
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--main-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .equation-box {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            font-size: 1.5em;
+            background: var(--dim-green);
+            padding: 0.5rem 2rem;
+            border: 1px dashed var(--main-green);
+        }
+
+        .status-msg {
+            margin-top: 0.5rem;
+            color: var(--alert-green);
+            min-height: 1.2em;
+        }
+
+        /* ZONE B: VISUALIZATION STAGE */
+        .stage {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 2rem;
+            overflow-x: auto;
+        }
+
+        .array-track {
+            display: flex;
+            gap: 1.5vmin;
+            align-items: center;
+            padding: 4rem 1rem; /* Space for pointers above/below */
+        }
+
+        .cell {
+            width: 8vmin;
+            height: 8vmin;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid var(--main-green);
+            font-size: 1.5em;
+            position: relative;
+            transition: transform 0.3s ease, background-color 0.2s;
+            background: black;
+        }
+
+        .cell.sorted {
+            border-style: dotted;
+        }
+
+        /* POINTER STYLES VIA PSEUDO-ELEMENTS */
+        
+        /* The Anchor (Top) */
+        .cell.is-anchor {
+            background-color: var(--dim-green);
+            box-shadow: 0 0 15px var(--main-green);
+            transform: translateY(5px);
+            z-index: 10;
+        }
+        .cell.is-anchor::before {
+            content: "LOCK";
+            position: absolute;
+            top: -2.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.5em;
+            background: var(--main-green);
+            color: black;
+            padding: 2px 4px;
+        }
+        .cell.is-anchor::after {
+            content: "↓";
+            position: absolute;
+            top: -1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+        }
+
+        /* The Seekers (Bottom) */
+        /* Since Low and High can be on the same cell, we use specific classes */
+        
+        .indicator {
+            position: absolute;
+            bottom: -2.5rem;
+            font-size: 0.6em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: left 0.3s ease;
+            width: 100%;
+        }
+        
+        .cell.is-low .indicator-low, 
+        .cell.is-high .indicator-high {
+            display: block;
+        }
+
+        .indicator-low, .indicator-high {
+            display: none;
+            background: black;
+            border: 1px solid var(--main-green);
+            padding: 2px;
+            margin-top: 2px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .cell.is-low { border-bottom: 4px solid var(--main-green); }
+        .cell.is-high { border-top: 4px solid var(--main-green); } /* Stylistic choice to differentiate borders */
+
+        /* Success State */
+        .cell.is-match {
+            background-color: var(--main-green);
+            color: black;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* ZONE C: CONTROLS & LOG */
+        .controls-deck {
+            flex: 0 0 25%;
+            border-top: 2px solid var(--main-green);
+            display: flex;
+            padding: 1rem;
+            gap: 1rem;
+            background: #000900;
+        }
+
+        .log-panel {
+            flex: 2;
+            border: 1px solid var(--dim-green);
+            padding: 0.5rem;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            font-family: monospace;
+            background: rgba(0, 20, 0, 0.8);
+        }
+
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #002200; }
+        .log-entry span { opacity: 0.7; }
+
+        .control-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--main-green);
+            color: var(--main-green);
+            padding: 10px 20px;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.1s;
+        }
+
+        button:hover { background: var(--dim-green); }
+        button:active { background: var(--main-green); color: black; }
+        button:disabled { border-color: var(--dim-green); color: var(--dim-green); cursor: not-allowed; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px; width: 16px;
+            background: var(--main-green);
+            margin-top: -6px;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            background: var(--dim-green);
+        }
+
+        /* Pseudo-element for Low/High labels manual handling */
+        .pointer-label {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            color: var(--main-green);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+    <div class="dither-bg"></div>
+
+    <!-- ZONE A -->
+    <header class="dashboard">
+        <div class="target-display">TARGET: <span id="target-val">--</span></div>
+        <div class="equation-box">
+            <span id="eq-a">?</span> + 
+            <span id="eq-b">?</span> + 
+            <span id="eq-c">?</span> = 
+            <span id="eq-sum">--</span>
+        </div>
+        <div class="status-msg" id="status-text">SYSTEM READY. AWAITING INPUT.</div>
+    </header>
+
+    <!-- ZONE B -->
+    <main class="stage">
+        <div class="array-track" id="array-container">
+            <!-- Cells generated via JS -->
+        </div>
+    </main>
+
+    <!-- ZONE C -->
+    <footer class="controls-deck">
+        <div class="log-panel" id="log-window">
+            <!-- Logs go here -->
+        </div>
+        <div class="control-panel">
+            <button id="btn-gen" onclick="init()">GENERATE DATA</button>
+            <button id="btn-run" onclick="startAlgo()" disabled>EXECUTE</button>
+            <label for="speed-range">PROCESS SPEED</label>
+            <input type="range" id="speed-range" min="50" max="1000" value="500">
+        </div>
+    </footer>
+
+    <script>
+        // --- STATE & CONFIG ---
+        const CONFIG = {
+            arraySize: 10,
+            minVal: 1,
+            maxVal: 20
+        };
+
+        let state = {
+            data: [],
+            target: 0,
+            anchorIdx: -1,
+            lowIdx: -1,
+            highIdx: -1,
+            isRunning: false,
+            delay: 500
+        };
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            container: document.getElementById('array-container'),
+            target: document.getElementById('target-val'),
+            eqA: document.getElementById('eq-a'),
+            eqB: document.getElementById('eq-b'),
+            eqC: document.getElementById('eq-c'),
+            eqSum: document.getElementById('eq-sum'),
+            status: document.getElementById('status-text'),
+            log: document.getElementById('log-window'),
+            btnGen: document.getElementById('btn-gen'),
+            btnRun: document.getElementById('btn-run'),
+            speed: document.getElementById('speed-range')
+        };
+
+        // --- HELPERS ---
+        const sleep = () => new Promise(r => setTimeout(r, state.delay));
+        
+        els.speed.addEventListener('input', (e) => {
+            state.delay = 1050 - e.target.value; // Invert so right is faster
+        });
+
+        function log(msg, type="info") {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            const time = new Date().toLocaleTimeString().split(' ')[0];
+            div.innerHTML = `<span>[${time}]</span> ${msg}`;
+            els.log.prepend(div); // Newest on top
+        }
+
+        function updateEquation(valA, valB, valC, sum) {
+            els.eqA.textContent = valA !== null ? valA : '?';
+            els.eqB.textContent = valB !== null ? valB : '?';
+            els.eqC.textContent = valC !== null ? valC : '?';
+            els.eqSum.textContent = sum !== null ? sum : '--';
+            
+            // Equation Color Logic
+            if(sum === null) els.eqSum.style.color = 'var(--main-green)';
+            else if(sum === state.target) els.eqSum.style.color = 'var(--alert-green)';
+            else if(sum < state.target) els.eqSum.style.color = '#ff4444'; // Red-ish for underflow
+            else els.eqSum.style.color = '#aa00ff'; // Purple-ish for overflow
+        }
+
+        function render() {
+            els.container.innerHTML = '';
+            state.data.forEach((val, idx) => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = val;
+
+                // Apply Classes based on state
+                if (idx === state.anchorIdx) cell.classList.add('is-anchor');
+                if (idx === state.lowIdx) cell.classList.add('is-low');
+                if (idx === state.highIdx) cell.classList.add('is-high');
+
+                // Visual labels for Low/High
+                let labels = [];
+                if (idx === state.lowIdx) labels.push('L');
+                if (idx === state.highIdx) labels.push('H');
+                
+                if (labels.length > 0) {
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'pointer-label';
+                    labelDiv.textContent = labels.join('/');
+                    cell.appendChild(labelDiv);
+                }
+
+                els.container.appendChild(cell);
+            });
+        }
+
+        // --- CORE LOGIC ---
+
+        function init() {
+            // Generate Random Data
+            state.data = Array.from({length: CONFIG.arraySize}, () => 
+                Math.floor(Math.random() * (CONFIG.maxVal - CONFIG.minVal) + CONFIG.minVal)
+            );
+            
+            // Pick a realistic target (sum of 3 randoms)
+            const r1 = state.data[Math.floor(Math.random()*CONFIG.arraySize)];
+            const r2 = state.data[Math.floor(Math.random()*CONFIG.arraySize)];
+            const r3 = state.data[Math.floor(Math.random()*CONFIG.arraySize)];
+            state.target = r1 + r2 + r3;
+
+            // Reset Pointers
+            state.anchorIdx = -1;
+            state.lowIdx = -1;
+            state.highIdx = -1;
+            state.isRunning = false;
+
+            // Update UI
+            els.target.textContent = state.target;
+            els.status.textContent = "DATA LOADED. UNSORTED.";
+            updateEquation(null, null, null, null);
+            els.log.innerHTML = '';
+            els.btnRun.disabled = false;
+            
+            render();
+            log("Initialized new dataset.");
+        }
+
+        async function startAlgo() {
+            if (state.isRunning) return;
+            state.isRunning = true;
+            els.btnGen.disabled = true;
+            els.btnRun.disabled = true;
+
+            // PHASE 1: SORTING
+            els.status.textContent = "PHASE 1: SORTING...";
+            log("Sorting array to establish monotonic property...");
+            state.data.sort((a,b) => a - b);
+            render();
+            await sleep();
+            
+            // PHASE 2 & 3
+            let solutionFound = false;
+
+            // Anchor Loop
+            for (let i = 0; i < state.data.length; i++) {
+                state.anchorIdx = i;
+                const a = state.data[i];
+                
+                // Set Up Two Pointers
+                // Strategy: "Lock one number first. Repetition allowed -> Low starts at 0"
+                state.lowIdx = 0; 
+                state.highIdx = state.data.length - 1;
+
+                els.status.textContent = `ANCHOR LOCKED: ${a}. SEEKING PAIR SUM: ${state.target - a}`;
+                log(`Anchor set to index ${i} (Value: ${a})`);
+                render();
+                await sleep();
+
+                // Inner Loop
+                while (state.lowIdx <= state.highIdx) {
+                    const b = state.data[state.lowIdx];
+                    const c = state.data[state.highIdx];
+                    const currentSum = a + b + c;
+
+                    updateEquation(a, b, c, currentSum);
+                    render();
+                    
+                    // Visual pause for calculation
+                    await sleep();
+
+                    if (currentSum === state.target) {
+                        // MATCH
+                        els.status.textContent = ">>> MATCH DETECTED <<<";
+                        log(`Match Found: ${a} + ${b} + ${c} = ${state.target}`);
+                        
+                        // Highlight Visuals
+                        const cells = document.querySelectorAll('.cell');
+                        if(cells[state.anchorIdx]) cells[state.anchorIdx].classList.add('is-match');
+                        if(cells[state.lowIdx]) cells[state.lowIdx].classList.add('is-match');
+                        if(cells[state.highIdx]) cells[state.highIdx].classList.add('is-match');
+                        
+                        solutionFound = true;
+                        // For this demo, we stop at first match. 
+                        // To find all, we would just increment low/decrement high here.
+                        els.btnGen.disabled = false;
+                        return; 
+                    } 
+                    else if (currentSum < state.target) {
+                        // UNDERFLOW
+                        els.status.textContent = "SUM TOO SMALL -> MOVING LOW POINTER UP";
+                        state.lowIdx++;
+                    } 
+                    else {
+                        // OVERFLOW
+                        els.status.textContent = "SUM TOO LARGE -> MOVING HIGH POINTER DOWN";
+                        state.highIdx--;
+                    }
+                    render();
+                    await sleep();
+                }
+                
+                // End of inner loop, reset pointers visual
+                state.lowIdx = -1;
+                state.highIdx = -1;
+            }
+
+            if (!solutionFound) {
+                els.status.textContent = "TERMINATED. NO SOLUTION FOUND.";
+                log("Search complete. No triples found.");
+            }
+
+            state.isRunning = false;
+            els.btnGen.disabled = false;
+        }
+
+        // Initialize on load
+        init();
+
+    </script>
+</body>
+</html>

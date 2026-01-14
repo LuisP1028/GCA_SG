@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOYER-MOORE: BATTLE OF ATTRITION</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --fg-color: #00FF41;
+            --dim-color: #003b0f;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--fg-color);
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .header {
+            padding: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(180deg, var(--bg-color) 0%, transparent 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--fg-color);
+            padding: 10px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button {
+            background: var(--fg-color);
+            color: var(--bg-color);
+            border: none;
+            font-family: inherit;
+            font-weight: bold;
+            padding: 5px 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #fff;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: var(--dim-color);
+            height: 5px;
+            width: 100px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: var(--fg-color);
+            cursor: pointer;
+        }
+
+        /* CRT Overlay Effects */
+        #crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            opacity: 0.6;
+        }
+        
+        #scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 21;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 65, 0.1) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 10s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="header">
+            <div>
+                <h1 style="margin:0; font-size: 24px;">BOYER-MOORE</h1>
+                <small style="opacity: 0.7;">VOTING_ALGORITHM // VISUALIZER_v1.0</small>
+            </div>
+            <div class="controls">
+                <label>SPEED</label>
+                <input type="range" id="speedSlider" min="1" max="10" value="3">
+                <button id="resetBtn">RESET SYSTEM</button>
+            </div>
+        </div>
+        <div style="padding: 20px; text-align: right; opacity: 0.5;">
+            <div id="status-readout">SYSTEM_READY</div>
+        </div>
+    </div>
+
+    <div id="crt-overlay"></div>
+    <div id="scanline"></div>
+    <canvas id="mainCanvas"></canvas>
+
+<script>
+/**
+ * 1-BIT DITHERPUNK VISUALIZATION ENGINE
+ * Target: Window-Agnostic, High-Contrast, Retro-Terminal Aesthetic
+ */
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency
+const speedSlider = document.getElementById('speedSlider');
+const resetBtn = document.getElementById('resetBtn');
+const statusReadout = document.getElementById('status-readout');
+
+// --- CONSTANTS & CONFIG ---
+const COLORS = {
+    BG: '#050505',
+    FG: '#00FF41',
+    DIM: '#005515',
+    ALERT: '#00FF41' // Monochromatic, so "Red" concepts are just intense flicker or patterns
+};
+
+const SHAPES = {
+    SQUARE: 0,
+    TRIANGLE: 1,
+    CIRCLE: 2
+};
+
+// Data Generation
+const STREAM_LENGTH = 16;
+const MAJORITY_SHAPE = SHAPES.SQUARE; // The "Candidate" to find
+
+// Animation States
+const STATE = {
+    SPAWN: 0,
+    MOVE_TO_FOCUS: 1,
+    CHECK_ZERO: 2,
+    MOVE_TO_COMPARE: 3,
+    COMPARE_ANIM: 4,
+    RESOLVE_MATCH: 5,
+    RESOLVE_MISMATCH: 6,
+    GRAVEYARD_FALL: 7,
+    FINISHED: 8
+};
+
+// Global Simulation State
+let sim = {
+    stream: [],
+    candidate: null, // { type: SHAPE }
+    count: 0,
+    processedCount: 0,
+    
+    // Animation specific
+    activeItem: null, // The item currently moving from stream
+    particles: [],
+    graveyard: [],
+    phase: STATE.SPAWN,
+    timer: 0,
+    speedMult: 1,
+    message: "SYSTEM INITIALIZED",
+    history: [] // For the stack visual
+};
+
+// --- RESIZE HANDLING ---
+let W, H;
+let ZONES = {};
+
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    
+    // Define layout zones based on percentages
+    ZONES = {
+        STREAM: { y: 0, h: H * 0.2 },
+        ARENA: { y: H * 0.2, h: H * 0.6 },
+        GRAVEYARD: { y: H * 0.8, h: H * 0.2 },
+        // Sub-zones
+        PODIUM: { x: W * 0.2, y: H * 0.6 },
+        INTERACTION: { x: W * 0.5, y: H * 0.5 },
+        STACK: { x: W * 0.8, y: H * 0.6 }
+    };
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- UTILITIES ---
+
+function generateStream() {
+    let arr = [];
+    // Ensure majority
+    for (let i = 0; i < STREAM_LENGTH; i++) {
+        if (i % 2 === 0 || Math.random() > 0.6) {
+            arr.push(MAJORITY_SHAPE);
+        } else {
+            arr.push(Math.random() > 0.5 ? SHAPES.TRIANGLE : SHAPES.CIRCLE);
+        }
+    }
+    return arr;
+}
+
+// Dither Pattern Generator (2x2 Checkerboard)
+function createPattern(color1, color2) {
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = 4;
+    pCanvas.height = 4;
+    const pCtx = pCanvas.getContext('2d');
+    pCtx.fillStyle = color1;
+    pCtx.fillRect(0,0,4,4);
+    pCtx.fillStyle = color2;
+    pCtx.fillRect(0,0,2,2);
+    pCtx.fillRect(2,2,2,2);
+    return ctx.createPattern(pCanvas, 'repeat');
+}
+
+const PATTERN_DIM = createPattern(COLORS.BG, COLORS.DIM);
+const PATTERN_SOLID = COLORS.FG;
+
+// --- DRAWING FUNCTIONS ---
+
+function drawShape(type, x, y, size, isFilled = true, color = COLORS.FG) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.fillStyle = isFilled ? PATTERN_SOLID : PATTERN_DIM;
+    
+    ctx.beginPath();
+    if (type === SHAPES.SQUARE) {
+        ctx.rect(x - size/2, y - size/2, size, size);
+    } else if (type === SHAPES.CIRCLE) {
+        ctx.arc(x, y, size/2, 0, Math.PI * 2);
+    } else if (type === SHAPES.TRIANGLE) {
+        ctx.moveTo(x, y - size/2);
+        ctx.lineTo(x + size/2, y + size/2);
+        ctx.lineTo(x - size/2, y + size/2);
+        ctx.closePath();
+    }
+    
+    if (isFilled) ctx.fill();
+    ctx.stroke();
+}
+
+function drawBlock(x, y, w, h, filled) {
+    ctx.fillStyle = filled ? COLORS.FG : COLORS.BG;
+    ctx.strokeStyle = COLORS.FG;
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    
+    // Internal crosshatch for texture
+    if(filled) {
+        ctx.fillStyle = COLORS.BG;
+        ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
+        ctx.fillStyle = PATTERN_DIM; // dither inside
+        ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+    }
+}
+
+function spawnExplosion(x, y) {
+    for(let i=0; i<20; i++) {
+        sim.particles.push({
+            x: x, 
+            y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            life: 1.0,
+            size: Math.random() * 4 + 2
+        });
+    }
+}
+
+// --- LOGIC & ANIMATION ---
+
+function initSim() {
+    sim.stream = generateStream().map((type, i) => ({
+        id: i,
+        type: type,
+        x: W + (i * (W*0.08)), // Initial positions off screen
+        y: ZONES.STREAM.h / 2,
+        state: 'waiting'
+    }));
+    
+    sim.candidate = null;
+    sim.count = 0;
+    sim.processedCount = 0;
+    sim.activeItem = null;
+    sim.history = []; // stack of items
+    sim.graveyard = [];
+    sim.particles = [];
+    sim.phase = STATE.SPAWN;
+    sim.message = "INITIALIZING STREAM...";
+    
+    statusReadout.innerText = "SYSTEM_READY";
+}
+
+function update() {
+    const speed = parseFloat(speedSlider.value) * 0.01;
+    sim.speedMult = parseFloat(speedSlider.value);
+    sim.timer += 1 * sim.speedMult;
+
+    // --- STATE MACHINE ---
+    
+    switch (sim.phase) {
+        case STATE.SPAWN:
+            if (sim.processedCount >= STREAM_LENGTH) {
+                sim.phase = STATE.FINISHED;
+                return;
+            }
+            
+            // Pick next item
+            sim.activeItem = sim.stream[sim.processedCount];
+            sim.activeItem.state = 'active';
+            sim.activeItem.targetX = ZONES.INTERACTION.x;
+            sim.activeItem.targetY = ZONES.INTERACTION.y;
+            sim.phase = STATE.MOVE_TO_FOCUS;
+            sim.message = "FETCHING ELEMENT " + sim.processedCount;
+            break;
+
+        case STATE.MOVE_TO_FOCUS:
+            // Move item to center
+            const dx = sim.activeItem.targetX - sim.activeItem.x;
+            const dy = sim.activeItem.targetY - sim.activeItem.y;
+            
+            sim.activeItem.x += dx * 0.1 * sim.speedMult;
+            sim.activeItem.y += dy * 0.1 * sim.speedMult;
+            
+            // Move entire stream left
+            sim.stream.forEach(item => {
+                if (item.state === 'waiting') {
+                    item.x -= (W*0.08) * 0.05 * sim.speedMult;
+                }
+            });
+
+            if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+                sim.phase = STATE.CHECK_ZERO;
+                sim.timer = 0;
+            }
+            break;
+
+        case STATE.CHECK_ZERO:
+            if (sim.timer < 20) break; // Pause
+            
+            if (sim.count === 0) {
+                sim.message = "COUNT IS ZERO -> NEW CANDIDATE";
+                // Move current active to podium
+                sim.candidate = { type: sim.activeItem.type };
+                sim.activeItem.targetX = ZONES.PODIUM.x;
+                sim.activeItem.targetY = ZONES.PODIUM.y - 40; // Hover above
+                
+                // Animate move to podium
+                const pdx = sim.activeItem.targetX - sim.activeItem.x;
+                const pdy = sim.activeItem.targetY - sim.activeItem.y;
+                sim.activeItem.x += pdx * 0.1 * sim.speedMult;
+                sim.activeItem.y += pdy * 0.1 * sim.speedMult;
+
+                if (Math.abs(pdx) < 2) {
+                    // It becomes the candidate visuals
+                    sim.count = 1;
+                    sim.history.push({ type: sim.activeItem.type }); // Add to stack
+                    sim.processedCount++;
+                    sim.activeItem = null; // Consumed
+                    sim.phase = STATE.SPAWN;
+                }
+            } else {
+                sim.phase = STATE.MOVE_TO_COMPARE;
+            }
+            break;
+
+        case STATE.MOVE_TO_COMPARE:
+            sim.message = "COMPARING WITH CANDIDATE";
+            // Move active item next to Podium
+            const cx = ZONES.PODIUM.x + 80;
+            const cy = ZONES.PODIUM.y;
+            
+            sim.activeItem.x += (cx - sim.activeItem.x) * 0.1 * sim.speedMult;
+            sim.activeItem.y += (cy - sim.activeItem.y) * 0.1 * sim.speedMult;
+            
+            if (Math.abs(cx - sim.activeItem.x) < 2) {
+                sim.phase = STATE.COMPARE_ANIM;
+                sim.timer = 0;
+            }
+            break;
+
+        case STATE.COMPARE_ANIM:
+            if (sim.timer < 30) break; // Wait for user to see
+            
+            if (sim.activeItem.type === sim.candidate.type) {
+                sim.phase = STATE.RESOLVE_MATCH;
+                sim.message = "MATCH DETECTED -> REINFORCE (+1)";
+            } else {
+                sim.phase = STATE.RESOLVE_MISMATCH;
+                sim.message = "MISMATCH DETECTED -> ELIMINATE (-1)";
+            }
+            break;
+
+        case STATE.RESOLVE_MATCH:
+            // Move to stack
+            const sx = ZONES.STACK.x;
+            const sy = ZONES.STACK.y - (sim.history.length * 30);
+            
+            sim.activeItem.x += (sx - sim.activeItem.x) * 0.15 * sim.speedMult;
+            sim.activeItem.y += (sy - sim.activeItem.y) * 0.15 * sim.speedMult;
+            
+            if (Math.abs(sx - sim.activeItem.x) < 5 && Math.abs(sy - sim.activeItem.y) < 5) {
+                sim.count++;
+                sim.history.push({ type: sim.candidate.type });
+                sim.processedCount++;
+                sim.activeItem = null;
+                sim.phase = STATE.SPAWN;
+            }
+            break;
+
+        case STATE.RESOLVE_MISMATCH:
+            // Visual warfare: Active item charges stack, Top of stack charges active item
+            const attackX = (ZONES.PODIUM.x + ZONES.STACK.x) / 2;
+            const attackY = ZONES.PODIUM.y - 50;
+            
+            // 1. Move Active Item to clash point
+            sim.activeItem.x += (attackX - sim.activeItem.x) * 0.2 * sim.speedMult;
+            sim.activeItem.y += (attackY - sim.activeItem.y) * 0.2 * sim.speedMult;
+            
+            // 2. Visually detach top stack item (we don't remove from array yet)
+            // Just simulate impact frame
+            if (Math.abs(attackX - sim.activeItem.x) < 10) {
+                // EXPLOSION
+                spawnExplosion(attackX, attackY);
+                sim.count--;
+                const deadStackItem = sim.history.pop();
+                
+                // Add to graveyard
+                sim.graveyard.push({ ...sim.activeItem, x: attackX, y: attackY, r: Math.random() });
+                sim.graveyard.push({ ...deadStackItem, x: attackX+10, y: attackY, r: Math.random() });
+                
+                sim.activeItem = null;
+                sim.processedCount++;
+                sim.phase = STATE.GRAVEYARD_FALL;
+                sim.timer = 0;
+            }
+            break;
+
+        case STATE.GRAVEYARD_FALL:
+            // Items in graveyard fall to bottom
+            sim.graveyard.forEach(g => {
+                if (g.y < ZONES.GRAVEYARD.y + Math.random()*50) {
+                    g.y += 5 * sim.speedMult;
+                    g.x += Math.sin(g.y * 0.1) * 2;
+                }
+            });
+            if (sim.timer > 20) {
+                sim.phase = STATE.SPAWN;
+            }
+            break;
+
+        case STATE.FINISHED:
+            sim.message = "STREAM COMPLETE. SURVIVOR IDENTIFIED.";
+            break;
+    }
+
+    // Particle Updates
+    for (let i = sim.particles.length - 1; i >= 0; i--) {
+        let p = sim.particles[i];
+        p.x += p.vx * sim.speedMult * 0.5;
+        p.y += p.vy * sim.speedMult * 0.5;
+        p.life -= 0.02 * sim.speedMult;
+        if (p.life <= 0) sim.particles.splice(i, 1);
+    }
+
+    // UI Updates
+    statusReadout.innerText = `PHASE: ${getPhaseName(sim.phase)} // MSG: ${sim.message}`;
+}
+
+function getPhaseName(p) {
+    return Object.keys(STATE).find(key => STATE[key] === p);
+}
+
+function render() {
+    // 1. Clear & Background
+    ctx.fillStyle = COLORS.BG;
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. Draw Zones (Grid lines)
+    ctx.strokeStyle = COLORS.DIM;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    
+    // Horizon lines
+    ctx.beginPath();
+    ctx.moveTo(0, ZONES.ARENA.y);
+    ctx.lineTo(W, ZONES.ARENA.y);
+    ctx.moveTo(0, ZONES.GRAVEYARD.y);
+    ctx.lineTo(W, ZONES.GRAVEYARD.y);
+    ctx.stroke();
+    
+    ctx.setLineDash([]); // Reset
+
+    // 3. Draw Labels
+    ctx.font = "16px 'Courier New'";
+    ctx.fillStyle = COLORS.DIM;
+    ctx.fillText("IN_STREAM", 20, ZONES.STREAM.h - 10);
+    ctx.fillText("ARENA_LOGIC", 20, ZONES.ARENA.y + 20);
+    ctx.fillText("DISCARD_PILE", 20, ZONES.GRAVEYARD.y + 20);
+
+    // 4. Draw Stream
+    sim.stream.forEach(item => {
+        if (item === sim.activeItem) return; // Draw separately
+        if (item.id < sim.processedCount) return; // Already processed
+        
+        drawShape(item.type, item.x, item.y, 40, true, COLORS.DIM);
+    });
+
+    // 5. Draw Candidate Podium
+    ctx.fillStyle = PATTERN_DIM;
+    ctx.fillRect(ZONES.PODIUM.x - 50, ZONES.PODIUM.y + 30, 100, 10); // Base
+    
+    // Label
+    ctx.fillStyle = COLORS.FG;
+    ctx.textAlign = "center";
+    ctx.fillText("CANDIDATE", ZONES.PODIUM.x, ZONES.PODIUM.y + 60);
+
+    if (sim.candidate && sim.count > 0) {
+        // Draw the candidate hologram
+        ctx.save();
+        ctx.shadowColor = COLORS.FG;
+        ctx.shadowBlur = 10;
+        drawShape(sim.candidate.type, ZONES.PODIUM.x, ZONES.PODIUM.y - 10, 60, false, COLORS.FG);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = COLORS.DIM;
+        ctx.fillText("NULL", ZONES.PODIUM.x, ZONES.PODIUM.y - 10);
+    }
+
+    // 6. Draw Count Stack
+    const stackBaseX = ZONES.STACK.x;
+    const stackBaseY = ZONES.STACK.y + 30;
+    
+    ctx.fillStyle = COLORS.FG;
+    ctx.fillText(`COUNT: ${sim.count}`, stackBaseX, stackBaseY + 30);
+
+    // Draw blocks
+    sim.history.forEach((histItem, idx) => {
+        const by = stackBaseY - (idx * 30);
+        drawBlock(stackBaseX - 25, by - 25, 50, 25, true);
+    });
+
+    // 7. Draw Active Item
+    if (sim.activeItem) {
+        drawShape(sim.activeItem.type, sim.activeItem.x, sim.activeItem.y, 40, true, COLORS.FG);
+    }
+
+    // 8. Draw Particles
+    sim.particles.forEach(p => {
+        ctx.fillStyle = COLORS.FG;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+
+    // 9. Draw Graveyard
+    sim.graveyard.forEach(g => {
+        ctx.save();
+        ctx.translate(g.x, g.y);
+        ctx.rotate(g.r);
+        ctx.globalAlpha = 0.3;
+        drawShape(g.type, 0, 0, 30, false, COLORS.DIM);
+        ctx.restore();
+    });
+
+    // 10. Glitch / Scanline aesthetic is handled by CSS, but we can add random noise
+    if (Math.random() > 0.95) {
+        ctx.fillStyle = "rgba(0, 255, 65, 0.1)";
+        const y = Math.random() * H;
+        const h = Math.random() * 20;
+        ctx.fillRect(0, y, W, h);
+    }
+}
+
+function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+}
+
+// --- BOOT ---
+resetBtn.addEventListener('click', initSim);
+initSim();
+loop();
+
+</script>
+</body>
+</html>

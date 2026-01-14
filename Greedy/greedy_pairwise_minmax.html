@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greedy Task Scheduler // Ditherpunk</title>
+    <style>
+        /* RESET & BASE */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: 'Courier New', Courier, monospace;
+            cursor: crosshair;
+        }
+
+        /* CANVAS LAYOUT */
+        /* We scale the canvas up with CSS to create sharp, chunky pixels */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* RETRO CRT FLICKER (OPTIONAL SUBTLE EFFECT) */
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="mainCanvas"></canvas>
+    <div class="crt-overlay"></div>
+
+<script>
+/**
+ * GREEDY TASK SCHEDULER // DITHERPUNK VISUALIZATION
+ * 
+ * Logic: Pairs Shortest Task with Longest Task to minimize bottleneck.
+ * Style: 1-bit Atkinson Dithering (Green/Black).
+ */
+
+// --- CONFIGURATION ---
+const RESOLUTION_DIVISOR = 4; // Lower resolution for retro feel & performance
+const COLOR_BLACK = [0, 0, 0];
+const COLOR_GREEN = [0, 255, 0];
+const ANIMATION_SPEED = 0.08; // Lerp factor (0.0 to 1.0)
+const DELAY_BETWEEN_STEPS = 40; // Frames to wait between pairing steps
+const NUM_TASKS = 24; // Must be even
+
+// --- STATE MANAGEMENT ---
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+// Offscreen buffer for drawing source grayscale/shades before dithering
+let bufferCanvas = document.createElement('canvas');
+let bufferCtx = bufferCanvas.getContext('2d');
+
+let width, height;
+let tasks = [];
+let maxLoad = 0;
+let phase = 'INIT'; // INIT, SORT, PAIRING, FINISHED
+let frameCount = 0;
+let pairLeftIndex = 0;
+let pairRightIndex = 0;
+let pairedStacks = []; // To track where to put the next stack
+let finishTimer = 0;
+
+// --- CLASS: TASK BLOCK ---
+class Task {
+    constructor(id, value, x, y, w, h) {
+        this.id = id;
+        this.value = value; // 10-100
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        
+        this.targetX = x;
+        this.targetY = y;
+        
+        // Visual properties
+        // Brightness based on value (shorter = dimmer, taller = brighter)
+        // Range 30% to 100% luminosity
+        this.luminosity = 30 + (this.value / 100) * 70;
+        
+        this.isPaired = false;
+    }
+
+    update() {
+        // Linear Interpolation for smooth movement
+        this.x += (this.targetX - this.x) * ANIMATION_SPEED;
+        this.y += (this.targetY - this.y) * ANIMATION_SPEED;
+    }
+
+    draw(context) {
+        // Draw mostly solid rect
+        // We use HSL logic but write it as grayscale for the dither engine to interpret
+        // The dither engine treats brightness as probability of being Green.
+        
+        const l = Math.floor(this.luminosity);
+        context.fillStyle = `rgb(${l}, ${l}, ${l})`;
+        context.fillRect(this.x, this.y, this.w, this.h);
+
+        // Draw Value Label (inverted color if bright)
+        if (this.w > 10) {
+            context.fillStyle = l > 60 ? '#000' : '#FFF';
+            context.font = '10px monospace';
+            context.textAlign = 'center';
+            context.fillText(Math.floor(this.value), this.x + this.w/2, this.y + this.h - 2);
+        }
+    }
+}
+
+// --- INIT & RESIZE ---
+function resize() {
+    // Set display canvas to window size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Set internal low-res buffer
+    width = Math.ceil(canvas.width / RESOLUTION_DIVISOR);
+    height = Math.ceil(canvas.height / RESOLUTION_DIVISOR);
+    bufferCanvas.width = width;
+    bufferCanvas.height = height;
+
+    // Reset simulation on severe resize
+    initSimulation();
+}
+
+function initSimulation() {
+    tasks = [];
+    pairedStacks = [];
+    maxLoad = 0;
+    phase = 'INIT';
+    finishTimer = 0;
+    
+    // Generate Random Tasks
+    const margin = 20;
+    const availableWidth = width - (margin * 2);
+    const blockWidth = (availableWidth / NUM_TASKS) - 2;
+
+    for (let i = 0; i < NUM_TASKS; i++) {
+        const val = Math.floor(Math.random() * 80) + 10; // Value 10 to 90
+        const blockHeight = (val / 150) * (height * 0.4); // Scale height relative to screen
+        
+        // Start scattered in Top Zone (top 40%)
+        const startX = margin + Math.random() * (availableWidth - blockWidth);
+        const startY = (height * 0.4) - blockHeight - 10; 
+
+        tasks.push(new Task(i, val, startX, startY, blockWidth, blockHeight));
+    }
+
+    // Transition to Sort Phase quickly
+    setTimeout(() => { phase = 'SORT'; }, 1000);
+}
+
+// --- LOGIC LOOP ---
+function updateLogic() {
+    // Phase 1: Sort
+    if (phase === 'SORT') {
+        // Sort tasks by value
+        tasks.sort((a, b) => a.value - b.value);
+        
+        // Arrange them nicely in the top row
+        const margin = 20;
+        const availableWidth = width - (margin * 2);
+        const blockWidth = (availableWidth / NUM_TASKS) - 2;
+
+        tasks.forEach((t, i) => {
+            t.targetX = margin + i * (blockWidth + 2);
+            t.targetY = (height * 0.4) - t.h - 5;
+            t.w = blockWidth; // update width in case of resize logic
+        });
+
+        // Check if movement is mostly done
+        const lastTask = tasks[NUM_TASKS - 1];
+        if (Math.abs(lastTask.x - lastTask.targetX) < 1) {
+            phase = 'PAIRING';
+            pairLeftIndex = 0;
+            pairRightIndex = NUM_TASKS - 1;
+            frameCount = 0;
+        }
+    }
+
+    // Phase 2: Pairing (Greedy)
+    if (phase === 'PAIRING') {
+        frameCount++;
+
+        if (frameCount > DELAY_BETWEEN_STEPS) {
+            if (pairLeftIndex >= pairRightIndex) {
+                phase = 'FINISHED';
+                return;
+            }
+
+            // Identify pair
+            const minTask = tasks[pairLeftIndex];
+            const maxTask = tasks[pairRightIndex];
+
+            // Determine Position in Bottom Zone
+            // We stack them from left to right in the bottom area
+            const margin = 40;
+            const stackIndex = pairedStacks.length;
+            const stackWidth = minTask.w * 1.5; // Slightly wider for visual emphasis in result
+            const stackGap = 4;
+            const destX = margin + stackIndex * (stackWidth + stackGap);
+            const groundY = height - 20; // Bottom margin
+
+            // Max Task (Bottom)
+            maxTask.targetX = destX;
+            maxTask.targetY = groundY - maxTask.h;
+            maxTask.w = stackWidth;
+            maxTask.isPaired = true;
+
+            // Min Task (Top)
+            minTask.targetX = destX;
+            minTask.targetY = groundY - maxTask.h - minTask.h;
+            minTask.w = stackWidth;
+            minTask.isPaired = true;
+
+            // Update Max Load Logic
+            const stackHeightVal = minTask.value + maxTask.value;
+            if (stackHeightVal > maxLoad) {
+                maxLoad = stackHeightVal;
+            }
+
+            pairedStacks.push({ h: stackHeightVal, x: destX, width: stackWidth });
+
+            // Move indices
+            pairLeftIndex++;
+            pairRightIndex--;
+            frameCount = 0;
+        }
+    }
+
+    // Phase 3: Finish
+    if (phase === 'FINISHED') {
+        finishTimer++;
+        if (finishTimer > 200) { // Wait ~3 seconds
+            initSimulation();
+        }
+    }
+
+    // Update all tasks physics
+    tasks.forEach(t => t.update());
+}
+
+// --- DRAWING ---
+function drawScene() {
+    // 1. Clear Buffer (Black)
+    bufferCtx.fillStyle = '#000000';
+    bufferCtx.fillRect(0, 0, width, height);
+
+    // 2. Draw UI Lines
+    
+    // Separator Line
+    bufferCtx.strokeStyle = '#333';
+    bufferCtx.beginPath();
+    bufferCtx.moveTo(0, height * 0.4);
+    bufferCtx.lineTo(width, height * 0.4);
+    bufferCtx.stroke();
+
+    // Max Load Threshold Line (Dashed)
+    if (maxLoad > 0) {
+        // Convert maxLoad value to pixel height
+        // value 150 ~= height * 0.4 roughly in generation logic
+        // We need to reverse calculate or just use the Y position of the stacks
+        // Visual approximation:
+        const scaleFactor = (height * 0.4) / 150; 
+        const lineY = (height - 20) - (maxLoad * scaleFactor);
+
+        bufferCtx.strokeStyle = '#FFF'; // Bright for dither to catch it
+        bufferCtx.setLineDash([4, 4]);
+        bufferCtx.beginPath();
+        bufferCtx.moveTo(0, lineY);
+        bufferCtx.lineTo(width, lineY);
+        bufferCtx.stroke();
+        bufferCtx.setLineDash([]);
+
+        // Label
+        bufferCtx.fillStyle = '#FFF';
+        bufferCtx.font = '10px monospace';
+        bufferCtx.fillText(`MAX LOAD: ${maxLoad}`, width - 100, lineY - 5);
+    }
+
+    // 3. Draw Tasks
+    tasks.forEach(t => t.draw(bufferCtx));
+
+    // 4. Draw Phase Label
+    bufferCtx.fillStyle = '#FFF';
+    bufferCtx.font = '12px monospace';
+    bufferCtx.fillText(`STATUS: ${phase}`, 10, 15);
+    
+    // 5. Draw Pointers (Triangles) if Pairing
+    if (phase === 'PAIRING' && pairLeftIndex < pairRightIndex) {
+        const t1 = tasks[pairLeftIndex];
+        const t2 = tasks[pairRightIndex];
+        
+        bufferCtx.fillStyle = '#FFF';
+        
+        // Min Pointer
+        bufferCtx.beginPath();
+        bufferCtx.moveTo(t1.x + t1.w/2, t1.y - 5);
+        bufferCtx.lineTo(t1.x + t1.w/2 - 3, t1.y - 10);
+        bufferCtx.lineTo(t1.x + t1.w/2 + 3, t1.y - 10);
+        bufferCtx.fill();
+
+        // Max Pointer
+        bufferCtx.beginPath();
+        bufferCtx.moveTo(t2.x + t2.w/2, t2.y - 5);
+        bufferCtx.lineTo(t2.x + t2.w/2 - 3, t2.y - 10);
+        bufferCtx.lineTo(t2.x + t2.w/2 + 3, t2.y - 10);
+        bufferCtx.fill();
+    }
+}
+
+// --- ATKINSON DITHERING ALGORITHM ---
+// Converts the grayscale buffer into 1-bit Green/Black pixels on the main canvas
+function applyDither() {
+    // Get buffer pixels
+    const imageData = bufferCtx.getImageData(0, 0, width, height);
+    const data = imageData.data; // Uint8ClampedArray [r,g,b,a, r,g,b,a...]
+
+    // We process only one channel since it's grayscale drawn
+    // Use a Float32Array to hold errors for precision before clamping
+    // We only need luminance, let's map it to an error buffer
+    // Width and Height are small (e.g., 320x240), so this is fast
+    const len = width * height;
+    
+    // Create a temporary error buffer. 
+    // We cannot modify 'data' directly for error diffusion comfortably because it's clamped 0-255
+    // We need logic flow: pixel -> +error -> threshold -> new pixel -> calc error -> push to neighbors
+    
+    // Ideally we want to write directly to display canvas, but we need to scale up.
+    // The CSS handles scaling. We just need to put the dithered pixels back into the bufferCanvas
+    // and then drawImage bufferCanvas to mainCanvas.
+
+    // Let's use a simpler approach: Modify imageData in place? 
+    // No, because Uint8ClampedArray clamps values immediately, losing negative errors.
+    // We need a float array.
+    
+    const currFrame = new Float32Array(len);
+    
+    // 1. Extract Luminance
+    for (let i = 0; i < len; i++) {
+        currFrame[i] = data[i * 4]; // R channel is enough
+    }
+
+    // 2. Dither Loop (Atkinson)
+    // Kernel:
+    //       X   1   1 
+    //   1   1   1
+    //       1
+    // Divisor: 8
+    
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = y * width + x;
+            const oldPix = currFrame[i];
+            const newPix = oldPix > 128 ? 255 : 0; // Threshold
+            const err = (oldPix - newPix) >> 3; // Divide error by 8
+
+            currFrame[i] = newPix; // Set final value for this pixel
+
+            if (err !== 0) {
+                // Distribute Error
+                if (x + 1 < width)                currFrame[i + 1] += err;
+                if (x + 2 < width)                currFrame[i + 2] += err;
+                if (x - 1 >= 0 && y + 1 < height) currFrame[i + width - 1] += err;
+                if (y + 1 < height)               currFrame[i + width] += err;
+                if (x + 1 < width && y + 1 < height) currFrame[i + width + 1] += err;
+                if (y + 2 < height)               currFrame[i + 2 * width] += err;
+            }
+        }
+    }
+
+    // 3. Write back to ImageData (Green or Black)
+    for (let i = 0; i < len; i++) {
+        const val = currFrame[i];
+        const idx = i * 4;
+        if (val > 128) {
+            // GREEN
+            data[idx] = 0;
+            data[idx+1] = 255;
+            data[idx+2] = 0;
+            data[idx+3] = 255;
+        } else {
+            // BLACK
+            data[idx] = 0;
+            data[idx+1] = 0;
+            data[idx+2] = 0;
+            data[idx+3] = 255;
+        }
+    }
+
+    bufferCtx.putImageData(imageData, 0, 0);
+    
+    // 4. Draw Scaled to Main Canvas
+    // Clear main
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw scaled
+    ctx.drawImage(bufferCanvas, 0, 0, canvas.width, canvas.height);
+}
+
+// --- MAIN LOOP ---
+function loop() {
+    updateLogic();
+    drawScene();
+    applyDither();
+    requestAnimationFrame(loop);
+}
+
+// --- BOOT ---
+window.addEventListener('resize', resize);
+resize(); // Init
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Point Search // Ditherpunk Visualizer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --accent-color: #00FF00;
+            --dim-color: #004400;
+            --scanline-color: rgba(0, 255, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--accent-color);
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- LAYOUT --- */
+        #app-container {
+            display: grid;
+            grid-template-rows: 60px 1fr 120px;
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+            position: relative;
+        }
+
+        /* --- HEADER --- */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 2px solid var(--accent-color);
+            background: repeating-linear-gradient(
+                45deg,
+                var(--bg-color),
+                var(--bg-color) 2px,
+                #001100 2px,
+                #001100 4px
+            );
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* --- CANVAS AREA --- */
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* --- CONTROLS --- */
+        #controls {
+            border-top: 2px solid var(--accent-color);
+            padding: 15px;
+            display: grid;
+            grid-template-columns: 1fr 200px;
+            gap: 20px;
+            align-items: center;
+            background-color: var(--bg-color);
+        }
+
+        #status-panel {
+            font-size: 1.2rem;
+            line-height: 1.4;
+        }
+
+        .log-line {
+            display: block;
+        }
+        .highlight {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            padding: 0 5px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        button {
+            background: transparent;
+            color: var(--accent-color);
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            border: 2px solid var(--accent-color);
+            padding: 10px 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+            border-radius: 0;
+            transition: all 0.1s steps(2);
+            box-shadow: 4px 4px 0 var(--dim-color);
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--dim-color);
+        }
+
+        button:hover {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+        }
+
+        button:disabled {
+            border-color: var(--dim-color);
+            color: var(--dim-color);
+            cursor: not-allowed;
+            box-shadow: none;
+            background: transparent;
+        }
+
+        /* --- CRT OVERLAY --- */
+        #crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            animation: flicker 0.15s infinite;
+        }
+
+        #crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.02; }
+            50% { opacity: 0.05; }
+            100% { opacity: 0.02; }
+        }
+
+        /* Responsive Text */
+        @media (max-width: 600px) {
+            #controls {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto;
+            }
+            .button-group {
+                justify-content: space-between;
+            }
+            button { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="crt-overlay"></div>
+
+    <div id="app-container">
+        <header>
+            <h1>FIXED_POINT_SEARCH.exe</h1>
+            <span>SYS.READY</span>
+        </header>
+
+        <div id="canvas-wrapper">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+
+        <div id="controls">
+            <div id="status-panel">
+                <span class="log-line">> INITIATING SEQUENCE...</span>
+                <span class="log-line">> WAITING FOR INPUT...</span>
+            </div>
+            <div class="button-group">
+                <button id="btn-reset">RESET</button>
+                <button id="btn-step">NEXT STEP</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * DITHERPUNK FIXED POINT VISUALIZER
+ * 
+ * Core Logic:
+ * 1. Maintain a state machine (Start -> Calc Mid -> Analyze -> Eliminate -> End).
+ * 2. Render everything to HTML5 Canvas.
+ * 3. Use Pattern Fills to simulate 1-bit dithering for "ghosted" or "undershoot" states.
+ */
+
+const CONFIG = {
+    colorBg: '#050505',
+    colorFg: '#00FF00',
+    colorDim: '#004400',
+    colorAlert: '#00FF00', // Using monochrome logic, but could be inverted
+    font: '20px "VT323"',
+    gridSize: 50
+};
+
+// The Data Set: Designed to show Undershoot, then Overshoot, then Match
+// Indices: 0   1   2   3   4   5   6
+// Values: -10, -4, 0,  2,  4,  9,  12
+// Step 1: L=0 R=6 Mid=3 Val=2. 2 < 3 (Undershoot). L becomes 4.
+// Step 2: L=4 R=6 Mid=5 Val=9. 9 > 5 (Overshoot). R becomes 4.
+// Step 3: L=4 R=4 Mid=4 Val=4. Match.
+const DATA = [-10, -4, 0, 2, 4, 9, 12];
+
+class Visualizer {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.wrapper = document.getElementById('canvas-wrapper');
+        
+        // State
+        this.L = 0;
+        this.R = DATA.length - 1;
+        this.mid = null;
+        this.state = 'IDLE'; // IDLE, CALC_MID, ANALYZE, ELIMINATE, FOUND, NOT_FOUND
+        this.history = [];
+        
+        // Patterns
+        this.ghostPattern = this.createDitherPattern(1); // Sparse
+        this.hashPattern = this.createHashPattern();     // For undershoot
+        
+        // Bindings
+        this.resize = this.resize.bind(this);
+        window.addEventListener('resize', this.resize);
+        this.resize();
+    }
+
+    // --- Graphics Helpers ---
+
+    createDitherPattern(density) {
+        // Creates a 4x4 pixel pattern for dithering
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 4;
+        pCanvas.height = 4;
+        const pCtx = pCanvas.getContext('2d');
+        
+        pCtx.fillStyle = CONFIG.colorBg;
+        pCtx.fillRect(0,0,4,4);
+        pCtx.fillStyle = CONFIG.colorFg;
+        
+        // Simple checkerboardish dither
+        if (density === 1) {
+            pCtx.fillRect(0,0,1,1);
+            pCtx.fillRect(2,2,1,1);
+        }
+        
+        return this.ctx.createPattern(pCanvas, 'repeat');
+    }
+
+    createHashPattern() {
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 8;
+        pCanvas.height = 8;
+        const pCtx = pCanvas.getContext('2d');
+        
+        pCtx.fillStyle = CONFIG.colorBg;
+        pCtx.fillRect(0,0,8,8);
+        pCtx.strokeStyle = CONFIG.colorFg;
+        pCtx.lineWidth = 1;
+        pCtx.beginPath();
+        pCtx.moveTo(0,8);
+        pCtx.lineTo(8,0);
+        pCtx.stroke();
+        
+        return this.ctx.createPattern(pCanvas, 'repeat');
+    }
+
+    resize() {
+        this.canvas.width = this.wrapper.clientWidth;
+        this.canvas.height = this.wrapper.clientHeight;
+        this.draw();
+    }
+
+    // --- Logic & State Machine ---
+
+    reset() {
+        this.L = 0;
+        this.R = DATA.length - 1;
+        this.mid = null;
+        this.state = 'IDLE';
+        this.updateLog("> SYSTEM RESET. SEARCH RANGE: [0 - " + (DATA.length-1) + "]");
+        this.draw();
+    }
+
+    step() {
+        switch(this.state) {
+            case 'IDLE':
+            case 'ELIMINATE':
+                if (this.L > this.R) {
+                    this.state = 'NOT_FOUND';
+                    this.updateLog("> SEARCH COMPLETE. TARGET NOT FOUND.");
+                } else {
+                    this.state = 'CALC_MID';
+                    this.mid = Math.floor((this.L + this.R) / 2);
+                    this.updateLog(`> CALCULATING MIDPOINT... INDEX [${this.mid}]`);
+                }
+                break;
+
+            case 'CALC_MID':
+                this.state = 'ANALYZE';
+                const val = DATA[this.mid];
+                const diff = val - this.mid;
+                let msg = `> A[${this.mid}] = ${val}. DIFF (${val} - ${this.mid}) = ${diff}`;
+                this.updateLog(msg);
+                break;
+
+            case 'ANALYZE':
+                const v = DATA[this.mid];
+                if (v === this.mid) {
+                    this.state = 'FOUND';
+                    this.updateLog(`> MATCH FOUND AT INDEX ${this.mid}!`);
+                } else if (v < this.mid) {
+                    // Undershoot
+                    this.state = 'ELIMINATE';
+                    this.updateLog(`> UNDERSHOOT. DISCARDING LEFT HALF.`);
+                    this.L = this.mid + 1;
+                } else {
+                    // Overshoot
+                    this.state = 'ELIMINATE';
+                    this.updateLog(`> OVERSHOOT. DISCARDING RIGHT HALF.`);
+                    this.R = this.mid - 1;
+                }
+                break;
+                
+            case 'FOUND':
+            case 'NOT_FOUND':
+                // Do nothing
+                break;
+        }
+        this.draw();
+        return this.state;
+    }
+
+    updateLog(msg1) {
+        const panel = document.getElementById('status-panel');
+        // Keep last 2 lines
+        let html = `<span class="log-line">${msg1}</span>`;
+        if (this.state === 'FOUND') {
+            html += `<span class="log-line highlight">*** EXECUTION SUCCESS ***</span>`;
+        } else if (this.state === 'ANALYZE') {
+            const val = DATA[this.mid];
+            const diff = val - this.mid;
+            let status = diff < 0 ? "TOO LOW" : (diff > 0 ? "TOO HIGH" : "MATCH");
+            html += `<span class="log-line">STATUS: ${status}</span>`;
+        }
+        panel.innerHTML = html;
+    }
+
+    // --- Rendering ---
+
+    draw() {
+        const { width, height } = this.canvas;
+        const ctx = this.ctx;
+
+        // Clear Background
+        ctx.fillStyle = CONFIG.colorBg;
+        ctx.fillRect(0, 0, width, height);
+
+        // Coordinate System Setup
+        // We need to fit indices -1 to 7 on X
+        // And values -12 to 15 on Y
+        const padding = 60;
+        const graphW = width - padding * 2;
+        const graphH = height - padding * 2;
+
+        const minX = -1, maxX = 7;
+        const minY = -12, maxY = 14;
+
+        const mapX = (i) => padding + ((i - minX) / (maxX - minX)) * graphW;
+        // Invert Y because canvas Y is down
+        const mapY = (v) => padding + graphH - ((v - minY) / (maxY - minY)) * graphH;
+
+        // 1. Draw Grid
+        ctx.strokeStyle = CONFIG.colorDim;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        
+        // Zero Lines
+        const zeroY = mapY(0);
+        const zeroX = mapX(0);
+
+        // X-Axis
+        ctx.beginPath();
+        ctx.moveTo(padding, zeroY);
+        ctx.lineTo(width - padding, zeroY);
+        ctx.stroke();
+
+        // Y-Axis
+        ctx.beginPath();
+        ctx.moveTo(zeroX, padding);
+        ctx.lineTo(zeroX, height - padding);
+        ctx.stroke();
+
+        // 2. Draw The Constant (Diagonal Line y=x)
+        ctx.strokeStyle = CONFIG.colorFg;
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Calculate points where y=x crosses the visible area logic
+        // Start point: index -1
+        ctx.moveTo(mapX(-1), mapY(-1));
+        ctx.lineTo(mapX(7), mapY(7));
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label the diagonal
+        ctx.fillStyle = CONFIG.colorFg;
+        ctx.font = "16px VT323";
+        ctx.fillText("y = index", mapX(6.5), mapY(6.8));
+
+        // 3. Draw Bars
+        const barWidth = (graphW / (maxX - minX)) * 0.6;
+        
+        DATA.forEach((val, idx) => {
+            const cx = mapX(idx);
+            const cy = mapY(val);
+            const y0 = mapY(0); // Baseline is 0 or Index Line? Standard bar chart uses 0
+            
+            // Determine Styling based on State
+            let isActive = false;
+            let isDiscarded = (idx < this.L || idx > this.R);
+            let isMid = (idx === this.mid);
+
+            ctx.beginPath();
+            
+            // Rect geometry
+            const top = Math.min(cy, y0);
+            const h = Math.abs(cy - y0);
+            
+            if (isDiscarded) {
+                // Ghosted Style
+                ctx.fillStyle = this.ghostPattern;
+                ctx.strokeStyle = CONFIG.colorDim;
+            } else if (this.state === 'FOUND' && isMid) {
+                // Success Style
+                ctx.fillStyle = CONFIG.colorFg; // Solid Green
+                ctx.strokeStyle = CONFIG.colorFg;
+                // Pulse effect logic could go here
+            } else if (this.state === 'ANALYZE' && isMid) {
+                // Analyzing current bar
+                const diff = val - idx;
+                if (diff < 0) {
+                    ctx.fillStyle = this.hashPattern; // Undershoot texture
+                } else if (diff > 0) {
+                    ctx.fillStyle = CONFIG.colorFg;   // Overshoot (Solid)
+                } else {
+                    ctx.fillStyle = CONFIG.colorFg;
+                }
+                ctx.strokeStyle = CONFIG.colorFg;
+            } else {
+                // Standard Active Range
+                ctx.fillStyle = 'transparent';
+                ctx.strokeStyle = CONFIG.colorFg;
+            }
+
+            // Draw Bar
+            ctx.lineWidth = 2;
+            ctx.rect(cx - barWidth/2, top, barWidth, h);
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw Index Labels
+            ctx.fillStyle = isDiscarded ? CONFIG.colorDim : CONFIG.colorFg;
+            ctx.textAlign = 'center';
+            ctx.fillText(idx, cx, mapY(minY) + 20);
+        });
+
+        // 4. Draw Analysis Overlays (The Gap Bracket)
+        if (this.state === 'ANALYZE' && this.mid !== null) {
+            const val = DATA[this.mid];
+            const idx = this.mid;
+            const cx = mapX(idx);
+            const valY = mapY(val);
+            const idxY = mapY(idx); // Height of the diagonal line at this x
+
+            // Draw Bracket between Value and Index Line
+            ctx.strokeStyle = CONFIG.colorFg;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            // Bracket logic
+            const gap = 10; // offset from center
+            const rightX = cx + barWidth/2 + 10;
+            
+            ctx.moveTo(rightX - 5, valY);
+            ctx.lineTo(rightX, valY);
+            ctx.lineTo(rightX, idxY);
+            ctx.lineTo(rightX - 5, idxY);
+            ctx.stroke();
+
+            // Label the gap
+            const diff = val - idx;
+            ctx.textAlign = 'left';
+            ctx.fillText(diff > 0 ? `+${diff}` : diff, rightX + 5, (valY + idxY)/2 + 5);
+        }
+
+        // 5. Draw Pointers (L, R, Mid)
+        // Only draw if not idle/reset
+        if (this.state !== 'IDLE') {
+            const pointerY = mapY(minY) + 35;
+            
+            // Draw L
+            ctx.fillStyle = CONFIG.colorFg;
+            ctx.textAlign = 'center';
+            ctx.fillText("L", mapX(this.L), pointerY);
+            
+            // Draw R
+            ctx.fillText("R", mapX(this.R), pointerY);
+
+            // Draw Mid
+            if (this.mid !== null && this.mid >= this.L && this.mid <= this.R) {
+                ctx.fillText("M", mapX(this.mid), pointerY - 15); // Staggered height
+            }
+        }
+    }
+}
+
+// --- App Initialization ---
+
+const viz = new Visualizer('mainCanvas');
+viz.reset(); // Initial draw
+
+// Button Listeners
+const btnStep = document.getElementById('btn-step');
+const btnReset = document.getElementById('btn-reset');
+
+btnStep.addEventListener('click', () => {
+    const state = viz.step();
+    if (state === 'FOUND' || state === 'NOT_FOUND') {
+        btnStep.disabled = true;
+        btnStep.innerText = "DONE";
+    }
+});
+
+btnReset.addEventListener('click', () => {
+    viz.reset();
+    btnStep.disabled = false;
+    btnStep.innerText = "NEXT STEP";
+});
+
+</script>
+</body>
+</html>

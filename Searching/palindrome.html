@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ditherpunk Palindrome Validator</title>
+    <style>
+        /* --- IMPORTS & VARS --- */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --fg-color: #33ff00;
+            --fg-dim: #1a8000;
+            --fg-error: #ff3333; /* For mismatch state */
+            --crt-flicker: 0.02;
+            --cell-size: min(4vw, 50px);
+            --font-main: 'VT323', monospace;
+        }
+
+        /* --- GLOBAL RESET & LAYOUT --- */
+        * { box-sizing: border-box; }
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-main);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+        }
+
+        /* --- GENERATED TEXTURE & CRT EFFECTS --- */
+        /* Scanlines */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        /* Dither Noise Overlay (Class added by JS) */
+        .noise-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.15;
+            z-index: 998;
+            pointer-events: none;
+        }
+
+        /* Text Glow */
+        .glow-text {
+            text-shadow: 0 0 4px var(--fg-color), 0 0 10px var(--fg-color);
+        }
+
+        /* --- ZONES LAYOUT --- */
+        
+        /* ZONE A: COMPARATOR (Top 20%) */
+        #zone-a {
+            height: 25vh;
+            border-bottom: 2px solid var(--fg-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .comparator-box {
+            width: 80px;
+            height: 80px;
+            border: 2px dashed var(--fg-dim);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            margin: 0 20px;
+            box-shadow: 0 0 10px var(--fg-dim);
+        }
+
+        .operator-display {
+            font-size: 3rem;
+            width: 50px;
+            text-align: center;
+        }
+
+        /* ZONE B: DATA TRACK (Middle 60%) */
+        #zone-b {
+            height: 55vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .array-container {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 40px;
+            flex-wrap: wrap; /* Safety wrap for small screens */
+            justify-content: center;
+            padding: 0 20px;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: calc(var(--cell-size) * 1.4);
+            border: 1px solid var(--fg-dim);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+            transition: all 0.2s ease;
+        }
+
+        .cell-content {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .cell-index {
+            font-size: 0.7rem;
+            color: var(--fg-dim);
+        }
+
+        /* Cell States */
+        .cell.dimmed {
+            border-color: #111;
+            color: var(--fg-dim);
+            opacity: 0.5;
+            background-image: radial-gradient(#111 20%, transparent 20%);
+            background-size: 4px 4px;
+        }
+
+        .cell.active {
+            border: 2px solid var(--fg-color);
+            box-shadow: 0 0 10px var(--fg-color);
+            background: rgba(51, 255, 0, 0.1);
+        }
+
+        .cell.verified {
+            background-color: var(--fg-color);
+            color: var(--bg-color);
+            border-color: var(--fg-color);
+        }
+
+        /* Pointers */
+        .pointers-track {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0; left: 0;
+            pointer-events: none;
+        }
+
+        .pointer {
+            position: absolute;
+            font-size: 1.2rem;
+            text-align: center;
+            transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pointer-marker {
+            font-size: 2rem;
+            line-height: 1rem;
+        }
+
+        .pointer-label {
+            margin-top: 5px;
+            background: var(--bg-color);
+            border: 1px solid var(--fg-color);
+            padding: 2px 4px;
+        }
+
+        /* i Pointer (Left) - Hollow feel */
+        #pointer-i .pointer-marker { content: '▲'; color: var(--fg-color); }
+        
+        /* j Pointer (Right) - Solid Block feel */
+        #pointer-j .pointer-marker { content: '▲'; color: var(--fg-color); text-shadow: 0 0 8px var(--fg-color); }
+        #pointer-j .pointer-label { background: var(--fg-color); color: var(--bg-color); }
+
+        /* ZONE C: CONTROL PANEL (Bottom 20%) */
+        #zone-c {
+            height: 20vh;
+            border-top: 2px solid var(--fg-dim);
+            padding: 10px 20px;
+            font-family: monospace;
+            overflow-y: auto;
+            background: rgba(0, 20, 0, 0.3);
+            display: flex;
+            flex-direction: column-reverse; /* Bottom anchored */
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            opacity: 0.8;
+            border-left: 2px solid var(--fg-dim);
+            padding-left: 8px;
+        }
+
+        .log-entry.highlight {
+            color: #fff;
+            opacity: 1;
+            border-left: 2px solid var(--fg-color);
+            text-shadow: 0 0 5px var(--fg-color);
+        }
+
+        /* --- ANIMATION CLASSES & KEYFRAMES --- */
+        
+        /* Flying Element */
+        .flying-char {
+            position: fixed;
+            z-index: 1000;
+            font-size: 2rem;
+            color: var(--fg-color);
+            font-weight: bold;
+            transition: all 0.6s ease-in-out;
+        }
+
+        /* Flash Screen Green */
+        .flash-success {
+            animation: flashGreen 0.3s forwards;
+        }
+        @keyframes flashGreen {
+            0% { background-color: var(--bg-color); filter: invert(0); }
+            50% { background-color: var(--fg-color); filter: invert(1); }
+            100% { background-color: var(--bg-color); filter: invert(0); }
+        }
+
+        /* Flash Screen Error */
+        .flash-error {
+            animation: flashRed 0.5s infinite;
+        }
+        @keyframes flashRed {
+            0%, 100% { background-color: var(--bg-color); }
+            50% { background-color: #500; }
+        }
+
+        /* Success Wave */
+        @keyframes wave {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-10px); background: var(--fg-color); color: black; }
+            100% { transform: translateY(0); }
+        }
+        
+        .wave-anim {
+            animation: wave 0.5s ease;
+        }
+
+        /* CRT Turn On Animation */
+        @keyframes turnOn {
+            0% { transform: scale(1, 0.002); opacity: 0; }
+            30% { transform: scale(1, 0.002); opacity: 1; }
+            50% { transform: scale(1, 0.002); opacity: 1; }
+            100% { transform: scale(1, 1); opacity: 1; }
+        }
+        
+        main {
+            width: 100%;
+            height: 100%;
+            animation: turnOn 0.4s ease-out forwards;
+        }
+        
+        .overlay-text {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            border: 4px solid var(--fg-color);
+            padding: 20px;
+            background: var(--bg-color);
+            z-index: 2000;
+            display: none;
+            box-shadow: 10px 10px 0 var(--fg-dim);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- CRT Noise Overlay -->
+    <canvas id="noise-canvas" class="noise-overlay"></canvas>
+
+    <main>
+        <!-- ZONE A: Comparator -->
+        <section id="zone-a">
+            <div class="comparator-box" id="comp-left"></div>
+            <div class="operator-display glow-text" id="op-display">?</div>
+            <div class="comparator-box" id="comp-right"></div>
+        </section>
+
+        <!-- ZONE B: Data Track -->
+        <section id="zone-b">
+            <div class="array-container" id="array-container">
+                <!-- Cells generated by JS -->
+            </div>
+            
+            <div class="pointers-track" id="pointers-track">
+                <div class="pointer" id="pointer-i">
+                    <div class="pointer-marker">▲</div>
+                    <div class="pointer-label">i</div>
+                </div>
+                <div class="pointer" id="pointer-j">
+                    <div class="pointer-marker">▲</div>
+                    <div class="pointer-label">j</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ZONE C: Control Panel -->
+        <section id="zone-c">
+            <div id="log-container"></div>
+        </section>
+    </main>
+    
+    <div id="result-overlay" class="overlay-text glow-text"></div>
+
+    <script>
+        /**
+         * DITHERPUNK PALINDROME VISUALIZER
+         * 
+         * Logic: Two-Pointer Algorithm
+         * Style: Monochrome CRT / Atkinson-ish Noise
+         */
+
+        /* --- UTILS --- */
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        function isAlphaNumeric(char) {
+            return /^[a-z0-9]+$/i.test(char);
+        }
+
+        /* --- TEXTURE GENERATOR --- */
+        // Generates a random noise pattern on a canvas to simulate dithering
+        function generateNoise() {
+            const canvas = document.getElementById('noise-canvas');
+            const ctx = canvas.getContext('2d');
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            
+            // Set canvas size (scaled down for performance, css scales up)
+            canvas.width = 300; 
+            canvas.height = 300;
+            
+            const idata = ctx.createImageData(300, 300);
+            const buffer32 = new Uint32Array(idata.data.buffer);
+            
+            for (let i = 0; i < buffer32.length; i++) {
+                if (Math.random() < 0.1) {
+                    // Green pixel with varying alpha
+                    buffer32[i] = 0xff00ff33; 
+                }
+            }
+            ctx.putImageData(idata, 0, 0);
+        }
+
+        /* --- CONTROLLER CLASS --- */
+        class PalindromeController {
+            constructor(inputString) {
+                this.input = inputString;
+                this.els = []; // DOM elements for cells
+                this.left = 0;
+                this.right = inputString.length - 1;
+                
+                // DOM References
+                this.container = document.getElementById('array-container');
+                this.pointerI = document.getElementById('pointer-i');
+                this.pointerJ = document.getElementById('pointer-j');
+                this.compLeft = document.getElementById('comp-left');
+                this.compRight = document.getElementById('comp-right');
+                this.opDisplay = document.getElementById('op-display');
+                this.logBox = document.getElementById('log-container');
+                this.resultOverlay = document.getElementById('result-overlay');
+            }
+
+            async init() {
+                generateNoise();
+                this.renderArray();
+                await this.updatePointers(true); // Immediate update
+                this.log(">> SYSTEM INITIALIZED.");
+                this.log(`>> INPUT LOADED: "${this.input}"`);
+                await sleep(1000);
+                this.run();
+            }
+
+            renderArray() {
+                this.container.innerHTML = '';
+                this.input.split('').forEach((char, index) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.innerHTML = `
+                        <span class="cell-content">${char}</span>
+                        <span class="cell-index">${index}</span>
+                    `;
+                    this.container.appendChild(cell);
+                    this.els.push(cell);
+                });
+            }
+
+            log(msg) {
+                const p = document.createElement('div');
+                p.className = 'log-entry highlight';
+                p.innerText = msg;
+                // Remove highlight from older logs
+                Array.from(this.logBox.children).forEach(c => c.classList.remove('highlight'));
+                this.logBox.prepend(p);
+            }
+
+            async updatePointers(immediate = false) {
+                // Get coordinates of the specific cells
+                const cellI = this.els[this.left].getBoundingClientRect();
+                const cellJ = this.els[this.right].getBoundingClientRect();
+                const track = document.getElementById('pointers-track').getBoundingClientRect();
+
+                // Calculate relative position within the track
+                const xI = cellI.left - track.left + (cellI.width / 2) - 15; // Centered
+                const yI = cellI.bottom - track.top + 5;
+
+                const xJ = cellJ.left - track.left + (cellJ.width / 2) - 15;
+                const yJ = cellJ.bottom - track.top + 5;
+
+                // Apply transforms
+                this.pointerI.style.transform = `translate(${xI}px, ${yI}px)`;
+                this.pointerJ.style.transform = `translate(${xJ}px, ${yJ}px)`;
+
+                if(!immediate) await sleep(600);
+            }
+
+            async animateComparison(val1, val2) {
+                // 1. Clone Elements
+                const rectI = this.els[this.left].querySelector('.cell-content').getBoundingClientRect();
+                const rectJ = this.els[this.right].querySelector('.cell-content').getBoundingClientRect();
+                const targetLeft = this.compLeft.getBoundingClientRect();
+                const targetRight = this.compRight.getBoundingClientRect();
+
+                const cloneI = this.createFlyingChar(val1, rectI);
+                const cloneJ = this.createFlyingChar(val2, rectJ);
+
+                // 2. Fly to boxes
+                await sleep(50); // layout thrashing buffer
+                
+                cloneI.style.top = (targetLeft.top + 20) + 'px';
+                cloneI.style.left = (targetLeft.left + 30) + 'px';
+                cloneI.style.fontSize = '3rem';
+
+                cloneJ.style.top = (targetRight.top + 20) + 'px';
+                cloneJ.style.left = (targetRight.left + 30) + 'px';
+                cloneJ.style.fontSize = '3rem';
+
+                await sleep(600); // Wait for flight
+
+                // 3. Set values in boxes and remove clones
+                this.compLeft.innerText = val1.toLowerCase();
+                this.compRight.innerText = val2.toLowerCase();
+                cloneI.remove();
+                cloneJ.remove();
+            }
+
+            createFlyingChar(char, rect) {
+                const el = document.createElement('div');
+                el.className = 'flying-char';
+                el.innerText = char;
+                el.style.top = rect.top + 'px';
+                el.style.left = rect.left + 'px';
+                document.body.appendChild(el);
+                return el;
+            }
+
+            async run() {
+                while (this.left < this.right) {
+                    
+                    // --- PHASE 2: SANITIZATION (LEFT) ---
+                    while (this.left < this.right && !isAlphaNumeric(this.input[this.left])) {
+                        this.log(`>> Index ${this.left} ['${this.input[this.left]}'] is non-alphanumeric.`);
+                        this.els[this.left].classList.add('dimmed');
+                        await sleep(300);
+                        this.left++;
+                        await this.updatePointers();
+                    }
+
+                    // --- PHASE 2: SANITIZATION (RIGHT) ---
+                    while (this.left < this.right && !isAlphaNumeric(this.input[this.right])) {
+                        this.log(`>> Index ${this.right} ['${this.input[this.right]}'] is non-alphanumeric.`);
+                        this.els[this.right].classList.add('dimmed');
+                        await sleep(300);
+                        this.right--;
+                        await this.updatePointers();
+                    }
+
+                    // Highlight Active Cells
+                    this.els[this.left].classList.add('active');
+                    this.els[this.right].classList.add('active');
+                    
+                    // --- PHASE 3: COMPARISON ---
+                    const charLeft = this.input[this.left];
+                    const charRight = this.input[this.right];
+
+                    this.log(`>> Comparing: '${charLeft}' vs '${charRight}'...`);
+                    await this.animateComparison(charLeft, charRight);
+
+                    if (charLeft.toLowerCase() !== charRight.toLowerCase()) {
+                        // MISMATCH
+                        this.opDisplay.innerText = "≠";
+                        this.opDisplay.style.color = "var(--fg-error)";
+                        this.triggerFailure();
+                        return;
+                    } else {
+                        // MATCH
+                        this.opDisplay.innerText = "=";
+                        this.opDisplay.style.color = "var(--fg-color)";
+                        
+                        // Flash Effect
+                        document.body.classList.add('flash-success');
+                        await sleep(300);
+                        document.body.classList.remove('flash-success');
+
+                        // Mark Verified
+                        this.els[this.left].classList.remove('active');
+                        this.els[this.right].classList.remove('active');
+                        this.els[this.left].classList.add('verified');
+                        this.els[this.right].classList.add('verified');
+                        
+                        // Clear Comparator
+                        this.compLeft.innerText = "";
+                        this.compRight.innerText = "";
+                        this.opDisplay.innerText = "?";
+
+                        this.log(">> Match confirmed. Moving inward.");
+                        this.left++;
+                        this.right--;
+                        await this.updatePointers();
+                    }
+                }
+
+                this.triggerSuccess();
+            }
+
+            triggerSuccess() {
+                this.log(">> EXECUTION COMPLETE. RESULT: TRUE");
+                
+                // Middle element handling (odd length strings)
+                if (this.left === this.right) {
+                    this.els[this.left].classList.add('verified');
+                }
+
+                // Wave Animation
+                this.els.forEach((el, i) => {
+                    setTimeout(() => {
+                        el.classList.add('wave-anim');
+                        el.classList.add('verified'); // Ensure all valid are green
+                    }, i * 50);
+                });
+
+                this.resultOverlay.innerText = "TRUE: PALINDROME";
+                this.resultOverlay.style.display = "block";
+            }
+
+            triggerFailure() {
+                this.log(">> EXECUTION HALTED. MISMATCH DETECTED.");
+                document.body.classList.add('flash-error');
+                this.resultOverlay.innerText = "FALSE: NOT A PALINDROME";
+                this.resultOverlay.style.borderColor = "var(--fg-error)";
+                this.resultOverlay.style.color = "var(--fg-error)";
+                this.resultOverlay.style.display = "block";
+            }
+        }
+
+        // --- BOOT ---
+        window.addEventListener('load', () => {
+            const viz = new PalindromeController("A man, a plan, a canal: Panama");
+            viz.init();
+        });
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+             generateNoise();
+             // In a real app we would debounce and update pointers, 
+             // but for this demo refresh is acceptable or visual glitching is part of the aesthetic.
+        });
+
+    </script>
+</body>
+</html>
