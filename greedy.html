@@ -155,7 +155,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">Compute an Optimum Assignment of Tasks [Pairwise min-max pairing]</div>
+                    <div class="subsection-title">
+                        Compute an Optimum Assignment of Tasks [Pairwise min-max pairing]
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/greedy_pairwise_minmax.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p><strong>Step 1: Pre-Processing (Sorting)</strong></p>
                     <ul>
                         <li>Logic: To make efficient decisions, we need immediate access to the extremal values (the shortest and longest tasks).</li>
@@ -185,7 +193,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">Schedule to Optimize Waiting Time</div>
+                    <div class="subsection-title">
+                        Schedule to Optimize Waiting Time
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/minimize_waiting.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <p>If you run a long task first, every subsequent task must wait for that long task to finish, drastically increasing the cumulative waiting time.</p>
                     <ul>
                         <li>Conversely, if you run short tasks first, the subsequent tasks wait less. The solution requires arranging the input data to exploit this mathematical relationship.</li>
@@ -217,8 +233,16 @@
                     Once the loop finishes, the final sum is your answer. Return this number. It represents the lowest possible total waiting time for the entire group of tasks.</p>
                 </div>
 
-                <div class="subsection">
-                    <div class="subsection-title">INTERVAL COVERING</div>
+<div class="subsection">
+                    <div class="subsection-title">
+                        INTERVAL COVERING
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/interval_covering.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <p><strong>[STRATEGY]</strong></p>
                     <p><strong>A. Focus on the "First Ending" Interval</strong><br>
                     Look at the entire set of intervals. Find the first task that ends earliest. (has the minimum right endpoint).</p>
@@ -257,7 +281,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <div class="subsection-title">3 SUM PROBLEM</div>
+                    <div class="subsection-title">
+                        3 SUM PROBLEM
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/3_sum.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <p>You are given a list of numbers and a target total. You must determine if any three numbers from that list add up to the target.</p>
                     <p><strong>The Strategy:</strong><br>
                     "Lock" one number first. Now, the problem changes: you only need to find two numbers that add up to the remaining amount needed. You repeat this "lock one, find two" process for every number in the list.</p>
@@ -290,7 +322,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">FINDING MAJORITY ELEMENT</div>
+                    <div class="subsection-title">
+                        FINDING MAJORITY ELEMENT
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/majority_element.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <p>A Majority Element is rigorously defined as an element that appears in strictly more than half of the positions</p>
                     <p><strong>The Logic of "Mutual Destruction"</strong><br>
                     The Boyer-Moore Voting Algorithm functions as a war of attrition.</p>
@@ -347,7 +387,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <div class="subsection-title">MAXIMUM WATER TRAPPED BY VERTICALS</div>
+                    <div class="subsection-title">
+                        MAXIMUM WATER TRAPPED BY VERTICALS
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/water.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
                     <p><strong>The Goal:</strong><br>
                     You want to maximize this simple calculation:(Distance between the walls) × (Height of the shorter wall)</p>
                     <p><strong>Step 1: Initialize Pointers</strong><br>
