@@ -148,21 +148,273 @@
         <details class="section">
             <summary>1. Binary Search</summary>
             <div class="section-content">
-                <!-- Placeholder for Binary Search Content -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">Searching Basics</div>
+                    <p>Custom types (like a Student object) require user-defined Comparators.</p>
+                    <p>"Comparable" simply means you have written a specific rule (a function) that tells the computer exactly how to decide which of two objects comes first.</p>
+                    <p>Transitivity = Logical Consistency</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">Search a Sorted Array for the First Occurrence of ‘k’</div>
+                    <p>Standard binary search returns the moment it finds k. This version keeps going left to ensure it found the first k, not just any k.</p>
+                    <ul>
+                        <li>Initialize: Set bounds to cover the entire array. Set result = −𝟏 (indicating failure).</li>
+                        <li>Loop: While the window remains valid (left ≤ right): • Calculate the middle index: mid = (left + right) // 𝟐</li>
+                        <li>Decision Logic:
+                            <ul>
+                                <li>Case A (𝐀[𝐦𝐢𝐝] > 𝐤): The first occurrence must lie to the left. Discard the right half → right = mid − 𝟏</li>
+                                <li>Case B (𝐀[𝐦𝐢𝐝] < 𝐤): The first occurrence must lie to the right. Discard the left half → left = mid + 𝟏</li>
+                                <li>Case C (𝐀[𝐦𝐢𝐝] = 𝐤): (The key difference from standard binary search) • We have found an occurrence of 𝐤 • Update result = mid (this is the best candidate found so far) • CRITICAL: Do not stop here. Aggressively prune the right side: right = mid − 𝟏 (We continue searching leftward to find any earlier occurrence)</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">SEARCH SORTED ARRAY FOR ENTRY EQUAL TO ITS INDEX</div>
+                    <p><strong>Rephrasing and Definition</strong><br>
+                    The problem asks you to find a "fixed point" in an array: a specific location (index) where the number stored there (value) is identical to the location number itself.</p>
+                    <p><strong>Algorithm Adaptation</strong>: It requires modifying a standard template (Binary Search) rather than simply implementing it.<br>
+                    The adaptation is simple: In standard Binary Search, you compare A[mid] to a fixed number (e.g., target). Here, you compare A[mid] to the index mid itself.</p>
+                    <p>Mid is the index (the slot number or address, e.g., 5).<br>
+                    A[mid] is the value stored inside that slot (e.g., 7).</p>
+                    <p><strong>THE HOW</strong></p>
+                    <ol>
+                        <li><strong>Initialization:</strong> Define the bounds of your Search Space. Initialize two pointers, left to 0 and right to the last index of the array (**len(𝐀)** − 1).</li>
+                        <li><strong>Bisection Loop:</strong> Enter a loop that continues as long as the search space is valid (i.e., left ≤ right). Inside, calculate the mid index: (**left** + right) // 2.</li>
+                        <li><strong>Transformation (The Logic Core):</strong> Instead of comparing 𝐀[mid] directly to a target, evaluate the difference between the value and its index.
+                        <br>• Compute difference = 𝐀[mid] − mid.
+                        <br>By subtracting the index, we transform the question to: “Does value minus index equal zero?”</li>
+                        <li><strong>Evaluation and Reduction:</strong> Check the state of difference:
+                            <ul>
+                                <li>Case 1 (Match): If difference == 0, then 𝐀[mid] == mid. You have found the entry. Return mid.</li>
+                                <li>Case 2 (Overshoot) Values grow at least as fast as indices. If the value is already bigger than the index, it will stay bigger everywhere to the right. The index can never catch up, so we discard the right side.</li>
+                                <li>Case 3 (Undershoot) Values grow at least as fast as indices. If the value is currently too small, it was also too small everywhere to the left. The value could not have equaled the index earlier, so we discard the left side.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Termination:</strong> If the loop concludes without Case 1 ever being true, no such index exists. Return −1.</li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">SEARCHING CYCLICALLY SORTED ARRAYS</div>
+                    <p>Instead of testing relationship between midpoint and target, test the relationship between the midpoint value and the rightmost boundary value.</p>
+                    <p>A cyclically sorted array contains distinct numbers originally sorted ascending but rotated. It increases, drops to the minimum, then increases again. Find the index of the smallest element efficiently.</p>
+                    <p>Divide and Conquer principle. Because the array is partially sorted, we can look at the middle element and the last element to determine which half of the array contains the anomaly</p>
+                    <p><strong>THE HOW</strong></p>
+                    <p><strong>Step 1: Initialize Boundaries</strong><br>
+                    We begin by establishing the Search Space. We set two pointers:
+                    <br>• left = 0 (The start of the array)
+                    <br>• right = len(A) - 1 (The last index of the array)</p>
+                    <p><strong>Step 2: The Loop Condition</strong><br>
+                    We initiate a while loop that runs as long as left < right.
+                    <br>• Note: We use < instead of <= because we are not looking for a specific target that might be missing. We are looking for a boundary that definitely exists. When left equals right, we have converged on the single answer.</p>
+                    <p><strong>Step 3: Calculate Midpoint</strong><br>
+                    Inside the loop, we calculate mid: mid = (left + right) // 2
+                    <br>• This uses integer division to find the center index.</p>
+                    <p><strong>Step 4: The Comparison Logic (The Invariant Check)</strong><br>
+                    We compare A[mid] with A[right]. This is the critical deviation from standard binary search. We do not compare against a specific target key; we compare against the search space boundary.</p>
+                    <p><strong>Case A: The "Broken" Sequence</strong>
+                    <br>• Condition: if A[mid] > A[right]
+                    <br>• Deduction: Normal sorting dictates that values increase from left to right. If the middle value is larger than the rightmost value, the array is not sorted in this section. The "cyclic drop" (the reset from max to min) must occur somewhere after mid.
+                    <br>• Action: left = mid + 1
+                    <br>• Ontological Consequence: We strictly exclude mid and everything to its left. The minimum is definitely in the range [mid + 1, right].</p>
+                    <p><strong>Case B: The "Sorted" Sequence</strong>
+                    <br>• Condition: else (implying A[mid] < A[right])
+                    <br>• Note on Distinctness: Since elements are distinct, A[mid] == A[right] is impossible.
+                    <br>• Deduction: If the middle is smaller than the right, the path from mid to right is ascending normally. Therefore, the "drop" cannot be in the right half. However, mid itself could be the minimum (e.g., [... 10, 20, 30]).
+                    <br>• Action: right = mid
+                    <br>• Ontological Consequence: We discard the right half (mid + 1 to right). We keep mid in the search space because it is a candidate for the minimum.</p>
+                    <p><strong>Step 5: Termination and Return</strong><br>
+                    The loop continues to halve the interval until left meets right.
+                    <br>• When the loop breaks, the Search Space has size 1.
+                    <br>• By the logic of the loop invariant, this single remaining index points to the smallest element.
+                    <br>• Return: left</p>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>2. Generalized Search</summary>
             <div class="section-content">
-                <!-- Placeholder for Search Theory -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">SEARCHING 2D SORTED ARRAYS</div>
+                    <p>A 2D array is sorted if it’s columns and rows are nondecreasing</p>
+                    <p><strong>Why checking the top-left A[0][0] value fails:</strong> It provides no information gain.<br>
+                    Since it is the smallest value in the matrix, finding that your target is larger offers no direction.</p>
+                    <p><strong>Why checking the top right A[0][n-1]value works:</strong> It is an extremal case, providing valuable information.<br>
+                    This corner is the perfect pivot: it is the largest number in the top row but the smallest in the last column.</p>
+                    <ul>
+                        <li>If your target is smaller than this pivot, it cannot be in this column (move left).</li>
+                        <li>If the target is larger, it cannot be in this row (move down).</li>
+                        <li>This property guarantees you eliminate a row or column with every comparison.</li>
+                    </ul>
+                    <p><strong>THE HOW: MANHATTAN WALKING</strong></p>
+                    <p><strong>Step 1: Initialize the Search Space</strong><br>
+                    We begin by setting our Pivot at the Top-Right corner of the matrix (Row 0, Last Column).
+                    <br>• Why here? This corner represents an Extremal Case. It is the largest value in the first row but the smallest value in the last column. This dual property is essential for Pruning.</p>
+                    <p><strong>Step 2: The Search Loop</strong><br>
+                    We enter a loop that continues only while our pivot remains inside the matrix boundaries. In each iteration, we compare the target x with the current element to make a decision.</p>
+                    <p><strong>Step 3: The Decision Logic</strong><br>
+                    We perform a three-way comparison to Eliminate parts of the grid:</p>
+                    <ol>
+                        <li><strong>Case: Match Found</strong>
+                        <br>• If the current element equals x, we have found the target.
+                        <br>• Action: Return True.</li>
+                        <li><strong>Case: Target is Smaller (Prune the Column)</strong>
+                        <br>• Condition: x is smaller than the current element.
+                        <br>• Logic: Due to Column Sortedness, values only increase as you go down, meaning x cannot exist anywhere in this column.
+                        <br>• Action: Eliminate the column by moving the pivot Left.</li>
+                        <li><strong>Case: Target is Larger (Prune the Row)</strong>
+                        <br>• Condition: x is larger than the current element.
+                        <br>• Logic: Due to Row Sortedness, values only decrease as you go left. Since the current element is the largest in the current row segment, x cannot exist anywhere in this row.
+                        <br>• Action: Eliminate the row by moving the pivot Down.</li>
+                    </ol>
+                    <p><strong>Step 4: Termination</strong><br>
+                    If the loop finishes (meaning the pivot moved off the left edge or below the bottom edge) without finding a match, the Search Space is exhausted.
+                    <br>• Action: Return False.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">FIND MIN/MAX SIMULTANEOUSLY</div>
+                    <p><strong>The Core Idea</strong><br>
+                    Normally, when looking for the minimum and maximum numbers in a list, you look at every number and ask two questions:
+                    <br>1. "Is this smaller than my current minimum?"
+                    <br>2. "Is this larger than my current maximum?"<br>
+                    For 2 numbers, that is 4 questions.</p>
+                    <p>This algorithm suggests a smarter way. Instead of looking at numbers one by one, you look at them in pairs (two at a time).
+                    <br>1. First, compare the two new numbers against each other.
+                    <br>2. Take the larger one (the "winner") and compare it only against the current maximum.
+                    <br>3. Take the smaller one (the "loser") and compare it only against the current minimum.<br>
+                    For 2 numbers, that is only 3 questions. Over a long list, this saves a huge amount of work.</p>
+                    <p><strong>THE HOW:</strong><br>
+                    Using the array [3, 5, 1, 2, 4]. This version maintains simplicity while correctly applying the technical terms local (the current pair) and global (the overall answer).</p>
+                    <p><strong>Step-by-Step Walkthrough</strong></p>
+                    <p><strong>1. Initialization (Global State Setup)</strong> We begin with the first pair of numbers: 3 and 5.
+                    <br>• We compare them to establish the baseline.
+                    <br>• Global Min: 3 (the smaller of the two)
+                    <br>• Global Max: 5 (the larger of the two)</p>
+                    <p><strong>2. Process Disjoint Pairs (Streaming Loop)</strong> We move to the next distinct pair: 1 and 2. We first compare them against each other to find candidates.
+                    <br>• Step A (Identify Local Candidates): Is 1 < 2? Yes.
+                    <br>◦ 1 becomes the Local Min.
+                    <br>◦ 2 becomes the Local Max.
+                    <br>• Step B (Update Global Max): Compare the Local Max (2) against the Global Max (5).
+                    <br>◦ Is 2 > 5? No. The Global Max remains 5.
+                    <br>• Step C (Update Global Min): Compare the Local Min (1) against the Global Min (3).
+                    <br>◦ Is 1 < 3? Yes. We update the Global Min to 1.
+                    <br>• Current Global State: Min is 1, Max is 5.</p>
+                    <p><strong>3. Handle the Odd Element</strong> The array has an odd length (n=5), so one number remains:4. We must compare this final element against the existing global bounds.
+                    <br>• Check Max: Is 4 > Global Max (5)? No.
+                    <br>• Check Min: Is 4 < Global Min (1)? No.</p>
+                    <p>Final Result: The Global Min is 1 and the Global Max is 5.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">FIND THE K-TH LARGEST ELEMENT</div>
+                    <p>To find the k-th ranked largest element, don't sort the whole list. Pick a pivot, partition so smaller elements go left, larger go right. The pivot lands in its final position. If it's at index k-1, we're done. Otherwise, discard the unwanted half and repeat.</p>
+                    <ul>
+                        <li>The Pivot: This is a randomly selected element from the current chunk of the array we are looking at. It acts as the "judge." We compare every other number against this Pivot.</li>
+                        <li>Partitioning (In-Place): This is the physical act of shuffling the array. We do this "in-place," meaning we swap numbers around inside the existing array rather than creating a new list.
+                            <ul>
+                                <li>By picking a random Pivot, we mathematically guarantee that, on average, we cut the problem size roughly in half every time.</li>
+                            </ul>
+                        </li>
+                        <li>Rank Comparison Since computers start counting at 0, if you want the 1st largest number, you are actually looking for index 0.</li>
+                    </ul>
+                    <p>Here is your text rewritten with Unicode mathematical alphanumeric symbols (bold, italic, script, etc.) where appropriate, while keeping the content identical in meaning and structure. Formatting has been cleaned up and unnecessary whitespace removed.</p>
+                    <p><strong>SIMPLIFIED HOW:</strong></p>
+                    <ol>
+                        <li>Define the beginning and end of the array</li>
+                        <li>Randomly pick a pivot value</li>
+                        <li>Move all values larger than the pivot to the left of the pivot, and move the pivot to the right, to not accidentally swap it.</li>
+                        <li>Move the pivot back to the front of the new index, where all values larger than it are to the left of</li>
+                        <li>Compare the pivot to the target. If found, you're done. if Pivot < Target, go Left. If Pivot > Target, go Right.</li>
+                    </ol>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Phase 1: Setup</strong><br>
+                    We start by looking at the whole array. We define a “search window” with a Left boundary (the start) and a Right boundary (the end).</p>
+                    <p><strong>Phase 2: The Loop (Divide and Conquer)</strong><br>
+                    We repeat the following steps until the target is found.</p>
+                    <ul>
+                        <li><strong>Step A: Pick a Random Pivot</strong>
+                        <br>◦ Inside our current search window, we select one index at random.</li>
+                        <li><strong>Step B: The Partition</strong>
+                        <br>◦ Now, we reorganize the array around the Pivot so that larger numbers move to the left and smaller numbers move to the right.</li>
+                    </ul>
+                    <div class="code-block">Hide the Pivot: We swap the Pivot to the very end of the window so it doesn't get in the way while we work.
+
+Partition Process: We scan the current window from left to right.
+- If a number is larger than the Pivot, we move it to the “left side” of our window.
+- If a number is smaller, we leave it alone (it will naturally end up on the right).
+
+Place the Pivot:
+Once the scan is finished, we take the Pivot from the end and swap it into the slot right after the “larger” numbers.</div>
+                    <ul>
+                        <li><strong>Step C: The Check (Pruning)</strong><br>
+                        We look at where the Pivot landed (new_pivot_idx) and compare it to our target rank.</li>
+                    </ul>
+                    <div class="code-block">- Scenario 1: Exact Match
+- Is new_pivot_idx equal to target [k − 1]?
+- Yes. We found it. Return the value at this index.
+
+- Scenario 2: Overshoot (Too far right)
+- Is new_pivot_idx greater than k − 1?
+- This means the Pivot we found is too small (it is ranked lower than our target). The answer must be one of the larger numbers to the left.
+- Action: Shrink the window. Move the Right boundary to new_pivot_idx − 1. Ignore the right side.
+
+- Scenario 3: Undershoot (Too far left)
+- Is new_pivot_idx less than target [k − 1]?
+- This means the Pivot is too big (it is ranked higher than our target). The answer must be one of the smaller numbers to the right.
+- Action: Shrink the window. Move the Left boundary to new_pivot_idx + 1. Ignore the left side.</div>
+                    <p><strong>Phase 3: Conclusion</strong><br>
+                    We repeat Phase 2 with the newly shrunk window. Because the search area gets smaller (roughly by half) every time, we converge on the specific answer very quickly.</p>
+                    <p><strong>REAL-WORLD USE CASE</strong><br>
+                    Infrastructure<br>
+                    In smart grids, this quickly identifies the top k highest-load transformers to trigger immediate load shedding. It avoids the latency of sorting millions of grid data points, preventing cascading blackouts during critical usage spikes.</p>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>3. Indexing & Hashing</summary>
             <div class="section-content">
-                <!-- Placeholder for Implementation -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">FIND MISSING IP ADDRESS</div>
+                    <p><strong>Step 1: Divide the Search Space (Pass 1 Setup)</strong><br>
+                    We cannot store all IP addresses in memory. Instead, we partition the entire 4-billion-integer address space into smaller chunks called buckets.
+                    <br>- We allocate an array of integers in RAM to act as counters.
+                    <br>- We index this array using the 16 Most Significant Bits (MSBs)—the “prefix” of the IP address.
+                    <br>- This creates 𝟐¹⁶ (65,536) buckets. Each bucket represents a specific prefix range.</p>
+                    <p><strong>Step 2: Count the Prefixes (Pass 1 Execution)</strong><br>
+                    We stream through the file of 1 billion IP addresses one by one.
+                    <br>- For every IP address, we isolate its top 16 bits (the prefix).
+                    <br>- We increment the counter in the array index corresponding to that prefix.
+                    <br>- Logic: We are not storing the IPs yet; we are simply counting how many IPs fall into each prefix category.</p>
+                    <p><strong>Step 3: Locate the “Candidate Bucket”</strong><br>
+                    We apply the Pigeonhole Principle to identify where the missing number hides.
+                    <br>- Each bucket covers a range of exactly 𝟐¹⁶ (65,536) possible numbers.
+                    <br>- Since there are fewer IPs in the file (1 billion) than total possible IPs (4 billion), many buckets will be full, but at least one bucket must contain fewer than 65,536 entries.
+                    <br>- We scan our counter array and select a bucket where the count is less than the bucket capacity. We call the prefix associated with this bucket the Candidate Prefix.</p>
+                    <p><strong>Step 4: Prepare the Checklist (Pass 2 Setup)</strong> We have identified the Candidate Prefix (the "Bucket") that is missing at least one IP address. Now, we need to find exactly which address is missing inside that bucket.
+                    <br>• We clear our previous counters from RAM to free up space.
+                    <br>• We allocate a Bit Vector. Think of this as a digital checklist with 65,536 checkboxes.
+                    <br>• Each checkbox represents one possible Suffix (the lower 16 bits) that could be attached to our Candidate Prefix.
+                    <br>• We start with every box unchecked (set to 0).</p>
+                    <p><strong>Step 5: Fill in the Blanks (Pass 2 Execution)</strong> We read through the hard drive file a second time.
+                    <br>• Filter: We look at every IP address. If an IP does not start with our Candidate Prefix, we ignore it completely. It’s not in the bucket we care about.
+                    <br>• Map: If the IP does start with our prefix, we look at its bottom 16 bits (the Suffix). We go to that specific number on our checklist (Bit Vector) and check the box (change the bit to 1).</p>
+                    <p><strong>Step 6: Identify and Reconstruct</strong> After checking every relevant IP in the file, we look at our checklist.
+                    <br>• Because we proved in Step 3 that this bucket was not full, there must be at least one box still unchecked (set to 0).
+                    <br>• Identify: We find the index of that 0. This is our Missing Suffix.
+                    <br>• Reconstruct: We take the Candidate Prefix (the top half) and glue it to the Missing Suffix (the bottom half). This combination is the specific IP address that was missing from the file.</p>
+                </div>
+
             </div>
         </details>
 
