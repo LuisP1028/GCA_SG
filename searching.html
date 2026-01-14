@@ -258,7 +258,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <div class="subsection-title">SEARCHING 2D SORTED ARRAYS</div>
+                    <div class="subsection-title">
+                        SEARCHING 2D SORTED ARRAYS
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/2D_sorted_array_search.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>A 2D array is sorted if it’s columns and rows are nondecreasing</p>
                     <p><strong>Why checking the top-left A[0][0] value fails:</strong> It provides no information gain.<br>
                     Since it is the smallest value in the matrix, finding that your target is larger offers no direction.</p>
