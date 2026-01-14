@@ -148,21 +148,240 @@
         <details class="section">
             <summary>1. Interval Scheduling</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">GREEDY ALGORITHMS</div>
+                    <p>Identifying that a local optimal choice (pairing the current largest with the current smallest) leads to a global optimum. Recognizing when a Greedy approach works—and when it doesn't—is a core skill.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">Compute an Optimum Assignment of Tasks [Pairwise min-max pairing]</div>
+                    <p><strong>Step 1: Pre-Processing (Sorting)</strong></p>
+                    <ul>
+                        <li>Logic: To make efficient decisions, we need immediate access to the extremal values (the shortest and longest tasks).</li>
+                        <li>Action: Apply a sorting algorithm to the input array task_durations.</li>
+                        <li>Result: The array is now ordered 𝐭₁ ≤ 𝐭₂ ≤ … ≤ 𝐭ₙ<br>This transforms the data from a random collection into a rank-ordered sequence, at a cost of O(𝑁 log 𝑁) time.</li>
+                    </ul>
+                    <p><strong>Step 2: Applying the Greedy Heuristic</strong></p>
+                    <ul>
+                        <li>Logic: The core insight is that the longest-duration task creates the highest risk of a bottleneck. To mitigate this risk, it must be paired with the task that adds the least additional time.</li>
+                        <li>Action: Pair the element at index 0 (absolute minimum) with the element at index 𝑛−1 (absolute maximum).</li>
+                        <li>Validation — Example durations: 1, 8, 9, 10
+                        <br>- Pairing longest (10) with second-longest (9) → burden = ₁₉
+                        <br>- Pairing longest (10) with shortest (1) → burden = ₁₁
+                        <br>Crucial distinction: The optimum makespan is not necessarily achieved by always taking min + max.
+                        <br>In this case the correct pairing is (1,10) and (8,9) → sums 11 and 17 → makespan = 17.
+                        <br>Even though 11 is low, this strategy keeps the highest pair sum (17) as small as possible.</li>
+                    </ul>
+                    <p><strong>Step 3: Iterative Construction</strong></p>
+                    <ul>
+                        <li>Logic: Once the current longest and shortest tasks are paired, they are removed from consideration. This leaves a sub-problem of size 𝑛−2 that has the same structure as the original problem.</li>
+                        <li>Action: Proceed inward using two pointers (or a single index 𝑖).
+                        <br>For iteration 𝑖 (starting from 0):
+                        <br>Pair array[𝑖] with array[𝑛−1−𝑖]</li>
+                        <li>This process continues for ⌊𝑛/2⌋ iterations (or until the middle is reached when 𝑛 is odd).</li>
+                    </ul>
+                    <p>The final pairing is therefore:<br>(𝐭₁, 𝐭ₙ), (𝐭₂, 𝐭ₙ₋₁), (𝐭₃, 𝐭ₙ₋₂), …</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">Schedule to Optimize Waiting Time</div>
+                    <p>If you run a long task first, every subsequent task must wait for that long task to finish, drastically increasing the cumulative waiting time.</p>
+                    <ul>
+                        <li>Conversely, if you run short tasks first, the subsequent tasks wait less. The solution requires arranging the input data to exploit this mathematical relationship.</li>
+                    </ul>
+                    <p><strong>The Process:</strong></p>
+                    <ol>
+                        <li>Input: Receive an unsorted array of integers representing service durations.</li>
+                        <li>Transformation: Apply a sorting algorithm to enforce a non-decreasing order.</li>
+                        <li>Calculation: Iterate through the sorted array once. For each element, multiply its value by the count of elements remaining after it.</li>
+                        <li>Output: Sum these products to return the minimum metric.</li>
+                    </ol>
+                    <p><strong>The Logic:</strong><br>
+                    The logic relies on the weight of contribution.</p>
+                    <ul>
+                        <li>A query processed early contributes its service time to the waiting time of every query that follows it.</li>
+                        <li>A query processed last contributes its service time to zero other queries (no one is waiting behind it).</li>
+                        <li>Therefore, to minimize the total sum, the values with the highest multiplier (processed earliest) must be the smallest numbers.</li>
+                    </ul>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Step 1: Sorting</strong><br>
+                    Sort the list of tasks from shortest to longest. This is the most critical step: running quick tasks first minimizes the total time everyone else spends sitting in the queue.</p>
+                    <p><strong>Step 2: The Loop</strong><br>
+                    Start a loop to look at each task in your sorted list one by one. This sets up the process where you will evaluate the specific cost of each task in the sequence.</p>
+                    <p><strong>Step 3: The Multiplier</strong><br>
+                    Count how many tasks are stuck waiting behind the current one. For example, if there are 5 tasks total and you are processing the first one, there are 4 tasks waiting behind it.</p>
+                    <p><strong>Step 4: The Math</strong><br>
+                    Multiply the current task's duration by the number of waiting tasks (from Step 3). Add this result to your total. This calculates exactly how much wait time this specific task causes.</p>
+                    <p><strong>Step 5: The Result</strong><br>
+                    Once the loop finishes, the final sum is your answer. Return this number. It represents the lowest possible total waiting time for the entire group of tasks.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">INTERVAL COVERING</div>
+                    <p><strong>[STRATEGY]</strong></p>
+                    <p><strong>A. Focus on the "First Ending" Interval</strong><br>
+                    Look at the entire set of intervals. Find the first task that ends earliest. (has the minimum right endpoint).</p>
+                    <p><strong>B. Select the Rightmost Point (Extremal Point)</strong><br>
+                    To cover the interval identified in Step 1, pick its right endpoint.
+                    <br>- Why? This is the greedy choice. By picking the latest possible time that still covers the first-ending interval, we maximize the probability that this same point will also overlap with intervals starting later.</p>
+                    <p>IN OTHER WORDS: Tasks don't change; your visit time does.If you visit early, you miss tasks starting later.by waiting until the deadline, you wait for those later tasks to begin, so you can catch them and the first task simultaneously.</p>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Step 1: Sort the Data</strong><br>
+                    To implement the above logic efficiently, sort all intervals in the list based on their right endpoints in ascending order.</p>
+                    <p><strong>Step 2: Iterate and Filter</strong><br>
+                    This loop filters out tasks you have already done.</p>
+                    <ul>
+                        <li>The Test: Did this task start after your last visit?
+                            <ul>
+                                <li>Yes: You missed it. You must add a new visit (at this task's deadline) to catch it.</li>
+                                <li>No: Your previous visit already caught it. You can safely ignore this task.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p>Run a loop through your sorted intervals:<br>
+                    1. Initialize a variable last_visit_time.<br>
+                    2. For each current interval, check: Does it start after last_visit_time?<br>
+                    - NO: The current interval is already covered by the previous visit. Ignore it.<br>
+                    - YES: The current interval is not covered. You must visit again.<br>
+                    3. Update: If the answer was YES, set last_visit_time = current interval’s right endpoint and increment the visit counter.</p>
+                    <p><strong>Step 3: Final Output</strong><br>
+                    The final count of visits is the size of the minimum set.</p>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>2. Invariants & Optimality</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">3 SUM PROBLEM</div>
+                    <p>You are given a list of numbers and a target total. You must determine if any three numbers from that list add up to the target.</p>
+                    <p><strong>The Strategy:</strong><br>
+                    "Lock" one number first. Now, the problem changes: you only need to find two numbers that add up to the remaining amount needed. You repeat this "lock one, find two" process for every number in the list.</p>
+                    <p><strong>Phase 1: Preparation (Sorting)</strong><br>
+                    The algorithm begins by sorting A in non-decreasing order.
+                    <br>• Sorting establishes the monotonic property required for the two-pointer technique.</p>
+                    <p><strong>Phase 2: Reduction (Iteration)</strong><br>
+                    We iterate through each element a in the array. We treat the current a as the fixed candidate for the first number in the triple.</p>
+                    <p><strong>Phase 3: The 2-Sum Subroutine (Two-Pointer Search)</strong><br>
+                    For every fixed a, we execute a search for b and c using two indices (pointers), let's call them low and high.
+                    <br>• Initialization: Set low = 0 (start of array) and high = n - 1 (end of array).
+                    <br>◦ Note: Because repetition is allowed, low starts at 0, not at the index of a.</p>
+                    <p><strong>The Loop (Convergence Logic)</strong><br>
+                    While low ≤ high:</p>
+                    <p>1. Calculate Sum<br>
+                    current_sum = A[low] + A[high]<br>
+                    2. Check Match<br>
+                    If current_sum = 𝑡−𝑎<br>
+                    → Solution found. Return True.<br>
+                    3. Branch 1 (Underflow)<br>
+                    If current_sum < 𝑡−𝑎<br>
+                    → Sum is too small.<br>
+                    Since the array is sorted, increase the sum by selecting a larger value for the lower pointer.<br>
+                    4. Branch 2 (Overflow)<br>
+                    If current_sum > 𝑡−𝑎<br>
+                    → Sum is too large.<br>
+                    Since the array is sorted, decrease the sum by selecting a smaller value for the upper pointer.</p>
+                    <p><strong>Phase 4: Termination</strong><br>
+                    If the outer loop finishes checking all a values without the inner 2-Sum subroutine returningTrue, then no such triple exists.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">FINDING MAJORITY ELEMENT</div>
+                    <p>A Majority Element is rigorously defined as an element that appears in strictly more than half of the positions</p>
+                    <p><strong>The Logic of "Mutual Destruction"</strong><br>
+                    The Boyer-Moore Voting Algorithm functions as a war of attrition.</p>
+                    <ul>
+                        <li>Every time the algorithm finds two different elements (a mismatch), it performs Elimination.</li>
+                        <li>It effectively says: "I will remove one Instance of the Candidate and one Instance of a Non-Candidate."</li>
+                    </ul>
+                    <p>If the Majority Element makes up more than 50% of the army, and every single enemy (Non-Candidate) manages to kill one Majority soldier, the Majority will still have soldiers left standing at the end.</p>
+                    <p><strong>Step 1: Establish State Variables</strong><br>
+                    We allocate memory for two variables only:<br>
+                    1. candidate: Stores the specific string currently suspected to be the majority.<br>
+                    2. candidate_count: An integer acting as a counter for the candidate.</p>
+                    <p><strong>Step 2: Begin Linear Scan (The Loop)</strong><br>
+                    We begin iterating through the input_stream. For every element it (iterator) in the sequence, we perform a logic check. It verifies whether the input stream contains a subsequent element to process.</p>
+                    <p><strong>Step 3: The Zero-Count Check (Reset Mechanism)</strong><br>
+                    Logic: If candidate_count is 0, it implies that all previous elements have effectively cancelled each other out (or we are at the start).</p>
+                    <p><strong>Step 4: The Comparison</strong><br>
+                    If the count is positive, compare the current element (it) with the candidate:</p>
+                    <ul>
+                        <li>Scenario A (Match): If candidate == it, reinforce the current hypothesis by incrementing the count by 1.</li>
+                        <li>Scenario B (Mismatch): If candidate != it, pair the distinct elements to cancel them out by decrementing the count by 1. (A zero count will trigger a reset in the next step).</li>
+                    </ul>
+                    <p><strong>Step 5: The Result</strong><br>
+                    When the list is finished, the string left in your candidate variable is the answer, thanks to the logic of mutual destruction.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">The Gasup Problem</div>
+                    <ul>
+                        <li>The Goal: Find the one specific city where, if you start there with an empty tank, you will never run out of gas during the trip.</li>
+                    </ul>
+                    <p><strong>Step 1: Conceptual Initialization</strong><br>
+                    We assume we start at the first city (Index 0) with 0 gallons of gas. Mathematically we will track the deficit</p>
+                    <p><strong>Step 2: Linear Traversal</strong><br>
+                    We iterate through the cities from 𝑖 = 1 to 𝑛−1. At each step, we calculate the fuel status as if we had traveled from the previous city</p>
+                    <p><strong>Step 3: Calculating the Running Balance</strong><br>
+                    For every city, we update a running variable (let’s call it remaining_gallons, representing the net fuel change after leaving the previous city and arriving at the current one.</p>
+                    <p><strong>Step 4: Identifying the Global Minimum</strong><br>
+                    We maintain a record of the minimum fuel level observed so far (min_gas) and the city index where that minimum occurred (min_city).</p>
+                    <ul>
+                        <li>Logic: If the remaining_gallons drops to a value lower than we have ever seen before, it means the stretch of road leading up to this specific city is the most resource-draining part of the loop relative to our start at Index 0.</li>
+                    </ul>
+                    <p><strong>Step 5: Selection of the Minimum City</strong><br>
+                    By making this “minimum city” the starting point, we define the baseline. Since this was the lowest point in the sequence, setting this point to 0 (by starting there) guarantees that all subsequent points in the sequence will be ≥ 0.</p>
+                    <p><strong>Step 6: The Return</strong><br>
+                    Return the min_city identified in Step 4.</p>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>3. Heuristics</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">MAXIMUM WATER TRAPPED BY VERTICALS</div>
+                    <p><strong>The Goal:</strong><br>
+                    You want to maximize this simple calculation:(Distance between the walls) × (Height of the shorter wall)</p>
+                    <p><strong>Step 1: Initialize Pointers</strong><br>
+                    Create two pointers, 𝐢𝐢 and 𝐣𝐣.<br>
+                    - Set 𝐢𝐢 to the very first index (0).<br>
+                    - Set 𝐣𝐣 to the very last index (𝑛−1).<br>
+                    - Initialize a variable max_water to 0.</p>
+                    <p><strong>Step 2: The Iterative Loop</strong><br>
+                    Enter a loop that continues as long as 𝐢𝐢 is strictly less than 𝐣𝐣. This ensures we have a valid width.</p>
+                    <p><strong>Step 3: Calculate Current Capacity</strong><br>
+                    Inside the loop:<br>
+                    1. Calculate the Width:<br>
+                    (𝐣 − 𝐢).<br>
+                    2. Determine the Height:<br>
+                    The minimum value between heights[𝐢] and heights[𝐣].<br>
+                    3. Calculate Area:<br>
+                    Width × Height.<br>
+                    4. Update max_water:<br>
+                    If this current Area is greater than the recorded max_water, overwrite it.</p>
+                    <p><strong>Step 4: The Decision Logic (Greedy Elimination)</strong><br>
+                    Compare the height of the line at 𝐢𝐢 with the height of the line at 𝐣𝐣.</p>
+                    <p><strong>Scenario A: Left wall is shorter</strong><br>
+                    The short left wall limits the water height. Keeping it while moving the right wall closer only shrinks width without gaining height. You must ditch the left wall to find a taller one.</p>
+                    <p><strong>Scenario B: Right wall is shorter</strong><br>
+                    The short right wall limits the water height. Keeping it while moving the left wall closer only shrinks width without gaining height. You must ditch the right wall to find a taller one.</p>
+                    <p><strong>Scenario C: Walls are equal height</strong><br>
+                    Both walls limit the height equally. Narrowing the gap while keeping either wall will only reduce the total water.</p>
+                    <ul>
+                        <li>You can safely discard either wall (usually the left) to continue searching.</li>
+                    </ul>
+                    <p><strong>Step 5: Return Result</strong><br>
+                    Once i and j meet, the entire search space has been explored or logically eliminated. Return max_water</p>
+                </div>
+
             </div>
         </details>
 
