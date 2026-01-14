@@ -346,7 +346,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">FIND THE K-TH LARGEST ELEMENT</div>
+                    <div class="subsection-title">
+                        FIND THE K-TH LARGEST ELEMENT
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/k_largest_element.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>To find the k-th ranked largest element, don't sort the whole list. Pick a pivot, partition so smaller elements go left, larger go right. The pivot lands in its final position. If it's at index k-1, we're done. Otherwise, discard the unwanted half and repeat.</p>
                     <ul>
                         <li>The Pivot: This is a randomly selected element from the current chunk of the array we are looking at. It acts as the "judge." We compare every other number against this Pivot.</li>
@@ -417,7 +425,15 @@ Once the scan is finished, we take the Pivot from the end and swap it into the s
             <div class="section-content">
                 
                 <div class="subsection">
-                    <div class="subsection-title">FIND MISSING IP ADDRESS</div>
+                    <div class="subsection-title">
+                        FIND MISSING IP ADDRESS
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/missing_IP.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p><strong>Step 1: Divide the Search Space (Pass 1 Setup)</strong><br>
                     We cannot store all IP addresses in memory. Instead, we partition the entire 4-billion-integer address space into smaller chunks called buckets.
                     <br>- We allocate an array of integers in RAM to act as counters.
