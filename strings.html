@@ -208,14 +208,23 @@
             <summary>2. Pattern Matching</summary>
             <div class="section-content">
                 
-                <div class="subsection">
-                    <div class="subsection-title">REPLACE AND REMOVE [Two Pass Algorithm]</div>
+<div class="subsection">
+                    <div class="subsection-title">
+                        REPLACE AND REMOVE [Two Pass Algorithm]
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/replace_and_remove.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>The problem asks you to modify a character array within its existing memory footprint (in-place). You must iterate through the array to delete all instances of the character 'b' and replace every instance of the character 'a' with two 'd's. The array has sufficient physical capacity to hold the resulting longer string</p>
                     <p>The optimal solution utilizes a two-pass algorithm.</p>
                     <ol>
                         <li>Pass One (Forward - "Filter and Count"):<br>Iterate from the start to the end. Remove 'b's by shifting valid characters to the left (compacting the array) and count the number of 'a's to calculate the final required length.</li>
                         <li>Pass Two (Backward - "Expand and Substitute"):<br>Iterate from the end of the compacted data backwards. Move characters to their final positions. If the character is 'a', write two 'd's; otherwise, copy the character. This backward approach prevents the expansion of 'a' into 'dd' from overwriting subsequent characters that have not yet been moved.</li>
                     </ol>
+                </div>
                     <p><strong>THE HOW: EXPANDED</strong></p>
                     <p><strong>Phase 1: The Compaction Pass (Forward Iteration)</strong><br>
                     Objective: Eliminate 'b's to create a dense block of valid characters and calculate the necessary storage for the next phase.</p>
@@ -279,7 +288,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">REVERSE WORDS IN A SENTENCE [DOUBLE REVERSAL]</div>
+                    <div class="subsection-title">
+                        REVERSE WORDS IN A SENTENCE [DOUBLE REVERSAL]
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/Double_Reversal.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>We need to take a sentence (a mutable sequence of characters) and rearrange the words so the last word becomes the first, the second-to-last becomes the second, and so on.</p>
                     <p>The strategy rundown:<br>
                     Reversing the entire data structure moves the words to their correct relative areas, but leaves the words themselves backward. We then iterate through the sentence and flip each individual word back to its correct forward readability.</p>
@@ -289,6 +306,7 @@
                         <li>Boundary Detection: The scanner looks for the Sentinel (space).</li>
                         <li>Segmented Inversion: When a boundary is found, the specific segment (word) defined by the previous and current pointers is inverted again.</li>
                     </ol>
+                </div>
                     <p><strong>THE HOW:</strong></p>
                     <p><strong>Phase 1: The Global Transposition</strong></p>
                     <p><strong>Step 1:</strong><br>
