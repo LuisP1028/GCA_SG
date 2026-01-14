@@ -157,7 +157,15 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">Search a Sorted Array for the First Occurrence of ‘k’</div>
+                    <div class="subsection-title">
+                        Search a Sorted Array for the First Occurrence of ‘k’
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/binary_search_for_k.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>Standard binary search returns the moment it finds k. This version keeps going left to ensure it found the first k, not just any k.</p>
                     <ul>
                         <li>Initialize: Set bounds to cover the entire array. Set result = −𝟏 (indicating failure).</li>
