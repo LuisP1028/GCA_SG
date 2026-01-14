@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HANOI.EXE [DITHERPUNK]</title>
+<style>
+  /* --- FONTS & BASICS --- */
+  @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+  :root {
+    --bg: #000000;
+    --green: #00FF41;
+    --green-dim: #003b10;
+    --green-ghost: rgba(0, 255, 65, 0.1);
+    --font-stack: 'VT323', monospace;
+  }
+
+  * { box-sizing: border-box; user-select: none; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg);
+    color: var(--green);
+    font-family: var(--font-stack);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- CRT & DITHER EFFECTS --- */
+  /* Scanlines overlay */
+  body::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 100;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+  }
+
+  /* CSS Dither Pattern for UI elements */
+  .dither-bg {
+    background-image: 
+      linear-gradient(45deg, var(--green-dim) 25%, transparent 25%), 
+      linear-gradient(-45deg, var(--green-dim) 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, var(--green-dim) 75%), 
+      linear-gradient(-45deg, transparent 75%, var(--green-dim) 75%);
+    background-size: 4px 4px;
+    background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
+  }
+
+  /* --- LAYOUT --- */
+  header {
+    height: 6vh;
+    border-bottom: 2px solid var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2vw;
+    font-size: 2.5vh;
+    text-shadow: 0 0 5px var(--green);
+  }
+
+  #main-interface {
+    display: flex;
+    height: 74vh;
+    width: 100vw;
+  }
+
+  /* --- LEFT PANEL: THE STAGE --- */
+  #stage-panel {
+    width: 60vw;
+    border-right: 2px solid var(--green);
+    position: relative;
+    background: radial-gradient(circle at center, #001100 0%, #000000 100%);
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* --- RIGHT PANEL: THE ENGINE --- */
+  #engine-panel {
+    width: 40vw;
+    display: flex;
+    flex-direction: column;
+    font-size: 1.8vh;
+  }
+
+  /* Code Section */
+  #code-container {
+    flex: 0 0 40%;
+    border-bottom: 1px dashed var(--green-dim);
+    padding: 1vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .code-line {
+    padding: 0.2vh 1vw;
+    opacity: 0.6;
+    transition: all 0.1s;
+  }
+  
+  .code-line.active {
+    background: var(--green);
+    color: var(--bg);
+    opacity: 1;
+    font-weight: bold;
+  }
+
+  /* Call Stack Section */
+  #stack-container {
+    flex: 1;
+    padding: 1vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5vh;
+    background: rgba(0, 20, 0, 0.5);
+  }
+
+  .stack-card {
+    border: 1px solid var(--green);
+    padding: 0.5vh;
+    font-size: 1.6vh;
+    background: #000;
+    transform: translateX(-10px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    box-shadow: 2px 2px 0px var(--green-dim);
+  }
+
+  .stack-card.enter {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .stack-card.inactive {
+    opacity: 0.4;
+    border-color: var(--green-dim);
+  }
+
+  /* --- CONTROLS --- */
+  #controls {
+    height: 20vh;
+    border-top: 2px solid var(--green);
+    display: flex;
+    flex-direction: column;
+    padding: 1vh 2vw;
+    gap: 1vh;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 2vw;
+  }
+
+  button {
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: var(--font-stack);
+    font-size: 2vh;
+    padding: 0.5vh 1.5vw;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.1s;
+  }
+
+  button:hover { background: var(--green-ghost); }
+  button:active { background: var(--green); color: var(--bg); }
+  button:disabled { border-color: var(--green-dim); color: var(--green-dim); cursor: not-allowed; }
+
+  /* Custom Range Input */
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 2vh;
+    width: 1vw;
+    background: var(--green);
+    cursor: pointer;
+    margin-top: -0.8vh; 
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 2px;
+    background: var(--green-dim);
+  }
+
+  /* Logger */
+  #log-box {
+    font-size: 1.5vh;
+    height: 6vh;
+    overflow: hidden;
+    color: var(--green);
+    opacity: 0.8;
+    border-left: 2px solid var(--green);
+    padding-left: 1vw;
+    display: flex;
+    flex-direction: column-reverse; /* Bottom up */
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div>SYS.HANOI_VISUALIZER <span class="blink">_</span></div>
+  <div id="status-display">READY</div>
+</header>
+
+<div id="main-interface">
+  <!-- THE STAGE -->
+  <div id="stage-panel">
+    <canvas id="stage"></canvas>
+  </div>
+
+  <!-- THE ENGINE -->
+  <div id="engine-panel">
+    <div id="code-container">
+      <div id="line-0" class="code-line">def hanoi(n, src, aux, dest):</div>
+      <div id="line-1" class="code-line">&nbsp;&nbsp;if n == 0: return</div>
+      <div id="line-2" class="code-line">&nbsp;&nbsp;hanoi(n-1, src, dest, aux)</div>
+      <div id="line-3" class="code-line">&nbsp;&nbsp;move_ring(src, dest)</div>
+      <div id="line-4" class="code-line">&nbsp;&nbsp;hanoi(n-1, aux, src, dest)</div>
+    </div>
+    <div style="padding:0 1vh; font-size:1.5vh; opacity:0.7;">> CALL STACK MEMORY</div>
+    <div id="stack-container"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <!-- Scrubber -->
+  <div class="control-row">
+    <span style="min-width: 5vw;">TIMELINE</span>
+    <input type="range" id="scrubber" min="0" max="100" value="0" step="1">
+    <span id="step-counter">0 / 0</span>
+  </div>
+
+  <!-- Buttons -->
+  <div class="control-row">
+    <button id="btn-play">PLAY</button>
+    <button id="btn-pause">PAUSE</button>
+    <button id="btn-step-in">STEP INTO</button>
+    <button id="btn-step-over">STEP OVER</button>
+    <select id="speed-select" style="background:black; color:var(--green); border:1px solid var(--green); font-family:inherit; padding: 0.5vh;">
+      <option value="2000">0.5x</option>
+      <option value="1000" selected>1.0x</option>
+      <option value="300">2.0x</option>
+      <option value="0">MAX</option>
+    </select>
+    <button id="btn-reset">RESET (N=5)</button>
+  </div>
+  
+  <div id="log-box"></div>
+</div>
+
+<script>
+/**
+ * DITHERPUNK HANOI VISUALIZER
+ * 
+ * Architecture:
+ * 1. Timeline Generator: Pre-calculates the entire tree of recursive states into a linear timeline.
+ *    This allows instant scrubbing and "Time Travel".
+ * 2. Renderer: Pure function that takes a State Snapshot and draws Canvas + DOM.
+ * 3. Loop: Handles animation interpolation between states for the "Atomic Move".
+ */
+
+// --- CONFIGURATION ---
+const COLORS = {
+  bg: '#000000',
+  fg: '#00FF41',
+  dim: '#003b10'
+};
+
+const NUM_RINGS = 5;
+const PEG_NAMES = ["0", "1", "2"];
+
+// --- STATE MANAGEMENT ---
+
+class HanoiEngine {
+  constructor(n) {
+    this.n = n;
+    this.timeline = []; // Array of State Snapshots
+    this.currentStateIndex = 0;
+    this.isAnimating = false;
+    this.animationProgress = 0; // 0.0 to 1.0 for atomic moves
+    this.speed = 1000; // ms per step
+    this.lastTime = 0;
+    this.accumulatedTime = 0;
+    this.reqId = null;
+    
+    // Build the logic timeline immediately
+    this.buildTimeline();
+  }
+
+  // Determine label for a peg based on current stack context
+  getPegRoles(src, aux, dest) {
+    let roles = ["", "", ""];
+    roles[src] = "S"; // Source
+    roles[aux] = "A"; // Aux
+    roles[dest] = "D"; // Dest
+    return roles;
+  }
+
+  // The Recursive Generator that builds the timeline
+  buildTimeline() {
+    this.timeline = [];
+    
+    // Initial Board State
+    let initialBoard = [[], [], []];
+    for(let i=this.n; i>=1; i--) initialBoard[0].push(i);
+
+    // Helper to deep copy board
+    const copyBoard = (b) => b.map(p => [...p]);
+
+    // Recursive Simulator
+    const simulate = (n, s, a, d, depth) => {
+      // Current Context for Stack
+      const stackFrame = { n, args: [s, a, d], depth };
+      const roles = this.getPegRoles(s, a, d);
+
+      // STEP A: Guard / Entry
+      this.timeline.push({
+        type: 'GUARD',
+        line: 1, // "if n == 0"
+        board: copyBoard(initialBoard),
+        stack: stackFrame,
+        roles: roles,
+        desc: `hanoi(${n}, ${s}→${d})`
+      });
+
+      if (n === 0) return;
+
+      // STEP B: Recursive Call 1
+      this.timeline.push({
+        type: 'CALL',
+        line: 2, // "hanoi(n-1, src, dest, aux)"
+        board: copyBoard(initialBoard),
+        stack: stackFrame,
+        roles: roles,
+        desc: `Recurse Left: n=${n-1}`
+      });
+
+      simulate(n - 1, s, d, a, depth + 1);
+
+      // STEP C: The Move (Pre-move state)
+      this.timeline.push({
+        type: 'PRE_MOVE',
+        line: 3, // "move_ring"
+        board: copyBoard(initialBoard),
+        stack: stackFrame,
+        roles: roles,
+        move: { from: s, to: d, val: initialBoard[s][initialBoard[s].length-1] },
+        desc: `Move Ring ${initialBoard[s][initialBoard[s].length-1]} from ${s} to ${d}`
+      });
+
+      // Execute Logic
+      let ring = initialBoard[s].pop();
+      initialBoard[d].push(ring);
+
+      // Post-move state
+      this.timeline.push({
+        type: 'POST_MOVE',
+        line: 3,
+        board: copyBoard(initialBoard),
+        stack: stackFrame,
+        roles: roles,
+        desc: `Move Complete`
+      });
+
+      // STEP D: Recursive Call 2
+      this.timeline.push({
+        type: 'CALL',
+        line: 4, // "hanoi(n-1, aux, src, dest)"
+        board: copyBoard(initialBoard),
+        stack: stackFrame,
+        roles: roles,
+        desc: `Recurse Right: n=${n-1}`
+      });
+
+      simulate(n - 1, a, s, d, depth + 1);
+    };
+
+    // Kickoff
+    simulate(this.n, 0, 1, 2, 0);
+    
+    // Final Idle State
+    this.timeline.push({
+      type: 'IDLE',
+      line: -1,
+      board: copyBoard(initialBoard),
+      stack: null,
+      roles: ["","",""],
+      desc: "DONE"
+    });
+  }
+
+  get totalSteps() { return this.timeline.length - 1; }
+  get currentSnapshot() { return this.timeline[this.currentStateIndex]; }
+}
+
+// --- VISUALIZATION CONTROLLER ---
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const engine = new HanoiEngine(NUM_RINGS);
+
+// UI Elements
+const uiLines = Array.from(document.querySelectorAll('.code-line'));
+const uiStack = document.getElementById('stack-container');
+const uiScrubber = document.getElementById('scrubber');
+const uiCounter = document.getElementById('step-counter');
+const uiLog = document.getElementById('log-box');
+
+// Setup Canvas size
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  render();
+}
+window.addEventListener('resize', resize);
+
+// Dither Pattern Generation (Canvas Pattern)
+let ditherPatternLight, ditherPatternHeavy;
+function createDitherPatterns() {
+  // Light Dither (Small dots)
+  const c1 = document.createElement('canvas');
+  c1.width = 4; c1.height = 4;
+  const x1 = c1.getContext('2d');
+  x1.fillStyle = COLORS.fg;
+  x1.fillRect(0,0,1,1); x1.fillRect(2,2,1,1);
+  ditherPatternLight = ctx.createPattern(c1, 'repeat');
+
+  // Heavy Dither (Lines/Grid)
+  const c2 = document.createElement('canvas');
+  c2.width = 4; c2.height = 4;
+  const x2 = c2.getContext('2d');
+  x2.fillStyle = COLORS.fg;
+  x2.fillRect(0,0,4,1); // Horizontal lines
+  ditherPatternHeavy = ctx.createPattern(c2, 'repeat');
+}
+
+// --- RENDERER ---
+
+function drawPegs(roles) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const pegY = h * 0.8;
+  const pegH = h * 0.5;
+
+  ctx.strokeStyle = COLORS.dim;
+  ctx.lineWidth = 4;
+  ctx.fillStyle = COLORS.fg;
+  ctx.textAlign = "center";
+  ctx.font = "20px VT323";
+
+  [0.2, 0.5, 0.8].forEach((xFactor, i) => {
+    const x = w * xFactor;
+    
+    // Draw Peg Line
+    ctx.beginPath();
+    ctx.moveTo(x, pegY);
+    ctx.lineTo(x, pegY - pegH);
+    ctx.stroke();
+
+    // Draw Label Base (0, 1, 2)
+    ctx.fillStyle = COLORS.dim;
+    ctx.fillText(i, x, pegY + 30);
+
+    // Draw Role (S, D, A)
+    if(roles && roles[i]) {
+      ctx.fillStyle = COLORS.fg;
+      ctx.font = "30px VT323";
+      ctx.fillText(roles[i], x, pegY - pegH - 20);
+      
+      // Box style based on role
+      const boxSize = 40;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS.fg;
+      if (roles[i] === 'S') ctx.setLineDash([]); // Solid
+      if (roles[i] === 'D') ctx.setLineDash([5, 5]); // Dashed
+      if (roles[i] === 'A') ctx.setLineDash([2, 4]); // Dotted
+      
+      ctx.strokeRect(x - boxSize/2, pegY - pegH - 45, boxSize, boxSize);
+      ctx.setLineDash([]);
+    }
+  });
+}
+
+function drawRing(val, pegIndex, heightIndex, customX = null, customY = null) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const pegX = w * (0.2 + (pegIndex * 0.3));
+  const pegY = h * 0.8;
+  
+  // Ring Geometry
+  const maxW = w * 0.25;
+  const minW = w * 0.05;
+  const ringW = minW + ((maxW - minW) * (val / NUM_RINGS));
+  const ringH = h * 0.05;
+  
+  const x = (customX !== null) ? customX : pegX;
+  const y = (customY !== null) ? customY : pegY - (heightIndex * (ringH + 2)) - (ringH/2);
+
+  // Aesthetic Logic: Dither density based on ring size
+  ctx.strokeStyle = COLORS.fg;
+  ctx.lineWidth = 2;
+  
+  // Fill logic
+  if (val === 1) {
+    ctx.fillStyle = COLORS.fg; // Smallest is solid
+  } else if (val === NUM_RINGS) {
+    ctx.fillStyle = ditherPatternHeavy; // Largest is dark/heavy dither
+  } else {
+    ctx.fillStyle = ditherPatternLight; // Mid
+    ctx.globalAlpha = 1.0 - (val * 0.15); // Fade slightly
+  }
+
+  ctx.fillRect(x - ringW/2, y - ringH/2, ringW, ringH);
+  ctx.globalAlpha = 1.0;
+  ctx.strokeRect(x - ringW/2, y - ringH/2, ringW, ringH);
+}
+
+function render() {
+  // Clear
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if(!ditherPatternLight) createDitherPatterns();
+
+  const state = engine.currentSnapshot;
+  if (!state) return;
+
+  // Draw Static Pegs
+  drawPegs(state.roles);
+
+  // Draw Rings (except moving one if animating)
+  state.board.forEach((peg, pIdx) => {
+    peg.forEach((ringVal, hIdx) => {
+      // If we are animating, skip drawing the moving ring in its static 'from' position
+      if (engine.isAnimating && state.type === 'PRE_MOVE' && 
+          pIdx === state.move.from && hIdx === peg.length - 1) {
+        return;
+      }
+      drawRing(ringVal, pIdx, hIdx);
+    });
+  });
+
+  // Handle Animation Frame
+  if (engine.isAnimating && state.type === 'PRE_MOVE') {
+    const { from, to, val } = state.move;
+    
+    // Calculate arc
+    const w = canvas.width;
+    const h = canvas.height;
+    const startX = w * (0.2 + (from * 0.3));
+    const startY = h * 0.8 - ((state.board[from].length-1) * (h*0.05+2)) - (h*0.05/2);
+    
+    const endX = w * (0.2 + (to * 0.3));
+    const endY = h * 0.8 - (state.board[to].length * (h*0.05+2)) - (h*0.05/2);
+    
+    const t = engine.animationProgress;
+    
+    // Linear X, Parabolic Y (Arc)
+    const curX = startX + (endX - startX) * t;
+    const arcHeight = h * 0.3;
+    const curY = startY + (endY - startY) * t - (Math.sin(t * Math.PI) * arcHeight);
+
+    // Flash white on impact
+    if (t > 0.95) ctx.fillStyle = '#FFFFFF';
+    
+    drawRing(val, -1, -1, curX, curY);
+  }
+
+  // Update DOM UI
+  updateDOM(state);
+}
+
+function updateDOM(state) {
+  // Highlights
+  uiLines.forEach(l => l.classList.remove('active'));
+  if(state.line >= 0) {
+    document.getElementById(`line-${state.line}`).classList.add('active');
+  }
+
+  // Scrubber
+  uiScrubber.max = engine.totalSteps;
+  uiScrubber.value = engine.currentStateIndex;
+  uiCounter.innerText = `${engine.currentStateIndex} / ${engine.totalSteps}`;
+
+  // Call Stack Visualization
+  // Strategy: The logic uses a "virtual" stack. We need to sync DOM to it.
+  // To avoid flicker, we only rebuild if depth changed significantly or content changed.
+  // Simple approach for Ditherpunk: Clear and rebuild is fast enough for DOM.
+  
+  if (state.type === 'GUARD' || state.type === 'CALL' || state.type === 'PRE_MOVE') {
+      // Traverse timeline backwards to find all parent calls active
+      // Actually, our 'stack' property in snapshot is just the TOP frame.
+      // We need the full chain. 
+      // Optimization: We will just visualize the current top frame and suggest depth.
+      
+      // Clear existing that are not valid (Simulated for visuals)
+      const currentStackCards = document.querySelectorAll('.stack-card');
+      
+      // Because we used a linear snapshot without full stack trace array, 
+      // we visualize the *current* frame. 
+      // Ideally, we'd have the full array. Let's fake the "Slide In".
+      
+      const frameId = `frame-${state.stack.n}-${state.stack.args.join('')}`;
+      
+      // Simple render: Just show the current top card clearly, others dimmed?
+      // Better: Reconstruct stack from recursion depth.
+      // Since we didn't store the full stack array in the snapshot (to save memory),
+      // we will clear and show the current Top Frame info.
+      
+      uiStack.innerHTML = '';
+      
+      // Mock previous frames for aesthetic depth
+      for(let i=0; i<state.stack.depth; i++) {
+          const ghost = document.createElement('div');
+          ghost.className = 'stack-card inactive';
+          ghost.innerText = `hanoi(n=?, ...) [PARENT]`;
+          uiStack.appendChild(ghost);
+      }
+
+      const card = document.createElement('div');
+      card.className = 'stack-card enter';
+      const [s, a, d] = state.stack.args;
+      card.innerHTML = `> hanoi(n=${state.stack.n}, s=${s}, a=${a}, d=${d})`;
+      uiStack.appendChild(card);
+  }
+}
+
+function log(msg) {
+  const div = document.createElement('div');
+  div.innerText = `>> ${msg}`;
+  uiLog.prepend(div);
+  if (uiLog.children.length > 5) uiLog.lastChild.remove();
+}
+
+// --- GAME LOOP ---
+
+function loop(timestamp) {
+  if (!engine.reqId) return; // Stopped
+
+  const dt = timestamp - engine.lastTime;
+  engine.lastTime = timestamp;
+
+  if (engine.isAnimating) {
+    // Handling Atomic Move Animation
+    // Speed 0 = instant
+    if (engine.speed === 0) {
+        engine.animationProgress = 1;
+    } else {
+        engine.animationProgress += dt / (engine.speed * 0.5); // Move takes half the step time
+    }
+
+    if (engine.animationProgress >= 1) {
+      engine.isAnimating = false;
+      engine.animationProgress = 0;
+      // Advance to POST_MOVE immediately
+      stepForward(); 
+    }
+  } else {
+    // Handling Logic Steps
+    engine.accumulatedTime += dt;
+    if (engine.accumulatedTime >= engine.speed) {
+      engine.accumulatedTime = 0;
+      stepForward();
+    }
+  }
+
+  render();
+  engine.reqId = requestAnimationFrame(loop);
+}
+
+function start() {
+  if (engine.reqId) return;
+  engine.lastTime = performance.now();
+  engine.reqId = requestAnimationFrame(loop);
+  document.getElementById('status-display').innerText = "RUNNING...";
+}
+
+function pause() {
+  if (engine.reqId) cancelAnimationFrame(engine.reqId);
+  engine.reqId = null;
+  document.getElementById('status-display').innerText = "PAUSED";
+}
+
+function stepForward() {
+  if (engine.currentStateIndex < engine.totalSteps) {
+    const nextState = engine.timeline[engine.currentStateIndex + 1];
+    
+    // Check if next state requires animation (PRE_MOVE)
+    if (nextState.type === 'PRE_MOVE' && engine.speed > 0) {
+      engine.currentStateIndex++;
+      engine.isAnimating = true;
+      engine.animationProgress = 0;
+      log(nextState.desc);
+    } else {
+      engine.currentStateIndex++;
+      if(nextState.desc && nextState.type !== 'PRE_MOVE') log(nextState.desc);
+    }
+  } else {
+    pause();
+    document.getElementById('status-display').innerText = "COMPLETED";
+  }
+  render();
+}
+
+// "Step Over" Logic
+function stepOver() {
+  const current = engine.currentSnapshot;
+  // If currently on a recursive call line (2 or 4), we want to skip until stack returns
+  if (current.type === 'CALL') {
+    const startDepth = current.stack.depth;
+    // Find index where depth returns to startDepth and we are past the call
+    let targetIdx = engine.currentStateIndex + 1;
+    while(targetIdx < engine.totalSteps) {
+        const frame = engine.timeline[targetIdx];
+        // If we are back at same depth or less, we returned
+        if (frame.stack.depth <= startDepth) break;
+        targetIdx++;
+    }
+    engine.currentStateIndex = targetIdx;
+    render();
+    log(">> Stepped Over Recursion");
+  } else {
+    stepForward();
+  }
+}
+
+// --- EVENTS ---
+
+document.getElementById('btn-play').onclick = start;
+document.getElementById('btn-pause').onclick = pause;
+
+document.getElementById('btn-step-in').onclick = () => {
+  pause();
+  stepForward();
+};
+
+document.getElementById('btn-step-over').onclick = () => {
+  pause();
+  stepOver();
+};
+
+document.getElementById('btn-reset').onclick = () => {
+  pause();
+  engine.currentStateIndex = 0;
+  engine.isAnimating = false;
+  uiLog.innerHTML = '';
+  render();
+};
+
+uiScrubber.addEventListener('input', (e) => {
+  pause();
+  engine.currentStateIndex = parseInt(e.target.value);
+  engine.isAnimating = false;
+  render();
+});
+
+document.getElementById('speed-select').addEventListener('change', (e) => {
+  engine.speed = parseInt(e.target.value);
+});
+
+// Init
+resize();
+createDitherPatterns();
+render();
+
+</script>
+</body>
+</html>

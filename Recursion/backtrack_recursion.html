@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFS Permutation Engine // DITHERPUNK v2.1</title>
+    <style>
+        /* --- CORE VARIABLES & RESET --- */
+        :root {
+            --bg-color: #050505;
+            --fg-color: #00FF00; /* Phosphor Green */
+            --dim-color: #004400;
+            --alert-color: #AAFF00; /* High intensity for Scan/Candidate */
+            --font-main: 'Courier New', Courier, monospace;
+            --border-thick: 2px solid var(--fg-color);
+            --border-thin: 1px solid var(--fg-color);
+            --block-size: 60px;
+            --gap: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- DITHER & CRT EFFECTS --- */
+        .dither-pattern {
+            background-image: 
+                linear-gradient(45deg, var(--fg-color) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--fg-color) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--fg-color) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--fg-color) 75%);
+            background-size: 4px 4px;
+            background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
+            opacity: 0.15;
+            pointer-events: none;
+            position: absolute;
+            top:0; left:0; right:0; bottom:0;
+            z-index: 0;
+        }
+
+        #crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            z-index: 999;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        /* --- LAYOUT GRID --- */
+        #layout {
+            display: grid;
+            grid-template-areas: 
+                "header header"
+                "panelA panelA"
+                "panelB panelC";
+            grid-template-rows: 60px 240px 1fr;
+            grid-template-columns: 2fr 1fr;
+            height: 100%;
+            width: 100%;
+            padding: 10px;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            grid-area: header;
+            border-bottom: var(--border-thick);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            text-transform: uppercase;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        button {
+            background: var(--bg-color);
+            color: var(--fg-color);
+            border: var(--border-thin);
+            padding: 8px 20px;
+            font-family: var(--font-main);
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        button:hover:not(:disabled) {
+            background: var(--fg-color);
+            color: var(--bg-color);
+        }
+        button:disabled {
+            border-color: var(--dim-color);
+            color: var(--dim-color);
+            cursor: not-allowed;
+        }
+
+        .panel {
+            border: var(--border-thick);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 50, 0, 0.02);
+        }
+        
+        .panel-label {
+            background: var(--fg-color);
+            color: var(--bg-color);
+            padding: 4px 8px;
+            position: absolute;
+            top: 0; left: 0;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        /* --- PANEL A: ARRAY & STAGE --- */
+        #panel-a { grid-area: panelA; }
+        
+        #array-container {
+            flex: 1;
+            /* Flexbox perfectly centers the stage regardless of window size */
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            transition: background-color 0.2s;
+            overflow: hidden;
+        }
+
+        #array-container.success-flash {
+            background-color: rgba(0, 255, 0, 0.2);
+        }
+
+        /* The Stage: A stable coordinate system for absolute animations */
+        #stage {
+            position: relative;
+            height: 200px; /* Provides room for pointers above/below blocks */
+            /* Width is set by JS based on array size */
+            flex-shrink: 0;
+        }
+
+        /* Pointers */
+        .ptr {
+            position: absolute;
+            width: 100px; /* Wide enough to hold text */
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s;
+            opacity: 0;
+            z-index: 20;
+            /* Center the pointer structure on the coordinate */
+            transform: translateX(-50%);
+            left: 0;
+        }
+
+        /* Anchor Pointer (i) */
+        #ptr-i {
+            color: var(--fg-color);
+            top: 50%;
+            margin-top: 45px; /* Offset below blocks */
+            border-top: 2px solid var(--fg-color);
+        }
+        #ptr-i::before {
+            content: '^'; display: block; font-size: 20px; line-height: 10px; margin-top: -8px; 
+        }
+        #ptr-i::after {
+            content: 'ANCHOR[i]'; display: block; margin-top: 5px;
+        }
+
+        /* Candidate Pointer (j) */
+        #ptr-j {
+            color: var(--alert-color);
+            top: 50%;
+            margin-top: -80px; /* Offset above blocks */
+            border-bottom: 2px dashed var(--alert-color);
+        }
+        #ptr-j::before {
+            content: 'SCAN[j]'; display: block; margin-bottom: 5px;
+        }
+        #ptr-j::after {
+            content: 'v'; display: block; font-size: 16px; line-height: 10px; margin-bottom: -10px;
+        }
+
+        /* Array Blocks */
+        .block {
+            width: var(--block-size);
+            height: var(--block-size);
+            border: var(--border-thick);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            position: absolute;
+            background: var(--bg-color);
+            /* Centering vertically using margin so transform is free for X-axis swap */
+            top: 50%;
+            margin-top: -30px; /* Half of block-size (60px) */
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s, opacity 0.3s;
+            z-index: 5;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.2);
+        }
+
+        .block.locked {
+            background-image: repeating-linear-gradient(
+                45deg, var(--dim-color), var(--dim-color) 2px, var(--bg-color) 2px, var(--bg-color) 6px
+            );
+            border-color: var(--dim-color);
+            color: var(--fg-color);
+        }
+
+        .block.dimmed {
+            opacity: 0.3;
+            filter: grayscale(100%);
+            border-color: var(--dim-color);
+            color: var(--dim-color);
+        }
+
+        .block.highlight-i {
+            box-shadow: 0 0 20px var(--fg-color), inset 0 0 10px var(--fg-color);
+            z-index: 15;
+            border-color: #fff;
+        }
+        .block.highlight-j {
+            border-style: dashed;
+            box-shadow: 0 0 15px var(--alert-color);
+            z-index: 15;
+            border-color: var(--alert-color);
+            color: var(--alert-color);
+        }
+
+        /* Boundary Line */
+        #boundary-line {
+            position: absolute;
+            height: 140px;
+            width: 0;
+            border-left: 2px dotted var(--fg-color);
+            top: 50%;
+            /* Center vertically using transform */
+            transform: translateY(-50%);
+            left: 0;
+            transition: left 0.4s ease;
+            z-index: 4;
+            opacity: 0.5;
+        }
+        #boundary-label {
+            position: absolute;
+            top: -10px; left: 5px;
+            font-size: 10px; color: var(--dim-color);
+            writing-mode: vertical-rl; text-orientation: mixed;
+        }
+
+        /* --- PANEL B & C --- */
+        #panel-b { grid-area: panelB; }
+        #tree-svg { width: 100%; height: 100%; }
+        
+        circle { fill: var(--bg-color); stroke: var(--fg-color); stroke-width: 2; transition: all 0.3s; }
+        circle.active { fill: var(--fg-color); animation: pulse 1s infinite; }
+        circle.backtracked { stroke: var(--dim-color); fill: transparent; }
+        line { stroke: var(--fg-color); stroke-width: 1; transition: stroke 0.3s; }
+        line.backtracked { stroke: var(--dim-color); }
+        
+        @keyframes pulse {
+            0% { r: 5; opacity: 1; }
+            50% { r: 7; opacity: 0.5; }
+            100% { r: 5; opacity: 1; }
+        }
+
+        #panel-c { grid-area: panelC; }
+        #log-container {
+            padding: 30px 10px 10px 10px;
+            overflow-y: auto;
+            height: 100%;
+            font-size: 12px;
+            line-height: 1.4;
+            font-family: 'Courier New', monospace;
+        }
+        .log-entry { margin-bottom: 4px; border-left: 2px solid var(--dim-color); padding-left: 8px; opacity: 0.7; }
+        .log-entry.highlight { border-left: 2px solid var(--alert-color); color: #fff; opacity: 1; }
+        .log-success { background: var(--fg-color); color: var(--bg-color); font-weight: bold; opacity: 1; padding: 2px 5px; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--dim-color); }
+        ::-webkit-scrollbar-thumb { background: var(--dim-color); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--fg-color); }
+    </style>
+</head>
+<body>
+
+    <div id="crt-overlay"></div>
+    <div class="dither-pattern"></div>
+
+    <div id="layout">
+        <header>
+            <div>DFS_PERM_ENGINE // V2.1</div>
+            <div>
+                <span id="status-text" style="margin-right: 20px; font-size: 0.8em; color: var(--alert-color);">IDLE</span>
+                <button id="btn-init" onclick="startVisualization()">INIT_SEQ</button>
+            </div>
+        </header>
+
+        <section id="panel-a" class="panel">
+            <div class="panel-label">A: ACTIVE_MEMORY</div>
+            <div id="array-container">
+                <!-- The Stage: A fixed coordinate system centered by flexbox -->
+                <div id="stage">
+                    <div id="boundary-line"><div id="boundary-label">SCOPE</div></div>
+                    <div id="ptr-i" class="ptr"></div>
+                    <div id="ptr-j" class="ptr"></div>
+                    <!-- Blocks injected via JS -->
+                </div>
+            </div>
+        </section>
+
+        <section id="panel-b" class="panel">
+            <div class="panel-label">B: RECURSION_TREE</div>
+            <svg id="tree-svg">
+                <g id="tree-edges"></g>
+                <g id="tree-nodes"></g>
+            </svg>
+        </section>
+
+        <section id="panel-c" class="panel">
+            <div class="panel-label">C: EXEC_LOG</div>
+            <div id="log-container"></div>
+        </section>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const DELAY_MS = 1000;
+        const INITIAL_ARRAY = [1, 2, 3, 4];
+        
+        // --- GLOBAL STATE ---
+        let arrayState = [...INITIAL_ARRAY];
+        let isRunning = false;
+        
+        // --- DOM REFERENCES ---
+        const stage = document.getElementById('stage');
+        const container = document.getElementById('array-container'); // Wrapper
+        const boundary = document.getElementById('boundary-line');
+        const ptrI = document.getElementById('ptr-i');
+        const ptrJ = document.getElementById('ptr-j');
+        const logContainer = document.getElementById('log-container');
+        const svgNodes = document.getElementById('tree-nodes');
+        const svgEdges = document.getElementById('tree-edges');
+        const statusText = document.getElementById('status-text');
+        const btnInit = document.getElementById('btn-init');
+
+        // Dimensions
+        const BLOCK_W = 60;
+        const GAP = 20;
+
+        // --- UTILS ---
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        function log(msg, type = 'normal') {
+            const div = document.createElement('div');
+            div.classList.add('log-entry');
+            if (type === 'success') div.classList.add('log-success');
+            if (type === 'highlight') div.classList.add('highlight');
+            div.innerText = `> ${msg}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Clear Blocks
+            document.querySelectorAll('.block').forEach(b => b.remove());
+            
+            // Set Stage Width
+            // This ensures the pointers and blocks share a fixed coordinate system
+            const n = INITIAL_ARRAY.length;
+            const totalWidth = (n * BLOCK_W) + ((n - 1) * GAP);
+            stage.style.width = `${totalWidth}px`;
+
+            arrayState = [...INITIAL_ARRAY];
+
+            // Create Blocks
+            arrayState.forEach((val, idx) => {
+                const el = document.createElement('div');
+                el.classList.add('block');
+                el.innerText = val;
+                el.dataset.val = val;
+                // Position relative to stage 0
+                el.style.left = `${idx * (BLOCK_W + GAP)}px`;
+                stage.appendChild(el);
+            });
+
+            // Reset Pointers & Boundary
+            ptrI.style.opacity = '0';
+            ptrJ.style.opacity = '0';
+            updateBoundary(0);
+            
+            // Reset SVGs
+            svgNodes.innerHTML = '';
+            svgEdges.innerHTML = '';
+            logContainer.innerHTML = '';
+            
+            log("System Initialized.", 'highlight');
+        }
+
+        // No resize listener needed for block positions! 
+        // CSS Flexbox handles centering the #stage automatically.
+
+        // --- VISUALIZATION HELPERS ---
+
+        function getCenterOfSlot(index) {
+            // Returns the center pixel coordinate of a slot relative to the stage
+            const slotStart = index * (BLOCK_W + GAP);
+            return slotStart + (BLOCK_W / 2);
+        }
+
+        function getStartOfSlot(index) {
+            return index * (BLOCK_W + GAP);
+        }
+
+        function updateBoundary(index) {
+            // Boundary sits between index-1 and index
+            // Coordinate: Start of slot `index` minus half gap
+            const x = getStartOfSlot(index) - (GAP / 2);
+            boundary.style.left = `${x}px`;
+        }
+
+        function updatePointers(indexI, indexJ) {
+            // Anchor I
+            if (indexI !== null) {
+                ptrI.style.left = `${getCenterOfSlot(indexI)}px`;
+                ptrI.style.opacity = '1';
+            } else {
+                ptrI.style.opacity = '0';
+            }
+
+            // Candidate J
+            if (indexJ !== null) {
+                ptrJ.style.left = `${getCenterOfSlot(indexJ)}px`;
+                ptrJ.style.opacity = '1';
+            } else {
+                ptrJ.style.opacity = '0';
+            }
+        }
+
+        function setDimming(limitIndex) {
+            for(let i=0; i<INITIAL_ARRAY.length; i++) {
+                const val = arrayState[i];
+                const block = document.querySelector(`.block[data-val='${val}']`);
+                if (!block) continue;
+                
+                if (i < limitIndex) {
+                    block.classList.add('dimmed');
+                } else {
+                    block.classList.remove('dimmed');
+                }
+            }
+        }
+
+        function getBlockAt(index) {
+            const val = arrayState[index];
+            return document.querySelector(`.block[data-val='${val}']`);
+        }
+
+        async function visualSwap(idx1, idx2) {
+            const el1 = getBlockAt(idx1);
+            const el2 = getBlockAt(idx2);
+
+            el1.classList.add('highlight-i');
+            el2.classList.add('highlight-j');
+
+            if (idx1 === idx2) {
+                await sleep(DELAY_MS * 0.5);
+                el1.classList.remove('highlight-i');
+                el2.classList.remove('highlight-j');
+                return;
+            }
+
+            // Animate using Transforms
+            // We read current left styles which are set in pixels relative to stage
+            const currentLeft1 = parseFloat(el1.style.left);
+            const currentLeft2 = parseFloat(el2.style.left);
+            const dist = currentLeft2 - currentLeft1;
+
+            el1.style.transform = `translateX(${dist}px)`;
+            el2.style.transform = `translateX(${-dist}px)`;
+
+            await sleep(DELAY_MS);
+
+            // Logic Swap
+            [arrayState[idx1], arrayState[idx2]] = [arrayState[idx2], arrayState[idx1]];
+
+            // Snap properties
+            el1.style.transition = 'none';
+            el2.style.transition = 'none';
+            el1.style.left = `${currentLeft2}px`;
+            el2.style.left = `${currentLeft1}px`;
+            el1.style.transform = 'none';
+            el2.style.transform = 'none';
+
+            // Reflow
+            void el1.offsetWidth;
+
+            // Restore transitions
+            el1.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s, opacity 0.3s';
+            el2.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s, opacity 0.3s';
+
+            el1.classList.remove('highlight-i');
+            el2.classList.remove('highlight-j');
+        }
+
+        // --- TREE DRAWING ---
+        let nodeCounter = 0;
+        function drawNode(depth, parentId) {
+            const id = `node-${nodeCounter++}`;
+            const svgW = document.getElementById('panel-b').clientWidth;
+            
+            let cx = svgW / 2;
+            let cy = 30 + (depth * 40);
+
+            if (parentId) {
+                const parentEl = document.getElementById(parentId);
+                const pCx = parseFloat(parentEl.getAttribute('cx'));
+                const offset = (nodeCounter % 2 === 0) ? 25 : -25;
+                cx = pCx + offset + (Math.random() * 10 - 5);
+                cx = Math.max(20, Math.min(svgW - 20, cx));
+            }
+
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute('cx', cx);
+            circle.setAttribute('cy', cy);
+            circle.setAttribute('r', 5);
+            circle.setAttribute('id', id);
+            circle.classList.add('active');
+            svgNodes.appendChild(circle);
+
+            if (parentId) {
+                const parentEl = document.getElementById(parentId);
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute('x1', parentEl.getAttribute('cx'));
+                line.setAttribute('y1', parentEl.getAttribute('cy'));
+                line.setAttribute('x2', cx);
+                line.setAttribute('y2', cy);
+                line.setAttribute('id', `edge-${id}`);
+                svgEdges.appendChild(line);
+            }
+            return id;
+        }
+
+        function deactivateNode(id) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.classList.remove('active');
+                el.classList.add('backtracked');
+            }
+            const edge = document.getElementById(`edge-${id}`);
+            if(edge) edge.classList.add('backtracked');
+        }
+
+        // --- CORE LOGIC ---
+
+        async function startVisualization() {
+            if (isRunning) return;
+            isRunning = true;
+            btnInit.disabled = true;
+            statusText.innerText = "RUNNING SEQ";
+            
+            init();
+            nodeCounter = 0;
+
+            await permute(0, null);
+
+            updatePointers(null, null);
+            setDimming(0);
+            updateBoundary(0);
+            statusText.innerText = "COMPLETE";
+            btnInit.disabled = false;
+            isRunning = false;
+        }
+
+        async function permute(i, parentNodeId) {
+            // PHASE 1: SCOPE SETUP
+            setDimming(i);
+            updatePointers(i, null);
+            const nodeId = drawNode(i, parentNodeId);
+            updateBoundary(i);
+
+            await sleep(DELAY_MS * 0.5);
+
+            // PHASE 2: BASE CASE
+            if (i === arrayState.length - 1) {
+                updatePointers(null, null);
+                container.classList.add('success-flash');
+                setTimeout(() => container.classList.remove('success-flash'), 200);
+                
+                log(`[ ${arrayState.join(' ')} ] FOUND`, 'success');
+                await sleep(DELAY_MS);
+                
+                deactivateNode(nodeId);
+                return;
+            }
+
+            // PHASE 3: CANDIDATE LOOP
+            for (let j = i; j < arrayState.length; j++) {
+                
+                updatePointers(i, j);
+                await sleep(DELAY_MS * 0.5);
+
+                log(`Swap Anchor[${i}] <-> Scan[${j}]`);
+                await visualSwap(i, j);
+
+                const lockedBlock = getBlockAt(i);
+                lockedBlock.classList.add('locked');
+
+                updateBoundary(i + 1);
+                
+                await permute(i + 1, nodeId);
+
+                // BACKTRACK
+                lockedBlock.classList.remove('locked');
+                updateBoundary(i);
+                setDimming(i);
+                updatePointers(i, j);
+
+                log(`Backtrack: Undo Swap`);
+                await visualSwap(i, j);
+            }
+
+            if (i > 0) {
+                const prevBlock = getBlockAt(i - 1);
+                if(prevBlock) prevBlock.classList.remove('dimmed');
+            }
+
+            deactivateNode(nodeId);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

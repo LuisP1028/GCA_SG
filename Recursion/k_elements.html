@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pruned Decision Tree // Ditherpunk</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #33FF00;
+            --dim: #1a8000;
+            --alert: #33FF00; /* Monochromatic constraint: use patterns for alert, not red */
+            --font: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font);
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        /* Layout */
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        #canvas-wrapper {
+            flex: 7;
+            position: relative;
+            border-right: 2px solid var(--fg);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #hud {
+            flex: 3;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+        }
+
+        /* HUD Elements */
+        .panel-box {
+            border: 2px solid var(--fg);
+            padding: 10px;
+            position: relative;
+            background: var(--bg);
+            box-shadow: 4px 4px 0px var(--dim);
+        }
+
+        .panel-title {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: var(--bg);
+            padding: 0 5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed var(--dim);
+            padding-bottom: 4px;
+        }
+        .stat-row:last-child { border-bottom: none; }
+
+        .stat-val { font-weight: bold; }
+
+        /* The Meter */
+        #meter-container {
+            margin-top: 10px;
+        }
+        
+        #meter-bar {
+            height: 20px;
+            width: 100%;
+            border: 1px solid var(--fg);
+            display: flex;
+        }
+        
+        #meter-fill-pool { background: var(--fg); height: 100%; transition: width 0.3s; }
+        #meter-fill-needed { background: repeating-linear-gradient(45deg, var(--bg), var(--bg) 2px, var(--fg) 2px, var(--fg) 4px); height: 100%; transition: width 0.3s; }
+
+        #alert-box {
+            display: none;
+            margin-top: 10px;
+            background: var(--fg);
+            color: var(--bg);
+            text-align: center;
+            font-weight: bold;
+            padding: 5px;
+            animation: flash 0.2s infinite;
+        }
+
+        #log-console {
+            flex-grow: 1;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.4;
+            opacity: 0.8;
+            max-height: 300px;
+        }
+
+        .log-entry { margin-bottom: 4px; }
+        .log-entry::before { content: "> "; opacity: 0.5; }
+
+        /* CRT Overlay Effects */
+        #crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        @keyframes flash {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* Results Area */
+        #results-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .result-tag {
+            border: 1px solid var(--fg);
+            padding: 2px 6px;
+            font-size: 11px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="crt-overlay"></div>
+
+<div id="container">
+    <div id="canvas-wrapper">
+        <canvas id="treeCanvas"></canvas>
+    </div>
+
+    <aside id="hud">
+        <div class="panel-box">
+            <span class="panel-title">System Vars</span>
+            <div class="stat-row"><span>Population (N)</span><span class="stat-val">5</span></div>
+            <div class="stat-row"><span>Subset Size (K)</span><span class="stat-val">3</span></div>
+            <div class="stat-row"><span>Status</span><span class="stat-val" id="status-val">IDLE</span></div>
+        </div>
+
+        <div class="panel-box">
+            <span class="panel-title">Logic State</span>
+            <div class="stat-row"><span>Active Node</span><span class="stat-val" id="active-node">[]</span></div>
+            <div class="stat-row"><span>Needed</span><span class="stat-val" id="needed-val">-</span></div>
+            <div class="stat-row"><span>Next Candidate</span><span class="stat-val" id="candidate-val">-</span></div>
+            <div class="stat-row"><span>Pool (N-i+1)</span><span class="stat-val" id="pool-val">-</span></div>
+            
+            <div id="meter-container">
+                <div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:2px;">
+                    <span>POOL CAPACITY</span>
+                    <span>REQUIRED</span>
+                </div>
+                <div id="meter-bar">
+                    <div id="meter-fill-pool" style="width: 0%"></div>
+                    <div id="meter-fill-needed" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="alert-box">PRUNING TRIGGERED</div>
+        </div>
+
+        <div class="panel-box" style="flex-grow: 1; display: flex; flex-direction: column;">
+            <span class="panel-title">Trace Log</span>
+            <div id="log-console"></div>
+        </div>
+
+        <div class="panel-box">
+            <span class="panel-title">Collected</span>
+            <div id="results-area"></div>
+        </div>
+    </aside>
+</div>
+
+<script>
+/**
+ * DITHERPUNK ALGORITHMIC VISUALIZER
+ * ---------------------------------
+ * Uses standard Canvas API with procedural pattern generation
+ * to simulate 1-bit aesthetics.
+ */
+
+// --- CONFIGURATION ---
+const CONSTANTS = {
+    N: 5,
+    K: 3,
+    DELAY: 1000, // Speed of animation in ms
+    NODE_RADIUS: 20,
+    LEVEL_HEIGHT: 100
+};
+
+// --- GRAPHICS ENGINE ---
+const canvas = document.getElementById('treeCanvas');
+const ctx = canvas.getContext('2d');
+
+let nodes = []; // Flat array of all node objects
+let scaleX = 1;
+let width = 0;
+let height = 0;
+
+// Pattern Generators (Offscreen Canvases)
+function createPattern(type) {
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = 8;
+    pCanvas.height = 8;
+    const pCtx = pCanvas.getContext('2d');
+    pCtx.fillStyle = '#33FF00';
+
+    if (type === 'stripe') {
+        // Pruned/Dead pattern (Diagonal)
+        pCtx.beginPath();
+        pCtx.lineWidth = 2;
+        pCtx.strokeStyle = '#33FF00';
+        pCtx.moveTo(0,8); pCtx.lineTo(8,0);
+        pCtx.stroke();
+    } else if (type === 'dither') {
+        // Pending/Neutral (Checkerboard)
+        pCtx.fillRect(0,0,2,2);
+        pCtx.fillRect(4,4,2,2);
+    } 
+    return ctx.createPattern(pCanvas, 'repeat');
+}
+
+const patterns = {
+    stripe: createPattern('stripe'),
+    dither: createPattern('dither')
+};
+
+// Resize Handler
+function resize() {
+    width = document.getElementById('canvas-wrapper').offsetWidth;
+    height = document.getElementById('canvas-wrapper').offsetHeight;
+    canvas.width = width;
+    canvas.height = height;
+    draw(); // Redraw static state
+}
+window.addEventListener('resize', resize);
+
+// --- DRAWING LOGIC ---
+
+function drawNode(node) {
+    const x = node.x * width;
+    const y = 50 + (node.depth * CONSTANTS.LEVEL_HEIGHT);
+
+    // Draw Connector
+    if (node.parentId !== null) {
+        const parent = nodes.find(n => n.id === node.parentId);
+        if (parent) {
+            const px = parent.x * width;
+            const py = 50 + (parent.depth * CONSTANTS.LEVEL_HEIGHT);
+            
+            ctx.beginPath();
+            ctx.moveTo(px, py + CONSTANTS.NODE_RADIUS);
+            ctx.lineTo(x, y - CONSTANTS.NODE_RADIUS);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = node.status === 'pruned' ? '#1a8000' : '#33FF00';
+            
+            // Dashed line for pruned attempts
+            if (node.status === 'pruned') ctx.setLineDash([5, 5]);
+            else ctx.setLineDash([]);
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+
+    // Draw Node Circle
+    ctx.beginPath();
+    ctx.arc(x, y, CONSTANTS.NODE_RADIUS, 0, Math.PI * 2);
+
+    // Fill based on Status
+    ctx.fillStyle = '#000000'; // Default clear
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#33FF00';
+
+    if (node.status === 'active') {
+        ctx.fillStyle = '#33FF00'; // Solid Green
+        ctx.fill();
+        ctx.strokeStyle = '#33FF00';
+        // Pulse Effect Ring
+        ctx.beginPath();
+        ctx.arc(x, y, CONSTANTS.NODE_RADIUS + 4, 0, Math.PI * 2);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    } 
+    else if (node.status === 'success') {
+        ctx.fillStyle = '#33FF00';
+        ctx.fill();
+        // Double Border
+        ctx.beginPath();
+        ctx.arc(x, y, CONSTANTS.NODE_RADIUS - 4, 0, Math.PI * 2);
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+    } 
+    else if (node.status === 'pruned') {
+        ctx.fillStyle = patterns.stripe;
+        ctx.fill();
+        ctx.strokeStyle = '#1a8000'; // Dim green
+    } 
+    else if (node.status === 'pending') {
+        ctx.fillStyle = patterns.dither;
+        ctx.fill();
+    }
+
+    // Re-stroke outline for cleanness
+    ctx.beginPath();
+    ctx.arc(x, y, CONSTANTS.NODE_RADIUS, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = node.status === 'pruned' ? '#1a8000' : '#33FF00';
+    ctx.stroke();
+
+    // Draw Text (Last value in combo)
+    ctx.fillStyle = (node.status === 'active' || node.status === 'success') ? '#000000' : '#33FF00';
+    if (node.status === 'pruned') ctx.fillStyle = '#1a8000';
+    
+    ctx.font = 'bold 16px Courier New';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    let label = node.value;
+    if (node.value === 'ROOT') label = 'R';
+    
+    // If pruned, draw X
+    if (node.status === 'pruned') label = 'X';
+    
+    ctx.fillText(label, x, y);
+    
+    // If active, show current full list below
+    if (node.status === 'active') {
+        ctx.fillStyle = '#33FF00';
+        ctx.font = '12px Courier New';
+        ctx.fillText(`[${node.combination.join(',')}]`, x, y + CONSTANTS.NODE_RADIUS + 15);
+    }
+}
+
+function draw() {
+    // Clear Screen
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Draw Grid (Dither aesthetic)
+    ctx.strokeStyle = '#0f3300';
+    ctx.lineWidth = 1;
+    // Simple grid lines
+    for(let i=0; i<width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,height); ctx.stroke(); }
+    for(let j=0; j<height; j+=40) { ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(width,j); ctx.stroke(); }
+
+    nodes.forEach(drawNode);
+}
+
+// --- HUD HELPERS ---
+const ui = {
+    status: document.getElementById('status-val'),
+    active: document.getElementById('active-node'),
+    needed: document.getElementById('needed-val'),
+    candidate: document.getElementById('candidate-val'),
+    pool: document.getElementById('pool-val'),
+    log: document.getElementById('log-console'),
+    alert: document.getElementById('alert-box'),
+    results: document.getElementById('results-area'),
+    barPool: document.getElementById('meter-fill-pool'),
+    barNeeded: document.getElementById('meter-fill-needed')
+};
+
+function log(msg) {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerText = msg;
+    ui.log.appendChild(div);
+    ui.log.scrollTop = ui.log.scrollHeight;
+}
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// --- CORE ALGORITHM ---
+
+// Helper to calculate X position
+// We use a simple recursive partitioning logic for visualization layout
+function calculateX(depth, indexInLevel, totalInLevel, parentX, range) {
+    // Simple even spread for this demo:
+    // Root is 0.5. 
+    // Children split the parent's available width segment.
+    return parentX; // This is a placeholder, real logic in generate()
+}
+
+// Global counters for IDs
+let nodeIdCounter = 0;
+
+async function generateCombinations() {
+    resize(); // Init canvas size
+    nodes = []; // Reset
+    ui.results.innerHTML = '';
+    ui.status.innerText = "RUNNING";
+    log("Starting Generation N=5, K=3");
+
+    // Create Root
+    const rootNode = {
+        id: nodeIdCounter++,
+        parentId: null,
+        value: 'ROOT',
+        combination: [],
+        status: 'active',
+        depth: 0,
+        x: 0.5, // Center
+        widthRange: 1.0 // Full width
+    };
+    nodes.push(rootNode);
+    draw();
+
+    // Start Recursion
+    await recurse(1, [], rootNode);
+
+    ui.status.innerText = "COMPLETE";
+    ui.active.innerText = "-";
+    ui.candidate.innerText = "-";
+    rootNode.status = 'pending'; // Reset root visual
+    draw();
+}
+
+/**
+ * Recursive Function
+ * @param {number} offset - Next number to consider
+ * @param {Array} currentCombo - Current list
+ * @param {Object} visualParent - Parent Node object for coords
+ */
+async function recurse(offset, currentCombo, visualParent) {
+    
+    // Update Active Node Visuals
+    visualParent.status = 'active';
+    ui.active.innerText = `[${currentCombo.join(', ')}]`;
+    draw();
+    await wait(CONSTANTS.DELAY / 2);
+
+    // BASE CASE: Check if complete
+    if (currentCombo.length === CONSTANTS.K) {
+        log(`Success: [${currentCombo.join(', ')}]`);
+        visualParent.status = 'success';
+        
+        // Add to result UI
+        const tag = document.createElement('div');
+        tag.className = 'result-tag';
+        tag.innerText = `[${currentCombo.join(',')}]`;
+        ui.results.appendChild(tag);
+        
+        draw();
+        await wait(CONSTANTS.DELAY);
+        
+        visualParent.status = 'pending'; // Reset to neutral on backtrack
+        return;
+    }
+
+    const needed = CONSTANTS.K - currentCombo.length;
+    ui.needed.innerText = needed;
+
+    // Calculate width slice for children to prevent overlap
+    // available candidates = (N - offset + 1).
+    // Note: This layout logic is simplified for visual clarity.
+    // It divides the parent's width range by the number of loops we WILL do.
+    const loopCount = CONSTANTS.N - offset + 1;
+    const sliceWidth = visualParent.widthRange / (loopCount + 1); // +1 for padding
+    let startX = visualParent.x - (visualParent.widthRange / 2) + sliceWidth;
+
+    // LOOP
+    for (let i = offset; i <= CONSTANTS.N; i++) {
+        
+        // --- VISUALIZE CONSTRAINT CHECK ---
+        const poolRemaining = CONSTANTS.N - i + 1;
+        
+        ui.candidate.innerText = i;
+        ui.pool.innerText = poolRemaining;
+        
+        // Update Meter
+        const poolPct = Math.min(100, (poolRemaining / CONSTANTS.N) * 100);
+        const needPct = Math.min(100, (needed / CONSTANTS.N) * 100);
+        ui.barPool.style.width = `${poolPct}%`;
+        ui.barNeeded.style.width = `${needPct}%`;
+
+        // Determine X position for this potential child
+        // Shift X based on iteration index (i - offset)
+        const childX = startX + ((i - offset) * sliceWidth);
+
+        // PRUNING CHECK
+        if (poolRemaining < needed) {
+            log(`Check ${i}: Pool(${poolRemaining}) < Need(${needed}) -> PRUNE`);
+            ui.alert.style.display = 'block';
+            
+            // Draw Ghost Node (The Pruned One)
+            const ghostNode = {
+                id: nodeIdCounter++,
+                parentId: visualParent.id,
+                value: i,
+                combination: [], 
+                status: 'pruned',
+                depth: visualParent.depth + 1,
+                x: childX,
+                widthRange: sliceWidth
+            };
+            nodes.push(ghostNode);
+            draw();
+            
+            await wait(CONSTANTS.DELAY * 1.5); // Pause to see the failure
+            
+            ui.alert.style.display = 'none';
+            // Pruning stops this loop branch immediately, and actually 
+            // since pool decreases as i increases, we can stop the loop entirely 
+            // for sorted inputs. Logic constraint says: if remaining < needed, break.
+            break; 
+        }
+
+        ui.alert.style.display = 'none';
+        log(`Check ${i}: OK. Recursing...`);
+
+        // Create Real Node
+        const newNode = {
+            id: nodeIdCounter++,
+            parentId: visualParent.id,
+            value: i,
+            combination: [...currentCombo, i],
+            status: 'pending',
+            depth: visualParent.depth + 1,
+            x: childX,
+            widthRange: sliceWidth
+        };
+        nodes.push(newNode);
+        draw();
+
+        await wait(CONSTANTS.DELAY / 2);
+
+        // RECURSE
+        await recurse(i + 1, [...currentCombo, i], newNode);
+
+        // BACKTRACK VISUALS
+        ui.active.innerText = `[${currentCombo.join(', ')}]`; // Restore parent active
+        visualParent.status = 'active';
+        ui.needed.innerText = needed; // Restore needed count
+        draw();
+        log(`Backtracking to [${currentCombo}]`);
+    }
+
+    // Done with this branch
+    visualParent.status = 'pending';
+    draw();
+}
+
+// Start
+window.onload = () => {
+    resize();
+    setTimeout(generateCombinations, 1000);
+};
+
+</script>
+</body>
+</html>

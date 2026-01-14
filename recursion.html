@@ -148,14 +148,79 @@
         <details class="section">
             <summary>1. Divide & Conquer</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                <p>RECURSION: The power of recursion evidently lies in the possibility of defining an infinite set of objects by a finite statement.</p>
+                <p>It is defined by a self-referential function containing two logical components: a base case (a direct solution) and a step ensuring convergence toward that end.</p>
+                
+                <div class="subsection">
+                    <div class="subsection-title">1. The Termination Condition (The Base Case)</div>
+                    <p>Also known as the stopping condition, this acts as the axiomatic truth of your algorithm. It defines the smallest valid input state (such as an empty set or leaf node), preventing infinite loops.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">2. The Decomposition (The Recursive Step)</div>
+                    <p>State space reduction. You isolate a specific element and apply the function to the remaining, strictly smaller sub-problem. This relies on the "inductive hypothesis"—the logical assumption that the recursive call will correctly solve the reduced input, allowing you to treat the future result as a known quantity.</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">3. The Local Computation (The Atomic Unit)</div>
+                    <p>This is the discrete unit of work executed within the current stack frame. It represents the immediate logic applied to the isolated element (e.g., evaluating a condition or performing an arithmetic operation).</p>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">4. The Synthesis (The Aggregation)</div>
+                    <p>As the call stack unwinds, this step performs the "inductive step." It aggregates the return value of the solved sub-problem with the result of your local computation.</p>
+                </div>
             </div>
         </details>
 
         <details class="section">
             <summary>2. Backtracking</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                <div class="subsection">
+                    <div class="subsection-title">[RECURSIVE BACKTRACKING] GENERATE EVERY PERMUTATION FOR A GIVEN ARRAY</div>
+                    <p>The goal is to take a list of unique numbers (an array of distinct integers) and produce every possible ordering (permutation) of those numbers. If the input has n numbers, you must find all n! (n-factorial) unique arrangements.</p>
+                    <p>1 Recursive Backtracking (Optimal Solution A): A "divide and conquer" strategy where you fix the first number, then recursively permute the remaining numbers. This involves swapping elements to place them in the "fixed" position, recursing, and then swapping them back (backtracking) to restore the array to its previous state.</p>
+                </div>
+                
+                <p><strong>THE HOW</strong></p>
+                
+                <p><strong>Step 1: Initialize the State</strong><br>
+                Create a standard list, to hold the final output. Define a recursive helper function, directed_permutations(i), where i represents the current depth. Current depth refers to the current index (i) we’re working on.</p>
+                <ul>
+                    <li>Think of i as the specific chair we are currently trying to fill.</li>
+                    <li>1 We put a number in Chair i.</li>
+                    <li>2 We move to Chair i+1 (recurse) to fill the rest.</li>
+                    <li>3 When we return, we backtrack (remove the number from Chair i).</li>
+                    <li>4 We pick a different number for that same Chair i.</li>
+                    <li>So i marks the specific spot we are working on, while the loop tries different values for it.</li>
+                </ul>
+
+                <p><strong>Step 2: Define the Base Case</strong><br>
+                The base case just means: "Path complete. Save it, then back up to find the next one."<br>
+                Inside the helper function, check if i equals len(A) - 1.</p>
+                <ul>
+                    <li>Logic: If the index i points to the last element, all preceding positions are fixed. The array now represents a complete, valid permutation.</li>
+                    <li>Action: Create a copy of the current state of A (a snapshot) and append it to result.</li>
+                </ul>
+
+                <p><strong>Step 3: Iterate Through Candidates (Branching)</strong><br>
+                If the base case is not met, initiate a loop with variable j running from i to len(A) - 1.</p>
+                <ul>
+                    <li>j is the selection pointer: it scans candidates from i to end, so we can swap each into slot i to test it.</li>
+                    <li>Logic: i is the position we are filling. j represents the index of every available candidate in the sub-array that can be moved into position i.</li>
+                </ul>
+
+                <p><strong>Step 4: Mutate State (The Swap)</strong><br>
+                Inside the loop, swap the values at A[i] and A[j].<br>
+                We are tentatively "fixing" the value originally at j into position i. By doing this, we define the starting number for this specific branch of the permutation tree.</p>
+
+                <p><strong>Step 5: Recursive Descent (The Sub-problem)</strong><br>
+                Call directed_permutations(i + 1).<br>
+                Think of it as saying: "I have decided the number at index i is fixed. Now, you go figure out every possible way to arrange the remaining numbers behind it."</p>
+
+                <p><strong>Step 6: Backtrack (State Restoration)</strong><br>
+                Backtracking ensures you don't lose track of which state you have already processed.<br>
+                Immediately after the recursive call returns, swap A[i] and A[j] again.</p>
             </div>
         </details>
 
