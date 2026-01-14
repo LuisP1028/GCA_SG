@@ -343,6 +343,50 @@
         </div>
     </details>
 
+    <!-- ============================================== -->
+    <!-- PART IV: SEARCHING -->
+    <!-- ============================================== -->
+    <details class="part">
+        <summary>Part IV: Searching</summary>
+        <div class="part-content" id="container-searching">
+            <span class="focus-line">Focus: Binary Search, K-th Element, Caching</span>
+            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
+        </div>
+    </details>
+
+    <!-- ============================================== -->
+    <!-- PART V: GREEDY -->
+    <!-- ============================================== -->
+    <details class="part">
+        <summary>Part V: Greedy Algorithms</summary>
+        <div class="part-content" id="container-greedy">
+            <span class="focus-line">Focus: Intervals, Invariants, Optimization</span>
+            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
+        </div>
+    </details>
+
+    <!-- ============================================== -->
+    <!-- PART VI: RECURSION -->
+    <!-- ============================================== -->
+    <details class="part">
+        <summary>Part VI: Recursion</summary>
+        <div class="part-content" id="container-recursion">
+            <span class="focus-line">Focus: Backtracking, Divide & Conquer, DP</span>
+            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
+        </div>
+    </details>
+
+    <!-- ============================================== -->
+    <!-- PART VII: STRINGS -->
+    <!-- ============================================== -->
+    <details class="part">
+        <summary>Part VII: Strings</summary>
+        <div class="part-content" id="container-strings">
+            <span class="focus-line">Focus: Palindromes, Parsing, Substrings</span>
+            <div class="loading-txt">[INITIALIZING DATA STREAM...]</div>
+        </div>
+    </details>
+
 </div>
 
 <!-- VISUALIZATION VIEWPORT CONTAINER -->
@@ -401,13 +445,17 @@
         }
     }
 
-    // Load the three parts
+    // Load all parts
     // Note: This requires the files to be hosted (GitHub Pages works perfectly)
     // Local file:// protocol will block this due to CORS
     document.addEventListener("DOMContentLoaded", () => {
         loadPart('arrays.html', 'container-arrays');
         loadPart('hash.html', 'container-hash');
         loadPart('sorting.html', 'container-sorting');
+        loadPart('searching.html', 'container-searching');
+        loadPart('greedy.html', 'container-greedy');
+        loadPart('recursion.html', 'container-recursion');
+        loadPart('strings.html', 'container-strings');
     });
 
 
