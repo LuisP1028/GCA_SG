@@ -148,21 +148,269 @@
         <details class="section">
             <summary>1. Palindromes & Anagrams</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">PALINDROMIC STRINGS</div>
+                    <p>A sequence of characters that reads the exact same forwards and backwards.</p>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Step 1: Initialization (Defining the State Space)</strong><br>
+                    We define the boundaries of our search. We establish two separate variables (pointers):
+                    <br>• Left Index (i): Initialized to 0 (the start of the string).
+                    <br>• Right Index (j): Initialized to len(s) - 1 (the very last character of the string).</p>
+                    <p><strong>Step 2: The Convergence Loop</strong><br>
+                    We begin a loop that continues only as long as the Left Index is numerically smaller than the Right Index (i < j).</p>
+                    <p><strong>Step 3: Left-Side Sanitization (The Inner Scan)</strong><br>
+                    At the start of every major loop iteration, we must ensure the Left Index points to meaningful data. We enter a conditional "while" loop to check the character at the current Left Index.</p>
+                    <ul>
+                        <li>The Check: Is the character at s[i] non-alphanumeric? (Is it punctuation or whitespace?)</li>
+                        <li>The Action: If it is non-alphanumeric, it is irrelevant. We increment the Left Index (i) by 1 to skip it.</li>
+                        <li>The Invariant: We repeat this action strictly while i remains less than j. This bounds check prevents the Left Index from running off the end of the string or passing the Right Index entirely.</li>
+                    </ul>
+                    <p><strong>Step 4: Right-Side Sanitization (The Inner Scan)</strong><br>
+                    Once the Left Index is settled on a valid character (or has met the Right Index), we perform the mirror operation for the Right Index.</p>
+                    <ul>
+                        <li>The Check: Is the character at s[j] non-alphanumeric?</li>
+                        <li>The Action: If it is non-alphanumeric, we decrement the Right Index (j) by 1 to skip it.</li>
+                        <li>The Invariant: We repeat this action strictly while i is still less than j.</li>
+                    </ul>
+                    <p><strong>Step 5: Normalization and Comparison (The Validity Test)</strong><br>
+                    At this point, both i and j are pointing to valid, alphanumeric characters. We must now determine if they are equivalent.</p>
+                    <ul>
+                        <li>Normalization: We convert both characters to the same case (usually lowercase) to ignore capitalization differences.</li>
+                        <li>Comparison: We compare the normalized value at s[i] with the normalized value at s[j].</li>
+                        <li>Short-Circuit Logic: If the values are not equal, the definition of a palindrome is broken. We verify the string is invalid immediately and return False. We do not process the rest of the string.</li>
+                    </ul>
+                    <p><strong>Step 6: Convergence (Advancing the State)</strong><br>
+                    If the characters at Step 5 were equal, the string is still potentially a palindrome. We must now narrow our search window to check the next pair of characters.</p>
+                    <ul>
+                        <li>Action: We increment the Left Index (i + 1) and decrement the Right Index (j - 1). This moves both pointers inward toward the center of the string.</li>
+                    </ul>
+                    <p><strong>Step 7: Termination (The Default Success)</strong><br>
+                    The outer loop continues until the indices meet or cross (i.e., when i is no longer less than j).</p>
+                    <ul>
+                        <li>Logic: If the code reaches this point, it means the indices successfully traversed the entire string without ever triggering the "Short-Circuit" in Step 5.</li>
+                        <li>Result: We return True. The string has been verified as a palindrome.</li>
+                    </ul>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>2. Pattern Matching</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">REPLACE AND REMOVE [Two Pass Algorithm]</div>
+                    <p>The problem asks you to modify a character array within its existing memory footprint (in-place). You must iterate through the array to delete all instances of the character 'b' and replace every instance of the character 'a' with two 'd's. The array has sufficient physical capacity to hold the resulting longer string</p>
+                    <p>The optimal solution utilizes a two-pass algorithm.</p>
+                    <ol>
+                        <li>Pass One (Forward - "Filter and Count"):<br>Iterate from the start to the end. Remove 'b's by shifting valid characters to the left (compacting the array) and count the number of 'a's to calculate the final required length.</li>
+                        <li>Pass Two (Backward - "Expand and Substitute"):<br>Iterate from the end of the compacted data backwards. Move characters to their final positions. If the character is 'a', write two 'd's; otherwise, copy the character. This backward approach prevents the expansion of 'a' into 'dd' from overwriting subsequent characters that have not yet been moved.</li>
+                    </ol>
+                    <p><strong>THE HOW: EXPANDED</strong></p>
+                    <p><strong>Phase 1: The Compaction Pass (Forward Iteration)</strong><br>
+                    Objective: Eliminate 'b's to create a dense block of valid characters and calculate the necessary storage for the next phase.</p>
+                    <ol>
+                        <li>Initialize Pointers:
+                            <ul>
+                                <li>Create a Read Pointer (to scan the input) and a Write Pointer (to place valid characters). Both start at the beginning of the array.</li>
+                                <li>(Read Pointer): Moves through every single slot to inspect the data.</li>
+                                <li>(Write Pointer): Marks the position where the next valid character belongs. It only moves after it successfully stores something.</li>
+                                <li>Initialize a counter to track the Occurrence Count of the character 'a'.</li>
+                            </ul>
+                        </li>
+                        <li>Filter and Compact:
+                            <ul>
+                                <li>Move the Read Pointer forward through each slot of the array.</li>
+                                <li>Conditional Check: If the character at the Read Pointer is not 'b', copy it to the slot at the Write Pointer. Then, advance the Write Pointer.</li>
+                                <li>Deletion Logic: If the character is 'b', do nothing. By not advancing the Write Pointer, the 'b' is effectively skipped and will be overwritten.
+                                    <ul>
+                                        <li>Instead of deleting characters in place, we're just not appending them.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>Accumulate Metadata:
+                            <ul>
+                                <li>During this same scan, every time the Read Pointer encounters an 'a', increment the Occurrence Count.</li>
+                            </ul>
+                        </li>
+                        <li>End State:
+                            <ul>
+                                <li>The array is now compacted. All valid characters (including 'a's) are packed contiguously at the start. The Write Pointer currently sits at the end of this valid block.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    <p><strong>Phase 2: The Expansion Pass (Backward Iteration)</strong><br>
+                    Objective: Expand 'a's into 'dd's. We work backward to ensure we process data before we overwrite it (Collision Avoidance).</p>
+                    <ol>
+                        <li>Calculate Final Dimensions:<br>Calculate the total length by adding the count of 'a's to the current size. Position the Read Pointer at the end of the compacted data, and the Write Pointer at the very end of the new total length.
+                            <ul>
+                                <li>The write pointer’s position is calculated with the use of frequency counts of ‘a’ + current array length of valid data</li>
+                                <li>The 'a' is already counted once in the current length. 'dd' adds only one extra character. So we add 1 (the increase), not 2, for each 'a'.</li>
+                            </ul>
+                        </li>
+                        <li>Iterate Backward:
+                            <ul>
+                                <li>Loop until the Read Pointer reaches the start of the array.</li>
+                            </ul>
+                        </li>
+                        <li>Expand or Copy:
+                            <ul>
+                                <li>Expansion Logic: If the character at the Read Pointer is 'a', write 'd' and 'd' at the Write Pointer and the slot before it. Move the Write Pointer back by two.</li>
+                                <li>Copy Logic: If the character is not 'a', simply copy it to the Write Pointer. Move the Write Pointer back by one.</li>
+                            </ul>
+                        </li>
+                        <li>Final Output:
+                            <ul>
+                                <li>Return the New Logical Size. The array has now been mutated in-place: 'b's are gone, and 'a's are expanded, with no data lost to overwriting.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">REVERSE WORDS IN A SENTENCE [DOUBLE REVERSAL]</div>
+                    <p>We need to take a sentence (a mutable sequence of characters) and rearrange the words so the last word becomes the first, the second-to-last becomes the second, and so on.</p>
+                    <p>The strategy rundown:<br>
+                    Reversing the entire data structure moves the words to their correct relative areas, but leaves the words themselves backward. We then iterate through the sentence and flip each individual word back to its correct forward readability.</p>
+                    <ol>
+                        <li>Total Inversion: The state of the entire system is inverted.</li>
+                        <li>Linear Scanning: The system is traversed from index 0 to (n)</li>
+                        <li>Boundary Detection: The scanner looks for the Sentinel (space).</li>
+                        <li>Segmented Inversion: When a boundary is found, the specific segment (word) defined by the previous and current pointers is inverted again.</li>
+                    </ol>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Phase 1: The Global Transposition</strong></p>
+                    <p><strong>Step 1:</strong><br>
+                    We receive s, a mutable bytearray. <strong>Step 2:</strong> We apply a reverse() operation to the entire array.</p>
+                    <ul>
+                        <li>Logic: This places the last word in the first word's memory block and the first word in the last word's memory block.</li>
+                        <li>Current State: The words are in the correct relative positions (Macro-Order), but the characters inside every word are backward (Micro-Order)
+                            <ul>
+                                <li>Example: "ram is costly" becomes "yltsoc si mar".</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p><strong>Phase 2: The Iterative Correction</strong></p>
+                    <p><strong>Step 3:</strong><br>
+                    We initialize a pointer, start, at index 0. We enter a loop to scan the bytearray.</p>
+                    <p><strong>Step 4:</strong><br>
+                    Within the loop, we search for the next whitespace delimiter (b' ') starting from our current start position. We assign this index to end.</p>
+                    <p><strong>Step 5: Conditional Branch (The Word Exists):</strong><br>
+                    If a space is found (meaning end is not -1):</p>
+                    <ul>
+                        <li>We have identified a word located between start and end - 1.</li>
+                        <li>We call reverse_range on this specific segment.</li>
+                        <li>Action: This flips the characters of just that word. "yltsoc" becomes "costly".</li>
+                        <li>Update: We advance the start pointer to end + 1 (skipping the space) to prepare for the next word.</li>
+                    </ul>
+                    <p><strong>Step 6: The loop ends:</strong><br>
+                    If no space is found (meaning end is -1), we have reached the final segment of the array. We break the loop.</p>
+                    <p><strong>FINALLY:</strong></p>
+                    <p><strong>Step 7:</strong> The loop logic relies on finding a space after a word. The very last word in the sentence usually does not have a trailing space. Therefore, the loop breaks before processing the last word.</p>
+                    <ul>
+                        <li>Action: We invoke reverse_range one final time.</li>
+                        <li>Range: From the current start pointer to the very end of the array (len(s) - 1).</li>
+                        <li>Result: The final word, "mar", is reversed to "ram".</li>
+                    </ul>
+                </div>
+
             </div>
         </details>
 
         <details class="section">
             <summary>3. Parsing & Formatting</summary>
             <div class="section-content">
-                <!-- Placeholder -->
+                
+                <div class="subsection">
+                    <div class="subsection-title">INTERCONVERT STRINGS AND INTEGERS</div>
+                    <p><strong>Part 1: Integer to String</strong><br>
+                    We convert the number backward, extracting one digit at a time starting from the ones place.</p>
+                    <ol>
+                        <li>Handle the Sign If the number is negative, record that fact and convert the number to positive so the math is simpler.</li>
+                        <li>Extract Digits Use the modulo operator (x % 10) to isolate the last digit.</li>
+                        <li>Convert to Character Transform the single digit (0-9) into its character representation (e.g., chr(ord('0') + digit)).</li>
+                        <li>Store Append this character to a list. We use a list because adding to the end is computationally fast.</li>
+                        <li>Shift Divide the number by 10 (x // 10) to remove the digit you just processed. Repeat until the number hits 0.</li>
+                        <li>Finalize Since we processed the last digit first, our list is backward. Reverse the list, join it into a string, and re-add the negative sign if needed.</li>
+                    </ol>
+                    <p>Example: We process the number backward. For 347:</p>
+                    <ul>
+                        <li>%10 → Extract 7, add to list ['7']</li>
+                        <li>Shift: 347 // 10 → 34</li>
+                        <li>%10 → Extract 4, add to list ['7', '4']</li>
+                        <li>Shift: 34 // 10 → 3</li>
+                        <li>%10 → Extract 3, add to list ['7', '4', '3']</li>
+                    </ul>
+                    <p><strong>Part 2: String to Integer [HORNER’S METHOD]</strong><br>
+                    We build the number forward, reading from left to right.</p>
+                    <ol>
+                        <li>Check Sign Look at the first character. If it is '−', mark the result as negative and begin processing at the second character.</li>
+                        <li>Accumulate Initialize a variable total = 0.</li>
+                        <li>Loop For each digit character in the string: • Shift left: total ← total × 10 • Add: total ← total + (current character as integer)</li>
+                        <li>To convert "314", start with a total of 0. Read from left to right. For each new digit, multiply the total by 10 to “shift” the existing numbers to the left, then add the new digit.
+                            <br>a. Digit '3': Shift: 0 × 10 = 0 Add 3 Total: 3
+                            <br>b. Digit '1': Shift: 3 × 10 = 30 Add 1 Total: 31
+                            <br>c. Digit '4': Shift: 31 × 10 = 310 Add 4 Total: 314</li>
+                        <li>Result If the original string began with '−', apply the negative sign to the final total.</li>
+                    </ol>
+                </div>
+
+                <div class="subsection">
+                    <div class="subsection-title">IMPLEMENTING RUN LENGTH ENCODING</div>
+                    <p>Run-Length Encoding (RLE) is a lossless data compression algorithm. It reduces the size of data by replacing consecutive repeating characters with a single instance of that character and a count of how many times it repeats.</p>
+                    <p>The problem requires two distinct operations:</p>
+                    <ol>
+                        <li>Compression (Encoding): traversing a raw string (e.g., "AAA") and converting it into a serialized format consisting of a repetition count followed by the character (e.g., "3A").</li>
+                        <li>Decompression (Decoding): Parsing a serialized string (e.g., "12B") to reconstruct the original sequence (e.g., "BBBBBBBBBBBB").</li>
+                    </ol>
+                    <p><strong>STEP-BY-STEP</strong></p>
+                    <p><strong>THE ENCODER</strong></p>
+                    <ol>
+                        <li>Initialization:
+                            <ul>
+                                <li>result (list): The buffer for our output strings.</li>
+                                <li>count (integer): The counter for the current run. It starts at 1 because if a character exists, we have at least one of them.</li>
+                            </ul>
+                        </li>
+                        <li>Iteration with Look-Behind:
+                            <ul>
+                                <li>We iterate using an index i from 1 up to len(s) (inclusive).</li>
+                                <li>To know when a group of identical items ends, you check the item behind you.</li>
+                            </ul>
+                        </li>
+                        <li>Comparison (Checking for end):<br>To see if the current run has ended, check:
+                            <ul>
+                                <li>i == len(s): We have reached the boundary (end of string).</li>
+                                <li>OR</li>
+                                <li>s[i] != s[i - 1]: The current character is different from the previous character (signal change).</li>
+                            </ul>
+                        </li>
+                        <li>Handling the State:<br>If the character changes: The previous group is finished. Save the count and that previous character (e.g., "3a"), then reset the count to 1 for the new letter.<br>If the character is the same: The group is still growing. Just add 1 to the count.</li>
+                    </ol>
+                    <p><strong>THE DECODER</strong></p>
+                    <ol>
+                        <li>Initialization: We establish two state variables:
+                            <ul>
+                                <li>count (integer): An accumulator for the numeric value of the repetition, initialized to 0.</li>
+                                <li>result (list): A buffer to store the expanded string segments.</li>
+                            </ul>
+                        </li>
+                        <li>Iteration: We loop through every character c in the input strings</li>
+                        <li>The Logical Bifurcation (DIGITS VS LETTERS):</li>
+                    </ol>
+                    <ul>
+                        <li>If digit: We are currently parsing the repetition count.<br>Process: We must update the count accumulator using Base-10 reconstruction.
+                            <ul>
+                                <li>Why: We are building a count. We use Base 10 logic because the computer reads "53" as two separate characters: '5' then '3'.</li>
+                            </ul>
+                        </li>
+                        <li>If letter: We have encountered the entity to be repeated. This signals the end of the current token. We perform string multiplication (c * count) to create the run. We append this run to the result list.</li>
+                    </ul>
+                </div>
+
             </div>
         </details>
 
