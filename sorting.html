@@ -428,7 +428,18 @@
                     </span>
                     <p>Find the smallest positive integer that cannot be formed as the sum of a subset.</p>
                     <ol>
-                        <li><strong
+                        <li><strong>Sort the Input:</strong> Sort the array in ascending order. This ensures we expand our range of constructible values efficiently from the bottom up.</li>
+                        <li><strong>Initialize the Invariant:</strong> Set <code>max_constructible</code> to 0. This variable tracks the largest value ensuring continuous values in the range <code>[0, V]</code> are constructible without gaps.</li>
+                        <li><strong>Gapping & Expanding:</strong> Iterate through the sorted numbers (let's call the current number <code>i</code>):
+                            <ul>
+                                <li><strong>Gapping:</strong> If <code>i > max_constructible + 1</code>, we have found a gap. The next number we need (max + 1) cannot be formed.</li>
+                                <li><strong>Expanding:</strong> If <code>i &le; max_constructible + 1</code>, update <code>max_constructible</code> to <code>max_constructible + i</code>, extending the continuous range.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Result:</strong> The answer is <code>max_constructible + 1</code>.</li>
+                    </ol>
+                    <p><em>Use Case: Infrastructure resource allocation (e.g., cutting stock). It helps optimize limited discrete resources to cover continuous ranges of demand sizes efficiently, minimizing gaps or waste.</em></p>
+                </div>
 
         <!-- ============================================== -->
         <!-- SECTION 4: SORTING THEORY -->
