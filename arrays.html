@@ -275,10 +275,12 @@ Analogy: Reading a Map
                     <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/permutations_array.html'; document.querySelector('.retro-viewport').classList.add('active');">
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
-                    <p>Shuffling a list according to instructions (P) without an in-memory buffer.</p>
-                    <p><strong>Cyclic Permutation:</strong> Disjoint cycles (e.g., 0->2->1->0).</p>
-                    <p><strong>Anchor (i):</strong> Main loop index acting as a "buffer."</p>
-                    <p><strong>Sentinel:</strong> Mark visited spots by subtracting array length from the index (since indices are non-negative).</p>
+                    <p>Shuffle a list of items (A) according to specific instructions (P) without using an in-memory buffer.</p>
+                    <p><strong>Cyclic Permutation:</strong> A chain of moves that loops back to the start (e.g., Position 0 &rarr; 2 &rarr; 1 &rarr; 0). All permutations are made of these disjoint cycles.</p>
+                    <p><strong>In-Place:</strong> Modifying the input structure directly without using significant extra memory (O(1) space).</p>
+                    <p><strong>Anchor (i):</strong> The main loop index moves sequentially (0, 1, 2…) through the list. It acts as a "holding buffer" for displaced items to ensure every position is processed. We cycle elements through <em>i</em> until the specific cycle closes.</p>
+                    <p><strong>Cycle Pointer (next):</strong> A variable that jumps non-sequentially around the array. It follows the chain of instructions, tracing the specific path of a loop until it returns to the start.</p>
+                    <p><strong>Sentinel:</strong> Use a sentinel to mark visited spots by subtracting the array length from the index value. Since array indices are non-negative, this allows state tracking without extra storage.</p>
                 </div>
 
                 <div class="subsection">
