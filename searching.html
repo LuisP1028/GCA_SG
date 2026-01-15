@@ -214,9 +214,16 @@
                 </div>
 
                 <div class="subsection">
-                    <div class="subsection-title">SEARCHING CYCLICALLY SORTED ARRAYS</div>
+                    <div class="subsection-title">
+                        SEARCHING CYCLICALLY SORTED ARRAYS
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Searching/cyclically_sorted.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>Instead of testing relationship between midpoint and target, test the relationship between the midpoint value and the rightmost boundary value.</p>
-                    <p>A cyclically sorted array contains distinct numbers originally sorted ascending but rotated. It increases, drops to the minimum, then increases again. Find the index of the smallest element efficiently.</p>
                     <p>Divide and Conquer principle. Because the array is partially sorted, we can look at the middle element and the last element to determine which half of the array contains the anomaly</p>
                     <p><strong>THE HOW</strong></p>
                     <p><strong>Step 1: Initialize Boundaries</strong><br>
