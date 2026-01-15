@@ -164,7 +164,8 @@
                             </svg>
                         </button>
                     </span>
-                    <p>When sliding the window and cutting it into chunks, the sequence of chunks does not matter. We only care that the chunks are exactly the right size and that the collection (multiset) contains exactly the same words with exactly the same counts as the given list.</p>
+                    <p>When sliding the window and cutting it into chunks, it finds where all words occur together contiguously. They must form one solid block (no gaps), though the order inside that block does not matter.</p>
+                    <p>Determine window size with: Word count x Word Length </p>
                     <p><strong>The Core Pattern:</strong> Fixed unit size → target multiset (frequency map) → sliding window of exact total size → partition into uniform units → compute observed multiset → check exact equality.</p>
                     <ol>
                         <li><strong>Determine the fixed unit size:</strong> Measure the length of each individual element (the "slice size").</li>
