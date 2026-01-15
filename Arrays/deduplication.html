@@ -13,8 +13,11 @@
             --term-green: #00FF41;
             --term-dim: #003B00;
             --term-highlight: #CDFFCD;
-            --shadow: 4px 4px 0px var(--term-dim);
-            --dither-pattern: repeating-linear-gradient(45deg, var(--term-dim) 25%, transparent 25%, transparent 75%, var(--term-dim) 75%, var(--term-dim)), repeating-linear-gradient(45deg, var(--term-dim) 25%, #050505 25%, #050505 75%, var(--term-dim) 75%, var(--term-dim));
+            --shadow: 0.25rem 0.25rem 0px var(--term-dim);
+            
+            /* Responsive sizes */
+            --cell-size: clamp(3rem, 8vw, 5rem); 
+            --font-base: clamp(1rem, 2vw, 1.4rem);
         }
 
         * {
@@ -28,17 +31,17 @@
             background-color: var(--bg);
             color: var(--term-green);
             font-family: 'VT323', monospace;
-            height: 100vh;
+            height: 100dvh; /* Dynamic viewport height for mobile */
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            font-size: 1.2rem;
+            font-size: var(--font-base);
         }
 
         /* --- CRT OVERLAY EFFECT --- */
         .scanlines {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            inset: 0;
             background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
             background-size: 100% 4px;
             pointer-events: none;
@@ -48,14 +51,14 @@
 
         /* --- LAYOUT --- */
         .container {
-            max-width: 1200px;
             width: 100%;
-            margin: 0 auto;
+            height: 100%;
             padding: 1rem;
-            flex-grow: 1;
             display: flex;
             flex-direction: column;
             gap: 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
         header {
@@ -64,58 +67,80 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
+            flex-wrap: wrap;
         }
 
-        h1 { margin: 0; text-transform: uppercase; font-size: 2rem; letter-spacing: 2px; text-shadow: 2px 2px var(--term-dim); }
-        .meta { font-size: 1rem; opacity: 0.8; }
+        h1 { 
+            margin: 0; 
+            text-transform: uppercase; 
+            font-size: clamp(1.5rem, 4vw, 2.5rem); 
+            letter-spacing: 2px; 
+            text-shadow: 2px 2px var(--term-dim); 
+            line-height: 1;
+        }
+        
+        .meta { 
+            font-size: 0.9em; 
+            opacity: 0.8; 
+            text-align: right;
+        }
 
         /* --- VISUALIZATION AREA --- */
         .viz-stage {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            justify-content: center; /* Vertically center */
+            align-items: flex-start; /* Horizontal scroll handling */
             position: relative;
             border: 2px solid var(--term-dim);
             background: rgba(0, 59, 0, 0.1);
-            overflow-x: auto; /* Handle small screens */
+            overflow-x: auto; 
+            overflow-y: hidden;
             padding: 2rem 0;
+        }
+
+        /* The scrollable track container */
+        .track-container {
+            min-width: 100%;
+            display: flex;
+            justify-content: center; /* Center array if it fits on screen */
+            padding: 0 2rem;
         }
 
         .array-track {
             display: flex;
-            gap: 4px;
+            gap: 0.5rem;
             position: relative;
-            padding: 40px 0; /* Space for pointers */
+            padding: 3rem 0; /* Space for pointers */
         }
 
         /* CELL STYLES */
         .cell {
-            width: 60px;
-            height: 60px;
+            width: var(--cell-size);
+            height: var(--cell-size);
+            flex-shrink: 0; /* Prevent squishing */
             border: 2px solid var(--term-green);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.5em;
             font-weight: bold;
             position: relative;
             background-color: var(--bg);
-            transition: all 0.3s ease;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
             box-shadow: var(--shadow);
         }
 
         .cell .index-label {
             position: absolute;
-            bottom: -25px;
+            bottom: -1.5rem;
             left: 0;
             width: 100%;
             text-align: center;
-            font-size: 0.8rem;
+            font-size: 0.6em;
             color: var(--term-green);
             opacity: 0.6;
-            border: none;
         }
 
         /* STATES */
@@ -126,7 +151,6 @@
         }
 
         .cell.trash {
-            /* Dither Pattern CSS Approximation */
             background-image: radial-gradient(var(--term-green) 1px, transparent 0);
             background-size: 4px 4px;
             opacity: 0.5;
@@ -144,88 +168,102 @@
         /* --- POINTERS --- */
         .pointer {
             position: absolute;
-            width: 60px; /* Matches cell width */
+            width: var(--cell-size);
             text-align: center;
-            transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: left 0.3s cubic-bezier(0.22, 1, 0.36, 1);
             font-weight: bold;
             z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none; /* Let clicks pass through */
         }
 
         .pointer-wrt {
-            top: -10px;
-            color: #00FFFF; /* Cyan for Writer distinctness within palette */
+            top: 0;
+            color: #00FFFF;
             text-shadow: 0px 0px 5px #00FFFF;
         }
         
         .pointer-rdr {
-            bottom: -10px;
-            color: #FF0055; /* Magenta/Red for Reader */
+            bottom: 0;
+            color: #FF0055;
             text-shadow: 0px 0px 5px #FF0055;
         }
 
         .pointer-arrow {
-            font-size: 1.5rem;
+            font-size: 1.5em;
             line-height: 1;
         }
         
         .pointer-label {
-            font-size: 0.8rem;
+            font-size: 0.7em;
             background: var(--bg);
             padding: 0 4px;
             border: 1px solid currentColor;
+            white-space: nowrap;
         }
 
-        /* --- ANIMATED PARTICLE (For Overwrite) --- */
+        /* --- ANIMATED PARTICLE --- */
         .flying-number {
-            position: absolute;
-            width: 60px;
-            height: 60px;
+            position: fixed; /* Fixed to viewport to escape overflow contexts */
+            width: var(--cell-size);
+            height: var(--cell-size);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 2rem;
+            font-size: 1.5em;
             color: var(--term-highlight);
             background: var(--term-green);
             border: 2px solid #FFF;
-            z-index: 50;
+            z-index: 9999;
             pointer-events: none;
         }
 
         /* --- DASHBOARD --- */
         .dashboard {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
+            display: flex;
+            flex-wrap: wrap;
             gap: 1rem;
-            height: 200px;
+            min-height: 25vh;
+            max-height: 40vh;
         }
 
-        @media (max-width: 768px) {
-            .dashboard { grid-template-columns: 1fr; height: auto; }
-        }
-
-        /* CONSOLE LOGIC */
         .console-box {
+            flex: 2 1 300px; /* Grow 2, Shrink 1, Base 300px */
             border: 2px solid var(--term-green);
             padding: 1rem;
-            font-size: 1rem;
+            font-size: 0.9em;
             position: relative;
             background: rgba(0,0,0,0.8);
             box-shadow: var(--shadow);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
 
         .console-title {
             position: absolute;
-            top: -12px;
+            top: -0.8em;
             left: 10px;
             background: var(--bg);
             padding: 0 8px;
             font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .code-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .code-line {
             padding: 2px 5px;
             opacity: 0.5;
             font-family: monospace;
+            white-space: nowrap; 
         }
         .code-line.active {
             opacity: 1;
@@ -235,22 +273,26 @@
         }
 
         .status-msg {
-            margin-top: 1rem;
+            margin-top: auto;
             padding-top: 0.5rem;
             border-top: 1px dashed var(--term-dim);
             color: var(--term-highlight);
+            min-height: 1.5em;
         }
 
         /* CONTROLS */
         .controls {
+            flex: 1 1 200px;
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
+            justify-content: center;
         }
 
         .btn-row {
             display: flex;
             gap: 0.5rem;
+            flex-wrap: wrap;
         }
 
         button {
@@ -259,12 +301,14 @@
             border: 2px solid var(--term-green);
             color: var(--term-green);
             font-family: 'VT323', monospace;
-            font-size: 1.2rem;
-            padding: 10px;
+            font-size: 1.1em;
+            padding: 0.6rem;
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 2px 2px 0 var(--term-green);
             transition: transform 0.1s;
+            white-space: nowrap;
+            min-width: 80px;
         }
 
         button:active {
@@ -286,11 +330,11 @@
 
         /* Comparison Indicator */
         .comparison-overlay {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 3rem;
+            font-size: clamp(3rem, 10vw, 6rem);
             color: #FFF;
             text-shadow: 0 0 10px var(--term-green);
             opacity: 0;
@@ -299,6 +343,14 @@
             z-index: 100;
         }
 
+        /* MOBILE ADJUSTMENTS */
+        @media (max-width: 600px) {
+            .container { padding: 0.5rem; gap: 0.5rem; }
+            .dashboard { flex-direction: column; }
+            .console-box { flex: 1 1 auto; max-height: 200px; }
+            .controls { flex: 0 0 auto; }
+            .cell .index-label { display: none; } /* Hide labels on very small screens if needed */
+        }
     </style>
 </head>
 <body>
@@ -314,35 +366,39 @@
         <div class="viz-stage" id="stage">
             <div class="comparison-overlay" id="compOverlay">==</div>
             
-            <div class="array-track" id="arrayTrack">
-                <!-- Pointers are absolute relative to the track -->
-                <div class="pointer pointer-wrt" id="writerPtr">
-                    <div class="pointer-label">WRT</div>
-                    <div class="pointer-arrow">▼</div>
+            <div class="track-container">
+                <div class="array-track" id="arrayTrack">
+                    <!-- Pointers are absolute relative to the track -->
+                    <div class="pointer pointer-wrt" id="writerPtr">
+                        <div class="pointer-label">WRT</div>
+                        <div class="pointer-arrow">▼</div>
+                    </div>
+                    <div class="pointer pointer-rdr" id="readerPtr">
+                        <div class="pointer-arrow">▲</div>
+                        <div class="pointer-label">RDR</div>
+                    </div>
+                    <!-- Cells generated by JS -->
                 </div>
-                <div class="pointer pointer-rdr" id="readerPtr">
-                    <div class="pointer-arrow">▲</div>
-                    <div class="pointer-label">RDR</div>
-                </div>
-                <!-- Cells generated by JS -->
             </div>
         </div>
 
         <div class="dashboard">
             <div class="console-box">
                 <div class="console-title">LOGIC_KERNEL</div>
-                <div class="code-line" id="line1">01. LOOP READER FROM 1 TO N</div>
-                <div class="code-line" id="line2">02.   IF ARR[RDR] != ARR[WRT-1]</div>
-                <div class="code-line" id="line3">03.     ARR[WRT] = ARR[RDR] (Copy)</div>
-                <div class="code-line" id="line4">04.     WRT++</div>
-                <div class="code-line" id="line5">05.   ELSE: DISCARD DUPLICATE</div>
+                <div class="code-container">
+                    <div class="code-line" id="line1">01. LOOP READER FROM 1 TO N</div>
+                    <div class="code-line" id="line2">02.   IF ARR[RDR] != ARR[WRT-1]</div>
+                    <div class="code-line" id="line3">03.     ARR[WRT] = ARR[RDR] (Copy)</div>
+                    <div class="code-line" id="line4">04.     WRT++</div>
+                    <div class="code-line" id="line5">05.   ELSE: DISCARD DUPLICATE</div>
+                </div>
                 <div class="status-msg" id="statusText">SYSTEM READY. AWAITING INPUT.</div>
             </div>
 
             <div class="controls">
                 <div class="btn-row">
                     <button onclick="init()">[ RESET ]</button>
-                    <button onclick="toggleAuto()" id="btnAuto">[ AUTO_RUN ]</button>
+                    <button onclick="toggleAuto()" id="btnAuto">[ AUTO ]</button>
                 </div>
                 <div class="btn-row">
                     <button onclick="step()" id="btnStep">[ STEP ]</button>
@@ -357,7 +413,6 @@
 
     <script>
         // --- CONFIGURATION ---
-        const CELL_WIDTH = 64; // 60px + 4px gap
         const INITIAL_DATA = [1, 1, 2, 2, 2, 3, 4, 4, 5, 5];
         let data = [];
         
@@ -375,6 +430,7 @@
         const ptrRdr = document.getElementById('readerPtr');
         const statusText = document.getElementById('statusText');
         const compOverlay = document.getElementById('compOverlay');
+        const stage = document.getElementById('stage');
         const lines = {
             1: document.getElementById('line1'),
             2: document.getElementById('line2'),
@@ -386,10 +442,11 @@
         // --- INITIALIZATION ---
         function init() {
             stopAuto();
-            // Generate sorted array with duplicates
             data = [...INITIAL_DATA]; 
             
-            // Render Cells
+            // Clear track but keep pointers
+            // (We detach pointers first to preserve them, or just rebuild them)
+            // Easier to clear HTML and append pointers back
             track.innerHTML = '';
             track.appendChild(ptrWrt);
             track.appendChild(ptrRdr);
@@ -400,7 +457,6 @@
                 el.id = `cell-${idx}`;
                 el.textContent = val;
                 
-                // Add index label
                 const idxLabel = document.createElement('div');
                 idxLabel.className = 'index-label';
                 idxLabel.textContent = idx;
@@ -409,26 +465,48 @@
                 track.appendChild(el);
             });
 
-            // Reset Pointers
+            // Reset Logic
             writer = 1;
             reader = 1;
             stepState = 0;
             
-            // Set initial styles
-            updatePointerPositions();
-            document.getElementById(`cell-0`).classList.add('valid'); // Index 0 is always unique
+            // Force layout calc then update pointers
+            requestAnimationFrame(() => {
+                updatePointerPositions();
+                document.getElementById(`cell-0`).classList.add('valid');
+            });
             
             highlightLine(1);
-            statusText.textContent = "INITIALIZED. INDEX 0 IS UNIQUE.";
+            statusText.textContent = "INITIALIZED. INDEX 0 UNIQUE.";
             compOverlay.style.opacity = 0;
         }
 
-        // --- VISUAL UTILS ---
+        // --- RESPONSIVE POSITIONING ---
+        // Instead of hardcoded pixels, we calculate based on DOM
         function updatePointerPositions() {
-            ptrWrt.style.left = `${writer * CELL_WIDTH}px`;
-            ptrRdr.style.left = `${reader * CELL_WIDTH}px`;
+            if (writer > data.length || reader >= data.length + 1) return;
+
+            // Helper to place pointer over specific cell
+            const setPtr = (ptr, idx) => {
+                const cell = document.getElementById(`cell-${idx}`);
+                if (cell) {
+                    // Position relative to the track container
+                    const leftPos = cell.offsetLeft;
+                    ptr.style.left = `${leftPos}px`;
+                }
+            };
+
+            setPtr(ptrWrt, writer < data.length ? writer : writer - 1);
+            // If reader exceeds array, keep it at last valid or just hide/clamp
+            setPtr(ptrRdr, reader < data.length ? reader : data.length - 1);
         }
 
+        // Handle Window Resize to keep pointers aligned
+        window.addEventListener('resize', () => {
+            updatePointerPositions();
+        });
+
+        // --- VISUAL UTILS ---
         function highlightLine(num) {
             Object.values(lines).forEach(l => l.classList.remove('active'));
             if(lines[num]) lines[num].classList.add('active');
@@ -438,34 +516,33 @@
 
         function showComparison(val1, val2, isMatch) {
             compOverlay.textContent = isMatch ? "==" : "!=";
-            compOverlay.style.color = isMatch ? "#FF0055" : "#00FF41"; // Red for dupe, Green for unique
+            compOverlay.style.color = isMatch ? "#FF0055" : "#00FF41"; 
             compOverlay.style.opacity = 1;
-            
-            // Position overlay between the two cells roughly
-            // In this logic, we are comparing reader and writer-1
-            const p1 = (writer - 1) * CELL_WIDTH;
-            const p2 = reader * CELL_WIDTH;
-            const mid = (p1 + p2) / 2;
-            compOverlay.style.left = `calc(50% - ${(data.length * CELL_WIDTH)/2}px + ${mid + 30}px)`; 
-            // Note: Centering logic depends on container, simplified here:
-            // Actually, let's just center it on screen, simpler for this layout
-            compOverlay.style.left = '50%';
         }
 
         function animateOverwrite(fromIdx, toIdx, value, callback) {
             const fromCell = getCell(fromIdx);
             const toCell = getCell(toIdx);
+            
+            // Get positions relative to viewport for the fixed flyer
             const rectFrom = fromCell.getBoundingClientRect();
             const rectTo = toCell.getBoundingClientRect();
 
             const flyer = document.createElement('div');
             flyer.className = 'flying-number';
             flyer.textContent = value;
+            
+            // Set initial position
             flyer.style.left = rectFrom.left + 'px';
             flyer.style.top = rectFrom.top + 'px';
+            
+            // Match current dimension of cells
+            flyer.style.width = rectFrom.width + 'px';
+            flyer.style.height = rectFrom.height + 'px';
+            
             document.body.appendChild(flyer);
 
-            // Trigger reflow
+            // Force reflow
             flyer.offsetHeight;
 
             // Animate
@@ -475,7 +552,6 @@
 
             setTimeout(() => {
                 toCell.textContent = value;
-                // Re-add label because textContent wiped it
                 const idxLabel = document.createElement('div');
                 idxLabel.className = 'index-label';
                 idxLabel.textContent = toIdx;
@@ -484,6 +560,16 @@
                 flyer.remove();
                 if(callback) callback();
             }, speed * 0.5);
+        }
+
+        // --- SCROLL INTO VIEW LOGIC ---
+        function ensureVisible(idx) {
+            const cell = getCell(idx);
+            if (!cell) return;
+            
+            // Simple logic: if offscreen, scroll parent
+            // We use 'nearest' to avoid jumping around too much
+            cell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
 
         // --- CORE LOGIC ---
@@ -495,16 +581,18 @@
                 return;
             }
 
+            // Ensure we are looking at the action
+            ensureVisible(reader);
+
             const cellReader = getCell(reader);
             const cellPrevUnique = getCell(writer - 1);
 
-            // Machine State Machine
             switch (stepState) {
-                case 0: // PREPARE / HIGHLIGHT
+                case 0: // PREPARE
                     highlightLine(2);
                     cellReader.classList.add('comparing');
                     cellPrevUnique.classList.add('comparing');
-                    statusText.textContent = `COMPARE: ARR[${reader}] (${data[reader]}) vs ARR[${writer-1}] (${data[writer-1]})`;
+                    statusText.textContent = `COMPARE: ARR[${reader}] vs ARR[${writer-1}]`;
                     stepState = 1;
                     break;
 
@@ -514,43 +602,35 @@
 
                     if (isDuplicate) {
                         highlightLine(5);
-                        statusText.textContent = "DUPLICATE FOUND. MARK AS TRASH.";
-                        stepState = 3; // Skip copy, go to cleanup
+                        statusText.textContent = "DUPLICATE. DISCARD.";
+                        stepState = 3; 
                     } else {
                         highlightLine(3);
-                        statusText.textContent = "UNIQUE FOUND. OVERWRITE AT WRITER.";
-                        stepState = 2; // Go to copy
+                        statusText.textContent = "UNIQUE. COPY TO WRITER.";
+                        stepState = 2; 
                     }
                     break;
 
-                case 2: // COPY ACTION (Only if Unique)
+                case 2: // COPY ACTION
                     compOverlay.style.opacity = 0;
                     animateOverwrite(reader, writer, data[reader], () => {
                         data[writer] = data[reader];
                         getCell(writer).classList.add('valid');
-                        // Writer increment
                         highlightLine(4);
                         writer++;
                         updatePointerPositions();
                         stepState = 3; 
-                        if(isRunning) step(); // Auto-chain for smoothness
+                        if(isRunning) step(); 
                     });
-                    if(isRunning) return; // Wait for callback if running
+                    if(isRunning) return; 
                     break;
 
-                case 3: // ADVANCE / CLEANUP
+                case 3: // ADVANCE
                     compOverlay.style.opacity = 0;
-                    
-                    // Remove highlights
                     document.querySelectorAll('.comparing').forEach(el => el.classList.remove('comparing'));
 
-                    // Visual cleanup of processed index
-                    if (data[reader] === data[writer-1]) {
-                        // It was a dupe
+                    if (data[reader] === data[writer-1] || reader >= writer) {
                          getCell(reader).classList.add('trash');
-                    } else {
-                        // It was unique, current reader index is done
-                         getCell(reader).classList.add('trash'); // technically we moved it, so the old spot is "garbage" logic-wise
                     }
 
                     reader++;
@@ -577,18 +657,15 @@
         function stopAuto() {
             isRunning = false;
             clearTimeout(autoInterval);
-            document.getElementById('btnAuto').textContent = "[ AUTO_RUN ]";
+            document.getElementById('btnAuto').textContent = "[ AUTO ]";
             document.getElementById('btnStep').disabled = false;
         }
 
         function autoTick() {
             if (!isRunning) return;
             step();
-            
-            // Dynamic delay based on state to make animation readable
             let delay = speed;
-            if (stepState === 2) delay = speed + 100; // Give time for animation
-
+            if (stepState === 2) delay = speed + 150; 
             autoInterval = setTimeout(autoTick, delay);
         }
 
@@ -597,7 +674,7 @@
         }
 
         // Run Init
-        init();
+        window.onload = init;
 
     </script>
 </body>
