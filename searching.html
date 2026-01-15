@@ -200,8 +200,7 @@
                     <ol>
                         <li><strong>Initialization:</strong> Define the bounds of your Search Space. Initialize two pointers, left to 0 and right to the last index of the array (**len(𝐀)** − 1).</li>
                         <li><strong>Bisection Loop:</strong> Enter a loop that continues as long as the search space is valid (i.e., left ≤ right). Inside, calculate the mid index: (**left** + right) // 2.</li>
-                        <li><strong>Transformation (The Logic Core):</strong> Instead of comparing 𝐀[mid] directly to a target, evaluate the difference between the value and its index.
-                        <br>• Compute difference = 𝐀[mid] − mid.
+                        <li><strong>Transformation (The Logic Core):</strong> Instead of comparing 𝐀[mid] directly to a target, use the Difference = Value − Index.
                         <br>By subtracting the index, we transform the question to: “Does value minus index equal zero?”</li>
                         <li><strong>Evaluation and Reduction:</strong> Check the state of difference:
                             <ul>
