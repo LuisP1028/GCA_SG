@@ -171,6 +171,9 @@
                         <li><strong>Offset Map:</strong> A map tracking the current write index for each Key group.</li>
                         <li><strong>In-Place Permutation:</strong> Rearranging elements within the original memory allocation, minimizing auxiliary space.</li>
                         <li><strong>Cyclic Sort / Routing:</strong> The logic of identifying where an element belongs, swapping it there, and dealing with the element that was displaced.</li>
+                        <li><strong>Interactions between maps and pointers: 
+                            The Frequency Map is used once initially to calculate partition sizes. These sums determine the starting indices for the Offset Map.
+                            The Offset Map functions as dynamic write pointers. During the routing loop, the algorithm reads the item at the current index and queries the Offset Map to find its correct destination. Upon placing an item (via swap or match), you increment that group's value in the Offset Map. This advances the pointer to the next free slot.</li>
                     </ul>
                     <ol>
                         <li><strong>Step 1: The Frequency Pass (Virtual Sectioning).</strong> Iterate through the array once to build the Frequency Map. Calculate the exact size of every group to virtually "reserve" a block of indices.</li>
