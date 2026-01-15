@@ -285,8 +285,20 @@ Analogy: Reading a Map
 
                 <div class="subsection">
                     <span class="subsection-title">Alternations (Wiggle Sort)</span>
-                    <p>Pattern: Low, High, Low, High (A[0] ≤ A[1] ≥ A[2]...).</p>
-                    <p><strong>Local Optimality:</strong> Only look at pair (i, i+1). Fixing the current pair doesn't break the previous one because if index i is even (needs to be smaller) and we swap to make i+1 larger, it only helps satisfy the previous condition.</p>
+                    <p>In formal math, this is called an Alternation. In computer science interviews, this is often called a Wiggle Sort.</p>
+                    <p><strong>The Purpose:</strong> Breaking down optimization problems into smaller subproblems and optimizing them alternately.</p>
+                    <p><strong>The Pattern:</strong></p>
+                    <ul>
+                        <li>The 1st number should be smaller than (or equal to) the 2nd.</li>
+                        <li>The 2nd number should be bigger than (or equal to) the 3rd.</li>
+                        <li>The 3rd number should be smaller than (or equal to) the 4th.</li>
+                    </ul>
+                    <p><strong>Vocabulary:</strong></p>
+                    <p><strong>State:</strong> The list A is a mutable object. Its state changes every time the loop runs.</p>
+                    <p><strong>Local Optimality:</strong> The algorithm doesn't "look ahead." It looks only at the current pair (i and i+1). It assumes that fixing the current pair won't break the previous pair in a way that matters.</p>
+                    <p><em>Why doesn't it break the previous pair?</em></p>
+                    <p>If index i is even, we ensure A[i] &lt; A[i+1]. In the next step (index i+1 is odd), we ensure A[i+1] &gt; A[i+2]. Because we made A[i+1] larger in the current step, it actually helps satisfy the requirement for the previous step!</p>
+                    <p><strong>Online Processing:</strong> The text mentions this code is "online." This means the algorithm processes data as it arrives (sequentially) without needing to see the entire future of the list to make a decision about the current element.</p>
                 </div>
 
             </div>
