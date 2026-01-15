@@ -349,42 +349,29 @@
                         <em><strong>Naive Way (Bad):</strong> Start from the beginning, insert each B element into the right spot in A → lots of shifting → very slow (O(m×n) worst case).</em>
                     </p>
                 
-                    <h5>The Setup (Arrays and Pointers)</h5>
-                    <ul>
-                        <li><strong>Array A (The Host):</strong> Contains sorted data plus a "buffer" (empty space) at the end exactly large enough to hold Array B.</li>
-                        <li><strong>Array B (The Donor):</strong> Contains sorted data that must be integrated into Array A.</li>
-                    </ul>
-                
-                    <h5>Three Pointers</h5>
-                    <ul>
-                        <li>
-                            <strong>Pointer a (The Host Tail):</strong> Points to the largest actual number currently sitting in Array A.<br>
-                            <em>Logic:</em> <code>m - 1</code> (Index of last real data, not including buffer).
-                        </li>
-                        <li>
-                            <strong>Pointer b (The Donor Tail):</strong> Points to the largest number currently sitting in Array B.<br>
-                            <em>Logic:</em> <code>n - 1</code> (Index of last item).
-                        </li>
-                        <li>
-                            <strong>Pointer write (The Target):</strong> Points to the absolute end of the available space in Array A. We will store B’s values from biggest to largest, starting from the end of A’s buffer space.<br>
-                            <em>Logic:</em> <code>m + n - 1</code> (Total size).
-                        </li>
-                    </ul>
-                
+                    <h5>The Setup (Arrays and Pointers)</h5>          
+               
                     <h5>The How</h5>
+                    <ul>
+                        <li><strong>Pointer a (Host Tail):</strong> Marks the largest valid number currently inside the Host array.</li>
+                        <li><strong>Pointer b (Donor Tail):</strong> Marks the largest number inside the Donor array.</li>
+                        <li><strong>Pointer write (The Target):</strong> Marks the final empty slot at the end of the buffer.</li>
+                    </ul>
+                    
+                    <p><strong>The Workflow:</strong></p>
                     <ol>
-                        <li><strong>The Comparison:</strong> Look at the values at <code>Pointer a</code> and <code>Pointer b</code>. We are identifying the Global Maximum.</li>
+                        <li><strong>The Comparison:</strong> Evaluate the values at <code>Pointer a</code> and <code>Pointer b</code>. Ask: "Which value is the Global Maximum?"</li>
+                        <li><strong>The Placement:</strong> Copy that winner into the target slot at <code>Pointer write</code>.</li>
                         <li>
-                            <strong>The Placement:</strong>
+                            <strong>The Decrement:</strong>
                             <ul>
-                                <li>If <code>A[a]</code> is larger: Place the value of <code>A[a]</code> into the slot at <code>A[write]</code> (place it in the buffer, iterating backwards). Move <code>Pointer a</code> one step left.</li>
-                                <li>If <code>B[b]</code> is larger: Place the value of <code>B[b]</code> into the slot at <code>A[write]</code>. Move <code>Pointer b</code> one step left.</li>
+                                <li>Shift <code>Pointer write</code> one index to the left (preparing the next slot).</li>
+                                <li>Shift the winner's pointer (either <code>a</code> or <code>b</code>) one index to the left (moving to the next data point).</li>
                             </ul>
                         </li>
-                        <li><strong>The Decrement:</strong> Move <code>Pointer write</code> one step left. We have successfully filled one empty slot.</li>
-                        <li><strong>Iteration:</strong> Repeat Steps 1–3 until one array is empty.</li>
+                        <li><strong>Iteration:</strong> Continue this cycle until the Donor array is fully integrated.</li>
                     </ol>
-                
+                    
                     <p>
                         <strong>Aerospace Example:</strong> Combining sorted telemetry/time-series data from multiple onboard sensors (flight data recorders, avionics, satellite payloads) for post-flight analysis or real-time health monitoring. Used in flight control systems to merge sorted event queues from redundant sources, ensuring stable & predictable ordering in safety-critical avionics software.
                     </p>
