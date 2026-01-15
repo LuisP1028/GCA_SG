@@ -156,7 +156,7 @@
                 
                 <div class="subsection">
                     <span class="subsection-title">
-                        Decomposition (Multiset Matching)
+                        DECOMPOSITION / Sliding window exact multiset matching
                         <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Hash/decomposition.html'; v.classList.add('active');">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -164,13 +164,13 @@
                             </svg>
                         </button>
                     </span>
-                    <p>Check if chunks of a sentence match a required multiset of words, regardless of sequence.</p>
+                    <p>When sliding the window and cutting it into chunks, the sequence of chunks does not matter. We only care that the chunks are exactly the right size and that the collection (multiset) contains exactly the same words with exactly the same counts as the given list.</p>
                     <p><strong>The Core Pattern:</strong> Fixed unit size → target multiset (frequency map) → sliding window of exact total size → partition into uniform units → compute observed multiset → check exact equality.</p>
                     <ol>
-                        <li>Determine fixed unit size (e.g., word length).</li>
-                        <li>Build target frequency map.</li>
-                        <li>Slide window: Divide window into pieces, compare observed frequencies to target.</li>
-                        <li>Store: If exact match, add starting index to results.</li>
+                        <li><strong>Determine the fixed unit size:</strong> Measure the length of each individual element (the "slice size").</li>
+                        <li><strong>Build the target frequency map:</strong> Record the exact number of occurrences expected for each distinct element in the required multiset.</li>
+                        <li><strong>Slide a fixed-size window:</strong> At every position, partition the window into pieces of the fixed unit size and compare the observed frequency map to the target map.</li>
+                        <li><strong>Storage:</strong> If the maps match exactly (same elements, same counts), append the starting position index to the result list.</li>
                     </ol>
                 </div>
 
