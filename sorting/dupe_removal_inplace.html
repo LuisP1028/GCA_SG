@@ -5,25 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DITHERPUNK: Composite Deduplication</title>
     <style>
-        /* -----------------------------------------------------------
-           1. AESTHETIC DIRECTIVE: GREEN-SCREEN DITHERPUNK
-           ----------------------------------------------------------- */
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
         :root {
+            /* --- Colors --- */
             --neon-green: #00FF41;
             --dim-green: #008F11;
             --void-black: #050505;
             --bright-white: #EEFFEE;
-            --scanline-color: rgba(0, 255, 65, 0.05);
+            
+            /* --- Responsive Dimensions using CLAMP --- */
+            /* Minimum 60px, Preferred 10vw, Max 140px */
+            --slot-w: clamp(60px, 10vw, 140px);
+            /* Aspect ratio roughly maintained */
+            --slot-h: clamp(72px, 12vw, 168px); 
+            --gap-size: clamp(5px, 1vw, 20px);
+            
+            /* --- Typography --- */
             --font-main: 'Share Tech Mono', monospace;
-            --slot-size: 100px;
-            --gap-size: 10px;
+            --text-base: clamp(0.8rem, 1.5vw, 1.1rem);
+            --text-lg: clamp(1.2rem, 3vw, 2rem);
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body, html {
@@ -34,26 +41,17 @@
             background-color: var(--void-black);
             font-family: var(--font-main);
             color: var(--neon-green);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            overflow: hidden; /* Main scroll hidden, inner scroll allowed */
         }
 
         /* --- Global Filters & Overlays --- */
         .crt-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            inset: 0;
             pointer-events: none;
             z-index: 999;
             background: 
-                /* Scanlines */
                 linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-                /* Vignette */
                 radial-gradient(circle at center, transparent 60%, black 100%);
             background-size: 100% 4px, 100% 100%;
             animation: flicker 0.15s infinite;
@@ -61,10 +59,7 @@
 
         .dither-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            inset: 0;
             pointer-events: none;
             z-index: 998;
             opacity: 0.15;
@@ -78,72 +73,104 @@
             100% { opacity: 0.98; }
         }
 
-        /* --- Layout --- */
+        /* --- Main Layout --- */
         .interface-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 90%;
-            max-width: 1200px;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
             z-index: 10;
         }
 
+        header {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 2vh;
+        }
+
         h1 {
+            font-size: var(--text-lg);
             text-transform: uppercase;
             letter-spacing: 2px;
             text-shadow: 0 0 5px var(--neon-green);
-            margin-bottom: 2rem;
-            text-align: center;
-            border-bottom: 1px solid var(--neon-green);
+            margin: 0;
             padding-bottom: 10px;
-            width: 100%;
+            border-bottom: 1px solid var(--neon-green);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        /* --- The Stage --- */
+        /* --- The Stage (Scrollable Container) --- */
         .stage {
             position: relative;
             width: 100%;
-            height: 300px;
+            /* Allocate enough height for slots + pointers */
+            min-height: calc(var(--slot-h) + 120px); 
             display: flex;
-            justify-content: center;
             align-items: center;
-            margin-bottom: 2rem;
+            /* Allow horizontal scroll on mobile */
+            overflow-x: auto; 
+            overflow-y: hidden;
+            padding: 40px 20px;
+            
+            /* Custom Scrollbar */
+            scrollbar-width: thin;
+            scrollbar-color: var(--dim-green) var(--void-black);
         }
 
-        /* --- The Wall (Array) --- */
+        /* Hide scrollbar for cleaner look where possible */
+        .stage::-webkit-scrollbar { height: 6px; }
+        .stage::-webkit-scrollbar-track { background: var(--void-black); }
+        .stage::-webkit-scrollbar-thumb { background: var(--dim-green); border-radius: 3px; }
+
+        /* --- The Array (Relative Anchor) --- */
         .array-container {
             display: flex;
             gap: var(--gap-size);
-            padding: 20px;
+            padding: 10px;
             border: 1px dashed var(--dim-green);
             position: relative;
+            /* Ensure it takes up width, but centers if smaller than screen */
+            margin: 0 auto; 
+            min-width: max-content; 
         }
 
         /* --- Composite Objects (Slots) --- */
         .slot {
-            width: 100px;
-            height: 120px;
+            width: var(--slot-w);
+            height: var(--slot-h);
             border: 2px solid var(--neon-green);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: all 0.3s ease;
             position: relative;
             background-color: var(--void-black);
-            opacity: 0.5; /* Unprocessed State */
+            opacity: 0.5;
+            transition: all 0.3s ease;
+            /* Prevent shrinking */
+            flex-shrink: 0; 
         }
 
         .slot-name {
-            font-size: 1.2rem;
+            font-size: calc(var(--text-base) * 1.2);
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 0.5rem;
             text-transform: uppercase;
+            text-align: center;
+            word-break: break-all;
         }
 
         .slot-payload {
-            font-size: 0.8rem;
+            font-size: calc(var(--text-base) * 0.7);
             opacity: 0.8;
+            font-family: monospace;
         }
 
         /* --- States --- */
@@ -164,7 +191,7 @@
 
         .slot.comparing {
             border-color: var(--bright-white);
-            box-shadow: 0 0 10px var(--bright-white) inset;
+            box-shadow: 0 0 15px var(--bright-white) inset;
             color: var(--bright-white);
         }
 
@@ -178,12 +205,12 @@
             position: absolute;
             left: 0;
             width: 100%;
-            height: 30px;
+            height: 0;
             pointer-events: none;
         }
 
-        .track-top { top: -40px; }
-        .track-bottom { bottom: -40px; }
+        .track-top { top: -20px; }
+        .track-bottom { bottom: -20px; }
 
         .pointer {
             position: absolute;
@@ -191,72 +218,63 @@
             height: 0;
             transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
             filter: drop-shadow(0 0 5px var(--neon-green));
-            left: 0; /* Will be translated via JS */
+            left: 0; 
+            z-index: 20;
         }
 
-        /* Write Pointer: Inverted Filled Triangle pointing Down */
+        /* Pointer shapes scaled via em/calc */
         .write-pointer {
-            border-left: 15px solid transparent;
-            border-right: 15px solid transparent;
-            border-top: 20px solid var(--neon-green);
-        }
-        .write-label {
-            position: absolute;
-            top: -25px;
-            left: -30px;
-            width: 60px;
-            text-align: center;
-            font-size: 0.8rem;
-        }
-
-        /* Read Pointer: Hollow Outlined Triangle pointing Up */
-        .read-pointer {
-            /* CSS Hollow Triangle Hack */
-            width: 20px;
-            height: 20px;
-            border-left: 2px solid var(--neon-green);
-            border-top: 2px solid var(--neon-green);
-            transform: rotate(45deg); /* Base shape, will adjust via wrapper if needed */
-            /* Actually, simpler approach for hollow triangle pointing UP */
-            transform: none;
-            width: 0; height: 0;
-            border: none;
+            border-left: 0.6em solid transparent;
+            border-right: 0.6em solid transparent;
+            border-top: 0.8em solid var(--neon-green);
+            font-size: clamp(16px, 2vw, 24px); /* Scales shape */
         }
         
-        /* Using pseudo-element for the hollow look to ensure cleanliness */
+        .read-pointer {
+            /* CSS Hollow Triangle Hack */
+            width: 0.8em;
+            height: 0.8em;
+            font-size: clamp(16px, 2vw, 24px); /* Scales shape */
+            position: relative;
+        }
+
         .read-pointer::after {
             content: '';
             position: absolute;
             top: 0;
-            left: -15px;
+            left: -0.6em;
             width: 0;
             height: 0;
-            border-left: 15px solid transparent;
-            border-right: 15px solid transparent;
-            border-bottom: 20px solid var(--neon-green);
-            z-index: 1;
+            border-left: 0.6em solid transparent;
+            border-right: 0.6em solid transparent;
+            border-bottom: 0.8em solid var(--neon-green);
         }
+        
         .read-pointer::before {
             content: '';
             position: absolute;
-            top: 4px; /* Offset to create thickness */
-            left: -11px;
+            top: 0.2em;
+            left: -0.4em;
             width: 0;
             height: 0;
-            border-left: 11px solid transparent;
-            border-right: 11px solid transparent;
-            border-bottom: 15px solid var(--void-black);
+            border-left: 0.4em solid transparent;
+            border-right: 0.4em solid transparent;
+            border-bottom: 0.6em solid var(--void-black);
             z-index: 2;
         }
 
-        .read-label {
+        .pointer-label {
             position: absolute;
-            bottom: -25px;
-            left: -30px;
-            width: 60px;
-            text-align: center;
-            font-size: 0.8rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            font-size: 0.6rem;
+            letter-spacing: 1px;
+            font-weight: bold;
         }
+        
+        .write-label { top: -1.5em; }
+        .read-label { bottom: -1.5em; }
 
         /* --- Floating Clone for Animation --- */
         .floating-clone {
@@ -264,13 +282,17 @@
             z-index: 100;
             pointer-events: none;
             transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            margin: 0 !important;
         }
 
         /* --- Controls & Logs --- */
         .controls {
             margin-top: 1rem;
             display: flex;
-            gap: 20px;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
         }
 
         button {
@@ -278,14 +300,15 @@
             border: 2px solid var(--neon-green);
             color: var(--neon-green);
             font-family: var(--font-main);
-            font-size: 1.2rem;
-            padding: 10px 30px;
+            font-size: var(--text-base);
+            padding: 0.5em 1.5em;
             cursor: pointer;
             text-transform: uppercase;
             transition: all 0.2s;
+            white-space: nowrap;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: var(--neon-green);
             color: var(--void-black);
             box-shadow: 0 0 15px var(--neon-green);
@@ -294,314 +317,352 @@
         button:disabled {
             opacity: 0.3;
             cursor: not-allowed;
-            box-shadow: none;
-            background: transparent;
-            color: var(--neon-green);
+            border-color: var(--dim-green);
+            color: var(--dim-green);
         }
 
         .log-panel {
-            margin-top: 20px;
+            margin-top: 2rem;
             width: 100%;
-            height: 100px;
+            flex-grow: 1; /* Take remaining height */
+            max-height: 200px;
+            min-height: 100px;
             border: 1px solid var(--dim-green);
             background: rgba(0, 20, 5, 0.8);
             padding: 10px;
-            font-size: 0.9rem;
+            font-size: calc(var(--text-base) * 0.9);
             overflow-y: auto;
             display: flex;
-            flex-direction: column-reverse; /* New logs at bottom visual trick */
+            flex-direction: column-reverse; 
         }
         
         .log-entry {
             margin-bottom: 4px;
             border-bottom: 1px solid rgba(0, 255, 65, 0.1);
+            word-wrap: break-word;
         }
-        .log-entry::before { content: "> "; }
+        .log-entry::before { content: "> "; color: var(--dim-green); }
 
     </style>
 </head>
 <body>
 
-    <!-- Visual Filters -->
-    <div class="crt-overlay"></div>
-    <div class="dither-overlay"></div>
+<!-- Visual Filters -->
+<div class="crt-overlay"></div>
+<div class="dither-overlay"></div>
 
-    <div class="interface-container">
-        <h1>Ditherpunk Deduplication // Two-Pointer</h1>
+<div class="interface-container">
+    <header>
+        <h1>Ditherpunk Deduplication</h1>
+    </header>
 
-        <!-- The Visualization Stage -->
-        <div class="stage">
-            <div class="array-container" id="array-container">
-                <!-- Pointers live relative to this container -->
-                <div class="pointer-track track-top">
-                    <div class="pointer write-pointer" id="write-ptr">
-                        <div class="write-label">WRITE</div>
-                    </div>
+    <!-- The Visualization Stage -->
+    <div class="stage" id="stage-viewport">
+        <div class="array-container" id="array-container">
+            
+            <div class="pointer-track track-top">
+                <div class="pointer write-pointer" id="write-ptr">
+                    <div class="pointer-label write-label">WRITE</div>
                 </div>
-                
-                <!-- Slots will be injected here via JS -->
+            </div>
+            
+            <!-- Slots Injected Here -->
 
-                <div class="pointer-track track-bottom">
-                    <div class="pointer read-pointer" id="read-ptr">
-                        <div class="read-label">READ</div>
-                    </div>
+            <div class="pointer-track track-bottom">
+                <div class="pointer read-pointer" id="read-ptr">
+                    <div class="pointer-label read-label">READ</div>
                 </div>
             </div>
         </div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <button id="btn-start" onclick="runVisualization()">> EXECUTE</button>
-            <button id="btn-reset" onclick="resetSystem()">> RESET</button>
-        </div>
-
-        <!-- Terminal Log -->
-        <div class="log-panel" id="terminal-log">
-            <div class="log-entry">System ready. Awaiting input.</div>
-        </div>
     </div>
 
-    <script>
-        /* -----------------------------------------------------------
-           4. ANIMATION LOGIC & DATA STRUCTURES
-           ----------------------------------------------------------- */
-        
-        // Initial Data Configuration
-        const INITIAL_DATA = [
-            { name: "CHARLIE", id: 1 },
-            { name: "ALICE", id: 2 },
-            { name: "BOB", id: 3 },
-            { name: "ALICE", id: 4 },
-            { name: "CHARLIE", id: 5 },
-            { name: "ALICE", id: 6 },
-            { name: "DAVID", id: 7},
-            { name: "BOB", id: 8}
-        ];
+    <!-- Controls -->
+    <div class="controls">
+        <button id="btn-start" onclick="runVisualization()">> EXECUTE</button>
+        <button id="btn-reset" onclick="resetSystem()">> RESET</button>
+    </div>
 
-        let currentData = [];
-        let isRunning = false;
-        
-        // DOM Elements
-        const container = document.getElementById('array-container');
-        const writePtr = document.getElementById('write-ptr');
-        const readPtr = document.getElementById('read-ptr');
-        const logPanel = document.getElementById('terminal-log');
-        const btnStart = document.getElementById('btn-start');
+    <!-- Terminal Log -->
+    <div class="log-panel" id="terminal-log">
+        <div class="log-entry">System ready. Awaiting input.</div>
+    </div>
+</div>
 
-        // Helper: Logging
-        function log(msg) {
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.textContent = msg;
-            // Insert at top of content (flex-direction reverses it visually)
-            logPanel.prepend(entry);
-        }
+<script>
+    /* -----------------------------------------------------------
+       LOGIC & RESPONSIVENESS
+       ----------------------------------------------------------- */
+    
+    // Initial Data
+    const INITIAL_DATA = [
+        { name: "CHARLIE", id: 1 },
+        { name: "ALICE", id: 2 },
+        { name: "BOB", id: 3 },
+        { name: "ALICE", id: 4 },
+        { name: "CHARLIE", id: 5 },
+        { name: "ALICE", id: 6 },
+        { name: "DAVID", id: 7},
+        { name: "BOB", id: 8}
+    ];
 
-        // Helper: Delay
-        function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
+    // Global State to handle Resizing
+    let state = {
+        data: [],
+        isRunning: false,
+        writeIdx: 0,
+        readIdx: 0,
+        stage: 'IDLE' // IDLE, SORTING, RUNNING, DONE
+    };
+    
+    // DOM Elements
+    const container = document.getElementById('array-container');
+    const writePtr = document.getElementById('write-ptr');
+    const readPtr = document.getElementById('read-ptr');
+    const logPanel = document.getElementById('terminal-log');
+    const btnStart = document.getElementById('btn-start');
 
-        // Setup: Render Array
-        function renderBoard(data) {
-            // Remove existing slots but keep pointers
-            const slots = document.querySelectorAll('.slot');
-            slots.forEach(s => s.remove());
+    // Helper: Logging
+    function log(msg) {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.textContent = msg;
+        logPanel.prepend(entry);
+    }
 
-            data.forEach((item, index) => {
-                const slot = document.createElement('div');
-                slot.className = 'slot';
-                slot.id = `slot-${index}`;
-                
-                // Top Half: Name
-                const nameDiv = document.createElement('div');
-                nameDiv.className = 'slot-name';
-                nameDiv.textContent = item.name;
+    // Helper: Delay
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-                // Bottom Half: Payload
-                const payDiv = document.createElement('div');
-                payDiv.className = 'slot-payload';
-                payDiv.textContent = `#ID:${item.id}`;
+    // Setup: Render Array
+    function renderBoard(data) {
+        // Clear slots, keep pointers
+        const slots = document.querySelectorAll('.slot');
+        slots.forEach(s => s.remove());
 
-                slot.appendChild(nameDiv);
-                slot.appendChild(payDiv);
-                container.appendChild(slot);
-            });
-
-            // Initialize pointers off-screen or at 0
-            updatePointerPos(writePtr, 0);
-            updatePointerPos(readPtr, 0);
-        }
-
-        // Helper: Update Pointer Position (Transform X)
-        function updatePointerPos(pointerEl, index) {
-            const slots = document.querySelectorAll('.slot');
-            if (!slots[index]) return;
+        data.forEach((item, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            slot.id = `slot-${index}`;
             
-            const slotRect = slots[index].getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            
-            // Calculate center of slot relative to container
-            const relativeX = (slotRect.left - containerRect.left) + (slotRect.width / 2);
-            
-            // Center the pointer (pointer is centered by css shape, translate centers it)
-            // Note: pointer absolute left is 0.
-            pointerEl.style.transform = `translate(${relativeX - 15}px, 0)`; // -15 is approx half pointer width adjustment
-        }
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'slot-name';
+            nameDiv.textContent = item.name;
 
-        // Helper: Handle Window Resize
-        window.addEventListener('resize', () => {
-            // Re-calculate pointer positions based on current logical indices if running
-            // For simplicity in this demo, we just reset strictly visual alignment
-            // In a full app, we'd store `state.writeIndex` globaly.
+            const payDiv = document.createElement('div');
+            payDiv.className = 'slot-payload';
+            payDiv.textContent = `#${item.id}`;
+
+            slot.appendChild(nameDiv);
+            slot.appendChild(payDiv);
+            container.appendChild(slot);
         });
 
-        /* --- THE ALGORITHM VISUALIZATION --- */
+        // Snap pointers to current state indices
+        updatePointerPos(writePtr, state.writeIdx);
+        updatePointerPos(readPtr, state.readIdx);
+    }
 
-        async function runVisualization() {
-            if (isRunning) return;
-            isRunning = true;
-            btnStart.disabled = true;
+    // Core Logic: Pointer Positioning
+    // Uses getBoundingClientRect to be strictly responsive to layout engine
+    function updatePointerPos(pointerEl, index) {
+        const slots = document.querySelectorAll('.slot');
+        
+        // Safety check
+        if (!slots[index] || index < 0) {
+            // If out of bounds, maybe hide or clamp?
+            // For this algo, we stick to last valid or 0
+            if(slots.length > 0) index = 0; 
+            else return; 
+        }
 
-            // --- Phase 1: Sort ---
-            log("Initializing Sort Protocol...");
-            await delay(500);
+        const targetSlot = slots[index];
+        const containerRect = container.getBoundingClientRect();
+        const slotRect = targetSlot.getBoundingClientRect();
 
-            // Logic Sort
-            currentData.sort((a, b) => a.name.localeCompare(b.name));
+        // Calculate center relative to the container
+        // Pointer left=0 is at container left=0.
+        const centerX = (slotRect.left - containerRect.left) + (slotRect.width / 2);
+        
+        pointerEl.style.transform = `translate(${centerX}px, 0)`;
+        
+        // Auto-scroll on mobile if pointer goes off screen
+        ensureVisible(targetSlot);
+    }
+
+    function ensureVisible(element) {
+        const viewport = document.getElementById('stage-viewport');
+        const rect = element.getBoundingClientRect();
+        const viewRect = viewport.getBoundingClientRect();
+
+        // Simple check if outside horizontal view
+        if (rect.right > viewRect.right) {
+            viewport.scrollBy({ left: rect.width + 20, behavior: 'smooth' });
+        } else if (rect.left < viewRect.left) {
+            viewport.scrollBy({ left: -(rect.width + 20), behavior: 'smooth' });
+        }
+    }
+
+    // Event: Resize Handler
+    // Debounced slightly for performance
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            if (state.data.length > 0) {
+                updatePointerPos(writePtr, state.writeIdx);
+                updatePointerPos(readPtr, state.readIdx);
+            }
+        }, 50);
+    });
+
+    /* --- THE ALGORITHM --- */
+
+    async function runVisualization() {
+        if (state.isRunning) return;
+        state.isRunning = true;
+        state.stage = 'SORTING';
+        btnStart.disabled = true;
+
+        // --- Phase 1: Sort ---
+        log("Sorting...");
+        await delay(500);
+
+        state.data.sort((a, b) => a.name.localeCompare(b.name));
+        renderBoard(state.data);
+        log("Sort complete.");
+        await delay(800);
+
+        // --- Phase 2: Init Pointers ---
+        state.stage = 'RUNNING';
+        
+        // Index 0 is implicitly committed
+        document.getElementById('slot-0').classList.add('committed');
+        
+        state.writeIdx = 1;
+        state.readIdx = 1;
+
+        updatePointerPos(writePtr, state.writeIdx);
+        updatePointerPos(readPtr, state.readIdx);
+        await delay(800);
+
+        // --- Phase 3: Loop ---
+        while (state.readIdx < state.data.length) {
+            // Update pointers visually
+            updatePointerPos(writePtr, state.writeIdx);
+            updatePointerPos(readPtr, state.readIdx);
+
+            const readSlot = document.getElementById(`slot-${state.readIdx}`);
+            const compareSlot = document.getElementById(`slot-${state.writeIdx - 1}`); // Compare against last written
+
+            await delay(400);
+
+            // Highlight
+            readSlot.classList.add('comparing');
+            compareSlot.classList.add('comparing');
             
-            // Visual Sort "Glitch" Update
-            renderBoard(currentData);
-            log("Array Sorted. Locality established.");
-            await delay(1000);
+            const valRead = state.data[state.readIdx];
+            const valPrev = state.data[state.writeIdx - 1];
 
-            // --- Phase 2: Initialization ---
-            const slots = document.querySelectorAll('.slot');
-            let write = 1;
-            let read = 1;
+            log(`CMP: [${valRead.name}] vs [${valPrev.name}]`);
+            await delay(700);
 
-            // Commit Index 0
-            slots[0].classList.add('committed');
-            log(`Index 0 [${currentData[0].name}] committed as Base.`);
-            
-            updatePointerPos(writePtr, 1);
-            updatePointerPos(readPtr, 1);
-            await delay(1000);
+            readSlot.classList.remove('comparing');
+            compareSlot.classList.remove('comparing');
 
-            // --- Phase 3: The Loop ---
-            while (read < currentData.length) {
-                // visual reference
-                const readSlot = document.getElementById(`slot-${read}`);
-                const compareSlot = document.getElementById(`slot-${write - 1}`);
-
-                // Update pointers
-                updatePointerPos(writePtr, write);
-                updatePointerPos(readPtr, read);
-                await delay(500);
-
-                // Highlight Comparison
-                readSlot.classList.add('comparing');
-                compareSlot.classList.add('comparing');
+            // Logic
+            if (valRead.name === valPrev.name) {
+                readSlot.classList.add('duplicate');
+                log("Duplicate. Skip.");
+                await delay(400);
+            } else {
+                log("Unique. Writing...");
                 
-                const valRead = currentData[read];
-                const valPrev = currentData[write - 1];
+                // Animation: Clone readSlot and move to writeSlot
+                await animateOverwrite(readSlot, document.getElementById(`slot-${state.writeIdx}`));
 
-                log(`Comparing [${valRead.name}] vs [${valPrev.name}]...`);
-                await delay(800);
-
-                // Remove highlight
-                readSlot.classList.remove('comparing');
-                compareSlot.classList.remove('comparing');
-
-                // --- Scenario A: Duplicate ---
-                if (valRead.name === valPrev.name) {
-                    log("Duplicate detected. Marking obsolete.");
-                    readSlot.classList.add('duplicate');
-                    await delay(500);
-                } 
-                // --- Scenario B: Unique ---
-                else {
-                    log("Unique value found. Committing...");
-                    
-                    // The Overwrite Animation
-                    // 1. Create Clone at Read Position
-                    const clone = readSlot.cloneNode(true);
-                    const rectRead = readSlot.getBoundingClientRect();
-                    const rectWrite = document.getElementById(`slot-${write}`).getBoundingClientRect();
-                    
-                    // Style clone
-                    clone.classList.add('floating-clone', 'committed'); // Make it look like final state
-                    clone.style.width = rectRead.width + 'px';
-                    clone.style.height = rectRead.height + 'px';
-                    clone.style.left = rectRead.left + 'px';
-                    clone.style.top = rectRead.top + 'px';
-                    clone.style.margin = 0;
-                    document.body.appendChild(clone);
-
-                    // Force reflow
-                    clone.getBoundingClientRect();
-
-                    // 2. Animate to Write Position
-                    const deltaX = rectWrite.left - rectRead.left;
-                    clone.style.transform = `translateX(${deltaX}px)`;
-
-                    await delay(600); // Wait for CSS transition
-
-                    // 3. Update DOM at Write Index
-                    const writeSlot = document.getElementById(`slot-${write}`);
-                    
-                    // Logic Update
-                    currentData[write] = currentData[read];
-                    
-                    // Visual Update (Text)
-                    writeSlot.querySelector('.slot-name').textContent = valRead.name;
-                    writeSlot.querySelector('.slot-payload').textContent = `#ID:${valRead.id}`;
-                    
-                    // Visual Update (Style)
-                    writeSlot.classList.remove('duplicate', 'garbage'); // Clean any previous state
-                    writeSlot.classList.add('committed');
-
-                    // Cleanup Clone
-                    clone.remove();
-                    
-                    write++;
-                }
-
-                read++;
+                // Data Update
+                state.data[state.writeIdx] = state.data[state.readIdx];
+                
+                // DOM Update
+                const writeSlot = document.getElementById(`slot-${state.writeIdx}`);
+                writeSlot.querySelector('.slot-name').textContent = valRead.name;
+                writeSlot.querySelector('.slot-payload').textContent = `#${valRead.id}`;
+                writeSlot.classList.remove('duplicate', 'garbage');
+                writeSlot.classList.add('committed');
+                
+                state.writeIdx++;
             }
-
-            // --- Phase 4: Truncation ---
-            log("Traversal complete. Initiating Garbage Collection...");
-            await delay(1000);
-
-            for (let i = write; i < currentData.length; i++) {
-                const s = document.getElementById(`slot-${i}`);
-                if (s) s.classList.add('garbage');
-            }
-
-            log(`Memory optimized. New Length: ${write}`);
-            btnStart.disabled = false;
-            isRunning = false;
+            state.readIdx++;
         }
 
-        function resetSystem() {
-            if (isRunning) return; // Prevent reset during run
-            log("System Reset.");
-            currentData = JSON.parse(JSON.stringify(INITIAL_DATA)); // Deep copy
-            renderBoard(currentData);
-            
-            // Reset styles manually since renderBoard is clean, 
-            // but we want to ensure pointers reset visually too
-            const slots = document.querySelectorAll('.slot');
-            slots.forEach(s => s.className = 'slot'); // remove committed/duplicate
-            
-            updatePointerPos(writePtr, 0);
-            updatePointerPos(readPtr, 0);
+        // --- Phase 4: Cleanup ---
+        log("Optimization complete. Truncating...");
+        updatePointerPos(writePtr, state.writeIdx); // Final position
+        await delay(500);
+
+        for (let i = state.writeIdx; i < state.data.length; i++) {
+            const s = document.getElementById(`slot-${i}`);
+            if (s) s.classList.add('garbage');
         }
 
-        // Initial Boot
-        resetSystem();
+        state.stage = 'DONE';
+        state.isRunning = false;
+        btnStart.disabled = false;
+        log(`Final Length: ${state.writeIdx}`);
+    }
 
-    </script>
+    // Helper: Animation Logic
+    function animateOverwrite(sourceEl, targetEl) {
+        return new Promise(resolve => {
+            const clone = sourceEl.cloneNode(true);
+            const sRect = sourceEl.getBoundingClientRect();
+            const tRect = targetEl.getBoundingClientRect();
+
+            // Setup fixed clone
+            clone.classList.add('floating-clone', 'committed');
+            clone.style.width = sRect.width + 'px';
+            clone.style.height = sRect.height + 'px';
+            clone.style.left = sRect.left + 'px';
+            clone.style.top = sRect.top + 'px';
+            
+            document.body.appendChild(clone);
+            
+            // Trigger reflow
+            clone.getBoundingClientRect();
+
+            // Calculate delta
+            const deltaX = tRect.left - sRect.left;
+            const deltaY = tRect.top - sRect.top; // Should be 0 usually, but robustness helps
+
+            clone.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+            setTimeout(() => {
+                clone.remove();
+                resolve();
+            }, 600); // Match CSS transition time
+        });
+    }
+
+    function resetSystem() {
+        if (state.isRunning) return;
+        
+        log("--- SYSTEM RESET ---");
+        state.data = JSON.parse(JSON.stringify(INITIAL_DATA));
+        state.writeIdx = 0;
+        state.readIdx = 0;
+        state.stage = 'IDLE';
+
+        renderBoard(state.data);
+        
+        // Reset Visual Styles
+        const slots = document.querySelectorAll('.slot');
+        slots.forEach(s => s.className = 'slot'); 
+    }
+
+    // Boot
+    resetSystem();
+
+</script>
 </body>
 </html>
