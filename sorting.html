@@ -249,8 +249,8 @@
                 
                     <p><strong>The Decision Logic:</strong> For every Next Interval in the list, we check its relationship to the Active Interval:</p>
                     <ul>
-                        <li><strong>Gap:</strong> If Next starts strictly after Active ends, the chain is broken. Save Active to your results. Next becomes the new Active.</li>
-                        <li><strong>Merge:</strong> If they touch or overlap, absorb Next. Extend Active's end to whichever value is higher. If the values are equal, keep the Closed endpoint to ensure the number is included.</li>
+                        <li><strong>Gap:</strong> If the next interval starts strictly after current interval ends, the chain is broken. Save Active to your results. Next becomes the new Active.</li>
+                        <li><strong>Merge:</strong> If they touch or overlap, absorb Next. Extend the current interval's right endpoint to whichever value is higher (new interval, or old). If the values are equal, keep the Closed endpoint to ensure the number is included.</li>
                     </ul>
                 </div>
 
@@ -264,9 +264,40 @@
                             </svg>
                         </button>
                     </span>
-                    <p><strong>Phase 1 (Left):</strong> Skip non-overlapping. Right &lt; New Left.</p>
-                    <p><strong>Phase 2 (Merge):</strong> Overlap zone. <code>New Left = min</code>, <code>New Right = max</code>. Mutate the temporary new_interval.</p>
-                    <p><strong>Phase 3 (Flush):</strong> Append the merged interval, then append the remainder.</p>
+                
+                    <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                        <strong>Concepts:</strong> Disjoint (non-overlapping), Union (combining sets), Closed Interval (inclusive endpoints <code>[a,b]</code>), Total Ordering (sorted data).
+                    </p>
+                
+                    <p><strong>Phase 1: Skip Non-Overlapping (Left)</strong></p>
+                    <p>Iterate through the existing intervals.</p>
+                    <ul>
+                        <li><strong>Logic:</strong> If the current interval’s right endpoint is strictly less than the <code>new_interval</code>'s left endpoint, they do not touch.</li>
+                        <li><strong>Action:</strong> Append the current interval to the result list unchanged.</li>
+                        <li><strong>Status:</strong> We are to the "left" of the insertion zone.</li>
+                    </ul>
+                
+                    <p><strong>Phase 2: Merge Overlapping (The Buffer)</strong></p>
+                    <ul>
+                        <li><strong>Logic:</strong> If the current interval starts before the new one ends, they overlap.</li>
+                        <li><strong>Action:</strong> Do not append yet. Instead, mutate the <code>new_interval</code> to represent the Union of itself and the current interval.
+                            <br><code>New Left = min(new_interval.left, current.left)</code>
+                            <br><code>New Right = max(new_interval.right, current.right)</code>
+                        </li>
+                        <li><strong>Note:</strong> <code>new_interval</code> is held in a temporary variable until it is done growing.</li>
+                    </ul>
+                
+                    <p><strong>Phase 3: Finalize (Flush)</strong></p>
+                    <p>Once the loop encounters an interval that starts after the <code>new_interval</code> ends, the <code>new_interval</code> has stopped growing.</p>
+                    <ul>
+                        <li><strong>Action:</strong>
+                            <ul>
+                                <li>Append the accumulated <code>new_interval</code>.</li>
+                                <li>Append the remainder.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Final Output:</strong> A sorted, disjoint array of intervals representing the union.</li>
+                    </ul>
                 </div>
 
                 <div class="subsection">
