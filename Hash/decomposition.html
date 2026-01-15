@@ -6,32 +6,44 @@
     <title>SLIDING_WINDOW_PROTOCOL // DITHER_PUNK</title>
     <style>
         :root {
+            /* COLORS */
             --bg: #000000;
             --fg: #00FF41;
             --fg-dim: #003b0f;
-            --err: #ff0000; /* Only used for critical rejects if desired, strictly 1-bit implies staying green/black, but distinct patterns are better. We will stay Mono-Green per prompt but use inversion for errors. */
-            
+            --err: #ff0000;
+
+            /* TYPOGRAPHY */
             --font-stack: 'VT323', 'Courier New', monospace;
-            --unit: 20px;
-            --gap: 10px;
+            /* Responsive font size: minimum 14px, preferred 2vw, max 18px */
+            --base-font: clamp(14px, 2vw, 18px); 
+            
+            /* DIMENSIONS */
+            /* Dynamic character width for the tape: min 20px, max 40px */
+            --char-w: clamp(20px, 4vw, 40px);
+            --char-h: calc(var(--char-w) * 1.5);
+            
+            --gap-sm: 0.5rem;
+            --gap-md: 1rem;
+            --gap-lg: 1.5rem;
         }
 
         /* RESET & BASE */
         * { box-sizing: border-box; }
+        
         body, html {
             margin: 0; padding: 0;
-            height: 100%; width: 100%;
+            width: 100%;
+            min-height: 100%;
             background-color: var(--bg);
             color: var(--fg);
             font-family: var(--font-stack);
-            overflow: hidden;
-            font-size: 16px;
-            user-select: none;
+            font-size: var(--base-font);
+            /* Allow scrolling on mobile if content overflows */
+            overflow-x: hidden; 
         }
 
-        /* UTILS: DITHERING & PATTERNS */
+        /* DITHERING UTILS */
         .dither-bg {
-            /* Procedural Atkinson-ish Dithering via gradients */
             background-image: radial-gradient(var(--fg) 15%, transparent 16%),
                               radial-gradient(var(--fg) 15%, transparent 16%);
             background-size: 4px 4px;
@@ -39,7 +51,6 @@
         }
         
         .dither-fill {
-            /* Denser pattern for filled states */
             background: repeating-linear-gradient(
                 45deg,
                 var(--fg),
@@ -52,20 +63,41 @@
         /* LAYOUT GRID */
         .layout {
             display: grid;
-            grid-template-columns: 250px 1fr;
-            grid-template-rows: 60px 1fr 100px;
-            height: 100vh;
-            padding: 20px;
-            gap: 20px;
+            width: 100%;
+            min-height: 100vh;
+            padding: var(--gap-md);
+            gap: var(--gap-md);
+            /* Mobile Layout (Stacked) */
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto auto 300px;
+            grid-template-areas: 
+                "header"
+                "stage"
+                "controls"
+                "sidebar";
             position: relative;
             z-index: 2;
         }
 
-        /* UI ELEMENTS */
+        /* Desktop Layout */
+        @media (min-width: 900px) {
+            .layout {
+                grid-template-columns: 280px 1fr;
+                grid-template-rows: 60px 1fr auto;
+                grid-template-areas: 
+                    "header header"
+                    "sidebar stage"
+                    "sidebar controls";
+                height: 100vh;
+                overflow: hidden; /* Lock scroll on desktop for app-feel */
+            }
+        }
+
+        /* UI PANELS */
         .panel {
             border: 1px solid var(--fg);
             box-shadow: 4px 4px 0 var(--fg);
-            padding: 10px;
+            padding: var(--gap-md);
             display: flex;
             flex-direction: column;
             background: var(--bg);
@@ -74,69 +106,96 @@
 
         .panel-label {
             position: absolute;
-            top: -10px;
-            left: 10px;
+            top: -0.7em;
+            left: var(--gap-sm);
             background: var(--bg);
-            padding: 0 5px;
+            padding: 0 0.4em;
             font-weight: bold;
             letter-spacing: 1px;
+            font-size: 0.9em;
+            white-space: nowrap;
         }
 
         /* HEADER */
         header {
-            grid-column: 1 / -1;
+            grid-area: header;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid var(--fg);
+            padding-bottom: var(--gap-sm);
         }
-        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; }
+        h1 { 
+            margin: 0; 
+            font-size: clamp(1.2rem, 3vw, 1.8rem); 
+            letter-spacing: 2px; 
+            text-transform: uppercase; 
+        }
 
-        /* SIDEBAR (FOUND INDICES) */
+        /* SIDEBAR */
         .sidebar {
-            grid-row: 2 / 4;
-            font-size: 0.9rem;
+            grid-area: sidebar;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         #log-output {
-            margin-top: 10px;
-            height: 100%;
+            flex: 1;
             overflow-y: auto;
             font-family: monospace;
             line-height: 1.4;
+            font-size: 0.85rem;
+            margin-top: var(--gap-md);
+            padding-right: 5px;
         }
-        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed var(--fg-dim); }
+        /* Custom scrollbar for webkit */
+        #log-output::-webkit-scrollbar { width: 6px; }
+        #log-output::-webkit-scrollbar-thumb { background: var(--fg); }
+        
+        .log-entry { 
+            margin-bottom: 5px; 
+            border-bottom: 1px dashed var(--fg-dim); 
+            word-break: break-all;
+        }
 
-        /* MAIN STAGE */
+        /* MAIN STAGE CONTAINER */
         .stage {
-            grid-column: 2;
-            grid-row: 2;
+            grid-area: stage;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: var(--gap-md);
+            min-height: 400px; /* Ensure space for animations */
         }
 
         /* ZONE A: INVENTORY */
         .zone-a {
             flex: 1;
             display: flex;
+            flex-wrap: wrap; /* Responsive wrapping */
             justify-content: center;
             align-items: center;
-            gap: 40px;
+            gap: var(--gap-lg);
             border: 1px dashed var(--fg-dim);
-            padding: 20px;
+            padding: var(--gap-lg);
         }
         .word-bin {
-            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .word-label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .word-label { margin-bottom: 5px; font-weight: bold; }
         .slots-container { display: flex; gap: 5px; }
+        
         .slot {
-            width: 40px; height: 40px;
+            width: clamp(30px, 5vw, 50px);
+            height: clamp(30px, 5vw, 50px);
             border: 1px solid var(--fg);
             display: flex;
             justify-content: center;
             align-items: center;
             font-size: 0.8rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ZONE B: DATA STREAM */
@@ -149,37 +208,43 @@
             border-top: 1px solid var(--fg);
             border-bottom: 1px solid var(--fg);
             background: #051005;
+            min-height: 120px;
         }
         
         .tape-container {
             display: flex;
             font-family: monospace;
-            font-size: 2rem;
-            letter-spacing: 5px;
+            /* Font size scales with char width */
+            font-size: calc(var(--char-w) * 0.8);
             white-space: nowrap;
-            padding-left: 50%; /* Center start */
+            /* Center logic handled by JS, but start 50% helps */
+            padding-left: 50%; 
+            will-change: transform;
             transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
         .char {
             display: inline-block;
-            width: 30px;
+            width: var(--char-w);
             text-align: center;
             opacity: 0.5;
+            flex-shrink: 0; /* Never squash chars */
         }
-        .char.active { opacity: 1; text-shadow: 0 0 5px var(--fg); }
+        .char.active { opacity: 1; text-shadow: 0 0 5px var(--fg); font-weight: bold; }
 
         /* The Window Overlay */
         .scan-window {
             position: absolute;
             left: 50%;
-            top: 10%;
-            height: 80%;
-            transform: translateX(0); /* Fixed center, tape moves */
+            top: 50%;
+            transform: translate(0, -50%); /* Center vertically */
+            height: 60%;
+            /* Width set by JS based on current char width */
             border: 2px solid var(--fg);
             box-shadow: 0 0 10px var(--fg);
             pointer-events: none;
             display: flex;
+            z-index: 10;
         }
         .window-segment {
             flex: 1;
@@ -188,20 +253,36 @@
         }
         .window-segment:last-child { border-right: none; }
 
-        /* ZONE C: PROCESSING */
+        /* CONTROLS ZONE */
         .zone-c {
-            grid-column: 2;
-            grid-row: 3;
+            grid-area: controls;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px;
-            position: relative; /* For flying elements */
+            gap: var(--gap-md);
+            padding-top: var(--gap-md);
         }
+        
+        @media (min-width: 600px) {
+            .zone-c { flex-direction: row; }
+        }
+
+        #processing-stage {
+            width: 120px; 
+            height: 50px; 
+            border: 1px dotted var(--fg-dim); 
+            display:flex; 
+            justify-content:center; 
+            align-items:center; 
+            opacity: 0.5;
+            margin-bottom: var(--gap-md);
+        }
+        @media(min-width: 600px) { #processing-stage { margin-bottom: 0; margin-right: var(--gap-lg); } }
 
         /* ANIMATION ELEMENTS */
         .chunk-flyer {
-            position: fixed;
+            position: absolute; /* Changed to absolute to work with scrollY in JS */
             border: 1px solid var(--fg);
             background: var(--bg);
             color: var(--fg);
@@ -210,6 +291,8 @@
             font-weight: bold;
             z-index: 100;
             transition: all 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            pointer-events: none;
+            font-size: 1rem;
         }
         .chunk-flyer.rejected {
             background: var(--fg);
@@ -222,7 +305,9 @@
         /* CONTROLS */
         .controls {
             display: flex;
-            gap: 10px;
+            gap: var(--gap-sm);
+            flex-wrap: wrap;
+            justify-content: center;
         }
         button {
             background: var(--bg);
@@ -234,6 +319,8 @@
             cursor: pointer;
             box-shadow: 2px 2px 0 var(--fg);
             transition: transform 0.1s;
+            flex: 1 1 auto; /* Grow buttons on small screens */
+            min-width: 120px;
         }
         button:active { transform: translate(2px, 2px); box-shadow: none; }
         button:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -242,7 +329,8 @@
         .crt-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
             background-size: 100% 2px, 3px 100%;
             pointer-events: none;
             z-index: 999;
@@ -255,13 +343,6 @@
             10% { opacity: 0.95; }
         }
 
-        /* FOUND INDICES MARKERS */
-        .found-marker {
-            color: var(--bg);
-            background: var(--fg);
-            font-weight: bold;
-        }
-
     </style>
 </head>
 <body>
@@ -272,7 +353,7 @@
         <!-- HEADER -->
         <header>
             <h1>// SUBSTRING_MATCHER_V1</h1>
-            <div class="status-light" style="width:10px; height:10px; background:var(--fg); animation: blink 1s infinite;"></div>
+            <div class="status-light" style="width:10px; height:10px; background:var(--fg); border-radius: 50%; animation: blink 1s infinite;"></div>
         </header>
 
         <!-- SIDEBAR -->
@@ -311,7 +392,7 @@
         <!-- ZONE C: PROCESSING & CONTROLS -->
         <div class="panel zone-c">
             <span class="panel-label">[LOGIC_GATE]</span>
-            <div id="processing-stage" style="width: 100px; height: 40px; border: 1px dotted var(--fg-dim); display:flex; justify-content:center; align-items:center; opacity: 0.5;">BUFFER</div>
+            <div id="processing-stage">BUFFER</div>
             
             <div class="controls">
                 <button id="btn-step">EXEC_STEP()</button>
@@ -326,6 +407,11 @@
         /**
          * DITHERPUNK SLIDING WINDOW VISUALIZER
          * Logic: LeetCode "Substring with Concatenation of All Words"
+         * 
+         * Refactoring Notes:
+         * - Removed hardcoded pixels for calculations.
+         * - Added dynamic measuring of elements for responsiveness.
+         * - Added scroll offsets for flying elements.
          */
 
         // --- CONFIG & STATE ---
@@ -356,6 +442,14 @@
             processStage: document.getElementById('processing-stage')
         };
 
+        // --- HELPER: DIMENSIONS ---
+        // Measures the current CSS-defined width of a character to ensure alignment
+        function getCharWidth() {
+            // Create a dummy char to measure if tape is empty
+            if (els.tape.children.length === 0) return 30;
+            return els.tape.children[0].getBoundingClientRect().width;
+        }
+
         // --- INITIALIZATION ---
 
         function init() {
@@ -364,20 +458,31 @@
                 `<span class="char" data-index="${i}">${char}</span>`
             ).join('');
 
-            // 2. Render Window Grid
-            els.window.style.width = `${STATE.totalWindowLen * 30}px`; // 30px per char
+            // 2. Render Inventory Bins
+            renderInventory();
+            
+            // 3. Setup Window & Initial Align
+            // We use a small timeout to let the DOM render widths before measuring
+            requestAnimationFrame(() => {
+                updateLayoutMetrics();
+                updateTapePosition();
+            });
+        }
+
+        function updateLayoutMetrics() {
+            const cw = getCharWidth();
+            
+            // Update Scan Window Width
+            els.window.style.width = `${STATE.totalWindowLen * cw}px`;
+            
+            // Re-render internal grid of scan window
             els.window.innerHTML = '';
             for(let i=0; i<CONFIG.words.length; i++) {
                 const segment = document.createElement('div');
                 segment.className = 'window-segment';
+                // Width is automatic via flex: 1
                 els.window.appendChild(segment);
             }
-
-            // 3. Render Inventory Bins
-            renderInventory();
-            
-            // 4. Initial Align
-            updateTapePosition();
         }
 
         function renderInventory() {
@@ -422,12 +527,10 @@
         }
 
         function updateTapePosition() {
-            // We want STATE.currentIndex to be centered under the window
-            // The window is absolutely centered.
-            // So we shift the tape to the left based on index.
-            // Base offset is roughly the padding-left (50%)
-            const charWidth = 30;
-            const offset = -(STATE.currentIndex * charWidth);
+            // We want STATE.currentIndex to be centered under the window.
+            // Since the window is absolute centered, we shift the tape.
+            const cw = getCharWidth();
+            const offset = -(STATE.currentIndex * cw);
             els.tape.style.transform = `translateX(${offset}px)`;
 
             // Highlight active chars
@@ -452,7 +555,10 @@
             }
 
             STATE.isAnimating = true;
-            resetInventoryVisuals(); // Clear previous filled slots
+            resetInventoryVisuals(); 
+            
+            // Ensure metrics are fresh (in case of resize during idle)
+            updateLayoutMetrics();
             updateTapePosition();
 
             log(`SCANNING INDEX [${STATE.currentIndex}]`);
@@ -464,7 +570,7 @@
                 chunks.push(currentSub.substr(i * CONFIG.wordLen, CONFIG.wordLen));
             }
 
-            // Temp map for checking
+            // Temp map for checking logic
             const wordMap = {};
             CONFIG.words.forEach(w => wordMap[w] = (wordMap[w] || 0) + 1);
             const seen = {};
@@ -479,10 +585,13 @@
                 flyer.className = 'chunk-flyer';
                 flyer.innerText = chunkStr;
                 
-                // Get coordinates
+                // Get coordinates relative to document (scroll safe)
                 const startRect = els.processStage.getBoundingClientRect();
-                flyer.style.left = `${startRect.left}px`;
-                flyer.style.top = `${startRect.top}px`;
+                const scrollX = window.scrollX || window.pageXOffset;
+                const scrollY = window.scrollY || window.pageYOffset;
+
+                flyer.style.left = `${startRect.left + scrollX}px`;
+                flyer.style.top = `${startRect.top + scrollY}px`;
                 document.body.appendChild(flyer);
 
                 await sleep(CONFIG.animSpeed / 2);
@@ -497,25 +606,26 @@
                     // Find a specific empty slot in DOM
                     const bin = document.querySelector(`.word-bin[data-word="${chunkStr}"]`);
                     const slots = bin.querySelectorAll('.slot');
-                    // Find first empty slot
                     for(let s of slots) {
                         if(s.dataset.status === 'empty') {
                             targetSlot = s;
-                            s.dataset.status = 'reserved'; // temporary lock
+                            s.dataset.status = 'reserved'; 
                             break;
                         }
                     }
                 }
 
                 if (targetSlot) {
-                    // ANIMATE TO SLOT
+                    // Recalculate dest rect as page might have shifted/scrolled
                     const destRect = targetSlot.getBoundingClientRect();
-                    flyer.style.left = `${destRect.left}px`;
-                    flyer.style.top = `${destRect.top}px`;
-                    
-                    await sleep(CONFIG.animSpeed); // Wait for flight
+                    const dScrollX = window.scrollX || window.pageXOffset;
+                    const dScrollY = window.scrollY || window.pageYOffset;
 
-                    // Snap in
+                    flyer.style.left = `${destRect.left + dScrollX}px`;
+                    flyer.style.top = `${destRect.top + dScrollY}px`;
+                    
+                    await sleep(CONFIG.animSpeed);
+
                     targetSlot.classList.add('dither-fill');
                     targetSlot.innerText = chunkStr;
                     flyer.remove();
@@ -526,14 +636,10 @@
                     flyer.classList.add('rejected');
                     flyer.innerText = "ERR";
                     
-                    // Jiggle
                     flyer.style.transform = `translate(${Math.random()*20-10}px, -20px)`;
                     
                     await sleep(CONFIG.animSpeed);
                     flyer.remove();
-                    
-                    log(`MATCH FAIL: "${chunkStr}"`);
-                    // Optimization: We could break here, but visualizer looks cooler if it finishes the scan
                 }
             }
 
@@ -542,7 +648,6 @@
                 log(`>> PATTERN MATCH FOUND AT ${STATE.currentIndex}`);
                 STATE.foundIndices.push(STATE.currentIndex);
                 
-                // Success Visual
                 els.window.style.boxShadow = `0 0 20px var(--fg), inset 0 0 20px var(--fg)`;
                 await sleep(CONFIG.animSpeed);
                 els.window.style.boxShadow = `0 0 10px var(--fg)`;
@@ -562,6 +667,7 @@
                 s.className = 'slot';
                 s.innerText = '';
                 s.dataset.status = 'empty';
+                s.classList.remove('dither-fill');
             });
         }
 
@@ -587,6 +693,16 @@
         });
 
         els.btnReset.addEventListener('click', resetAll);
+
+        // Handle Responsive Resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                updateLayoutMetrics();
+                updateTapePosition();
+            }, 100);
+        });
 
         // --- START ---
         init();
