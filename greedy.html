@@ -349,6 +349,32 @@
                     <p><strong>Step 5: The Result</strong><br>
                     When the list is finished, the string left in your candidate variable is the answer, thanks to the logic of mutual destruction.</p>
                 </div>
+                
+                <div class="subsection">
+                    <div class="subsection-title">
+                        FINDING MINIMUM IN ROTATED ARRAY
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'BinarySearch/min_element.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p><strong>Step 1: Initialize Boundaries</strong><br>
+                    We define the entire array as the search area. We place a 'left' marker at the very beginning (index 0) and a 'right' marker at the very end to bracket the smallest number.</p>
+                    <p><strong>Step 2: The Loop Condition</strong><br>
+                    Run the search while 'left' is strictly less than 'right'. We aren't looking for a missing value; we are narrowing down to a single survivor. When the markers meet, the loop stops.</p>
+                    <p><strong>Step 3: Calculate Midpoint</strong><br>
+                    We cut the range in half by adding 'left' and 'right' and dividing by two (integer division). This gives us the center index of the current search space.</p>
+                    <p><strong>Step 4: The Comparison (Pivot Logic)</strong><br>
+                    We compare the middle element against the rightmost element to determine where the rotation break occurs:</p>
+                    <ul>
+                        <li><strong>Case A (The "Broken" Sequence):</strong> If mid > right, the drop to the minimum happens to the right. We move the start to <code>mid + 1</code>.</li>
+                        <li><strong>Case B (The "Sorted" Sequence):</strong> If mid &le; right, the minimum is either at <code>mid</code> or to its left. We set the end to <code>mid</code>, discarding the right half.</li>
+                    </ul>
+                    <p><strong>Step 5: Termination and Return</strong><br>
+                    The loop repeats, halving the range, until 'left' and 'right' converge on the same index. Since we never discard the minimum, this final spot holds the answer.</p>
+                </div>
 
                 <div class="subsection">
                     <div class="subsection-title">The Gasup Problem</div>
