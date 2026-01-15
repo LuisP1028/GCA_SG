@@ -200,12 +200,18 @@
                             </svg>
                         </button>
                     </span>
-                    <p>Filter an array without allocating new memory using the <strong>Two Pointer Technique</strong>.</p>
+                    <p>The goal is to filter an array without allocating new memory using the <strong>Two Pointer Technique</strong>.</p>
                     <ol>
-                        <li><strong>Lexicographical Grouping:</strong> Sort so duplicates are neighbors.</li>
-                        <li><strong>Write Pointer:</strong> Initialize at index 1.</li>
-                        <li><strong>Scan:</strong> If <code>A[read] != A[write-1]</code>, overwrite <code>A[write]</code> and increment write pointer.</li>
-                        <li><strong>Truncation:</strong> Delete the obsolete buffer at the end.</li>
+                        <li><strong>Lexicographical Grouping (Sorting):</strong> Transform the array so that elements with identical values form contiguous blocks. This step is mandatory to satisfy the "locality" assumption—duplicates must be neighbors.</li>
+                        <li><strong>2 Pointer Initialization:</strong> Initialize a <em>write pointer</em> at index 1. We treat the element at index 0 as the "anchor" (the first unique item is always valid). Initialize a <em>read pointer</em> to iterate through the list.</li>
+                        <li><strong>Linear Traversal:</strong> Iterate through the array starting from index 1 using the read pointer.</li>
+                        <li><strong>Conditional Overwrite:</strong> Compare the read pointer’s value against the last confirmed unique item (under the write pointer).
+                            <ul>
+                                <li>If the item is <strong>different</strong>, it is a new unique name. Overwrite <code>A[write]</code> with the read value and increment the write pointer.</li>
+                                <li>If the item is the <strong>same</strong>, it is a duplicate. Ignore it (do not increment the write pointer).</li>
+                            </ul>
+                        </li>
+                        <li><strong>Truncation:</strong> After the loop, the valid dataset exists from <code>A[0]</code> to the write index position. Delete the space from the write index to the end of the array to remove the obsolete buffer.</li>
                     </ol>
                 </div>
 
