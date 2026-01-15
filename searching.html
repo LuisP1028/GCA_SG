@@ -205,8 +205,8 @@
                         <li><strong>Evaluation and Reduction:</strong> Check the state of difference:
                             <ul>
                                 <li>Case 1 (Match): If difference == 0, then 𝐀[mid] == mid. You have found the entry. Return mid.</li>
-                                <li>Case 2 (Overshoot) Values grow at least as fast as indices. If the value is already bigger than the index, it will stay bigger everywhere to the right. The index can never catch up, so we discard the right side.</li>
-                                <li>Case 3 (Undershoot) Values grow at least as fast as indices. If the value is currently too small, it was also too small everywhere to the left. The value could not have equaled the index earlier, so we discard the left side.</li>
+                                <li>Case 2 (Overshoot) If the value is already bigger than the index, it will stay bigger everywhere to the right. The index can never catch up, so we discard the right side.</li>
+                                <li>Case 3 (Undershoot) If the value is currently too small, it was also too small everywhere to the left. The value could not have equaled the index earlier, so we discard the left side.</li>
                             </ul>
                         </li>
                         <li><strong>Termination:</strong> If the loop concludes without Case 1 ever being true, no such index exists. Return −1.</li>
