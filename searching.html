@@ -353,7 +353,7 @@
 
                 <div class="subsection">
                     <div class="subsection-title">
-                        FIND THE K-TH LARGEST ELEMENT
+                        FIND THE K-TH RANKED LARGEST ELEMENT
                         <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/k_largest_element.html'; document.querySelector('.retro-viewport').classList.add('active');">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -361,22 +361,22 @@
                             </svg>
                         </button>
                     </div>
+                    <p><strong>THE HOW: MANHATTAN WALKING</strong></p>
                     <p>To find the k-th ranked largest element, don't sort the whole list. Pick a pivot, partition so smaller elements go left, larger go right. The pivot lands in its final position. If it's at index k-1, we're done. Otherwise, discard the unwanted half and repeat.</p>
                     <ul>
-                        <li>The Pivot: This is a randomly selected element from the current chunk of the array we are looking at. It acts as the "judge." We compare every other number against this Pivot.</li>
+                        <li>The Pivot: This is a randomly selected element from the current chunk of the array we are looking at. </li>
                         <li>Partitioning (In-Place): This is the physical act of shuffling the array. We do this "in-place," meaning we swap numbers around inside the existing array rather than creating a new list.
                             <ul>
                                 <li>By picking a random Pivot, we mathematically guarantee that, on average, we cut the problem size roughly in half every time.</li>
                             </ul>
                         </li>
-                        <li>Rank Comparison Since computers start counting at 0, if you want the 1st largest number, you are actually looking for index 0.</li>
+                        
                     </ul>
-                    <p>Here is your text rewritten with Unicode mathematical alphanumeric symbols (bold, italic, script, etc.) where appropriate, while keeping the content identical in meaning and structure. Formatting has been cleaned up and unnecessary whitespace removed.</p>
                     <p><strong>SIMPLIFIED HOW:</strong></p>
                     <ol>
                         <li>Define the beginning and end of the array</li>
                         <li>Randomly pick a pivot value</li>
-                        <li>Move all values larger than the pivot to the left of the pivot, and move the pivot to the right, to not accidentally swap it.</li>
+                        <li>Move all values larger than the pivot to the left of the pivot, and move the pivot to the right end of the array, to not accidentally swap it.</li>
                         <li>Move the pivot back to the front of the new index, where all values larger than it are to the left of</li>
                         <li>Compare the pivot to the target. If found, you're done. if Pivot < Target, go Left. If Pivot > Target, go Right.</li>
                     </ol>
