@@ -180,14 +180,19 @@ Analogy: Reading a Map
                     <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/Greedy_Visual.html'; document.querySelector('.retro-viewport').classList.add('active');">
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
-                    <p>The problem asks if you can navigate from start to end where values = max jump length.</p>
-                    <p><strong>Naive Approach:</strong> Simulating every path. Fails because it creates a branching tree of possibilities that explodes exponentially.</p>
-                    <p><strong>Optimal Approach (Greedy Horizon):</strong> Track the boundary of where you <em>can</em> go.</p>
+                    
+                    <p>The problem asks if you can navigate from the start of a list to the end, where the number at each position represents your maximum “jump” length.</p>
+                    
+                    <p><strong>Naive Approach (Simulating Every Path):</strong> This method creates "parallel universes" for every move. It fails because it creates a branching tree of possibilities that explodes exponentially, causing the program to freeze (Time Limit Exceeded).</p>
+                    
+                    <p><strong>Optimal Approach (The Greedy Horizon):</strong> Instead of tracking specific paths, we track the boundary. We walk one step at a time asking: <em>"Does the current stone allow me to extend the boundary further?"</em></p>
+                    
                     <ul>
-                        <li><strong>Horizon:</strong> The maximum index reachable so far.</li>
+                        <li><strong>Reach & Horizon:</strong> <em>Reach</em> is your current index + jump capacity ($i + A[i]$). The <em>Horizon</em> is the maximum Reach calculated so far.</li>
                         <li><strong>Gap:</strong> If <code>Current Position > Horizon</code>, you have hit a dead end (a gap in the bridge).</li>
                     </ul>
-                    <p><em>Use Case:</em> Therapeutic Window Management (Insulin coverage gaps).</p>
+                    
+                    <p><em>Use Case:</em> <strong>Therapeutic Window Management.</strong> For a programmable insulin pump, values represent duration of drug effect. The <strong>Horizon</strong> is the furthest point the patient is covered. If the horizon ends before the next safe dosing window, the system flags a risky coverage gap.</p>
                 </div>
 
                 <div class="subsection">
