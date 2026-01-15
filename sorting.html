@@ -235,12 +235,22 @@
                             </svg>
                         </button>
                     </span>
-                    <p>Convert a complex comparison problem into a linear stream of events.</p>
+                    <p>The computation of the union of intervals is optimized by converting a complex comparison problem into a linear "stream" of events. Instead of comparing every interval against every other interval (which is slow), we arrange them in a specific order so we only have to look at one at a time.</p>
+                
+                    <p><strong>Standardize:</strong> Convert all inputs into objects that track the numeric value and the "closed/open" status.</p>
+                
+                    <p><strong>Sort (The Critical Step):</strong> Arrange the intervals chronologically.</p>
                     <ul>
-                        <li><strong>Sort:</strong> By Left Endpoint. If equal, put <em>Closed</em> start before <em>Open</em> start.</li>
-                        <li><strong>Sweep:</strong> Maintain one Active Interval.</li>
-                        <li><strong>Gap:</strong> If Next starts strictly after Active ends, save Active. Next becomes Active.</li>
-                        <li><strong>Merge:</strong> If overlap, absorb Next. New End = <code>max(Active.end, Next.end)</code>.</li>
+                        <li><strong>Primary Sort:</strong> Sort all intervals by their Left Endpoint value (ascending).</li>
+                        <li><strong>Secondary Sort:</strong> If start times are equal, put <em>Closed</em> left endpoints before <em>Open</em> right endpoints. This ensures we catch overlaps immediately.</li>
+                    </ul>
+                
+                    <p><strong>Sweep and Merge:</strong> Once sorted, we perform a single pass (a "sweep") through the list. We maintain one <em>Active Interval</em> and compare it against the <em>Next Interval</em>.</p>
+                
+                    <p><strong>The Decision Logic:</strong> For every Next Interval in the list, we check its relationship to the Active Interval:</p>
+                    <ul>
+                        <li><strong>Gap:</strong> If Next starts strictly after Active ends, the chain is broken. Save Active to your results. Next becomes the new Active.</li>
+                        <li><strong>Merge:</strong> If they touch or overlap, absorb Next. Extend Active's end to whichever value is higher. If the values are equal, keep the Closed endpoint to ensure the number is included.</li>
                     </ul>
                 </div>
 
