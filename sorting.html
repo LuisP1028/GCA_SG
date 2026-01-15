@@ -387,11 +387,26 @@
                             </svg>
                         </button>
                     </span>
-                    <p>Find common elements of two sorted arrays.</p>
-                    <p><strong>Simultaneous Traversal:</strong></p>
+                    <p>Find common elements of two sorted arrays while filtering out duplicates.</p>
+                    
+                    <p><strong>Algorithm Steps:</strong></p>
                     <ul>
-                        <li><strong>Match:</strong> Check for duplicates (is it same as last added?). If unique, add to result. Increment BOTH pointers.</li>
-                        <li><strong>Mismatch:</strong> Increment the pointer of the <em>smaller</em> value to catch up.</li>
+                        <li><strong>Initialization:</strong> Define two index iterators, <code>i</code> and <code>j</code>, setting both to 0 to reference the start of arrays A and B. Create an empty list for the result.</li>
+                        <li><strong>Simultaneous Traversal:</strong> Enter a loop that continues only while both <code>i</code> and <code>j</code> are within the bounds of their respective arrays.</li>
+                        <li><strong>Comparison Logic:</strong> In each iteration, compare <code>A[i]</code> and <code>B[j]</code>:
+                            <ul>
+                                <li><strong>Match (A[i] == B[j]):</strong> Verify if this is a new value (duplicate detection). If unique, append to result. <em>Increment both pointers.</em></li>
+                                <li><strong>A[i] &lt; B[j]:</strong> <code>A[i]</code> cannot be in the intersection. Eliminate it by incrementing <code>i</code>.</li>
+                                <li><strong>A[i] &gt; B[j]:</strong> <code>B[j]</code> cannot be in the intersection. Eliminate it by incrementing <code>j</code>.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Termination:</strong> When one array is exhausted, return the result. Remaining elements in the non-exhausted array are irrelevant.</li>
+                    </ul>
+                
+                    <p><strong>Duplicate Detection Scenarios:</strong></p>
+                    <ul>
+                        <li><strong>Scenario 1 (A: 3,3; B: 3,9):</strong> The duplicate check is not strictly used. First 3s match and advance. The second 3 in A is smaller than 9, so it is discarded via standard traversal logic.</li>
+                        <li><strong>Scenario 2 (A: 3,3; B: 3,3):</strong> The duplicate check is vital. First 3s match and advance. Second 3s match again; the check sees the value is identical to the previously added one and skips it, ensuring the value appears only once.</li>
                     </ul>
                 </div>
 

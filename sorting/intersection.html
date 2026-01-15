@@ -8,8 +8,14 @@
         :root {
             --bg: #050505;
             --fg: #00FF41;
-            --cell-size: 60px;
-            --gap: 15px;
+            
+            /* Responsive Calculations */
+            /* Cells will be between 40px and 80px depending on viewport width */
+            --cell-size: clamp(40px, 8vw, 80px);
+            --gap: clamp(8px, 1.5vw, 20px);
+            
+            --font-base: clamp(16px, 2vw, 20px);
+            --font-lg: clamp(1.2rem, 4vw, 2.5rem);
         }
 
         /* --- GLOBAL RESET & CRT BASE --- */
@@ -17,23 +23,24 @@
         
         body {
             margin: 0;
-            padding: 20px;
+            padding: clamp(10px, 5vh, 40px);
             background-color: var(--bg);
             color: var(--fg);
             font-family: 'Courier New', 'VT323', monospace;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            /* Allow scrolling on small screens if content overflows vertically */
+            overflow-x: hidden;
+            overflow-y: auto; 
             text-transform: uppercase;
         }
 
-        /* CRT Scanline Overlay */
+        /* CRT Scanline Overlay - Fixed to cover viewport regardless of scroll */
         body::after {
             content: "";
-            position: absolute;
+            position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
             background: linear-gradient(
                 rgba(18, 16, 16, 0) 50%, 
@@ -51,13 +58,14 @@
 
         h1 {
             text-shadow: 0 0 5px var(--fg);
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+            margin: 0 0 2rem 0;
+            font-size: var(--font-lg);
             border-bottom: 2px solid var(--fg);
             padding-bottom: 10px;
             width: 100%;
-            max-width: 800px;
+            max-width: 1000px;
             text-align: center;
+            flex-shrink: 0;
         }
 
         /* --- LAYOUT ZONES --- */
@@ -66,9 +74,11 @@
             flex-direction: column;
             align-items: center;
             width: 100%;
-            max-width: 800px;
+            max-width: 1200px; /* Cap width for ultrawides */
             position: relative;
             z-index: 10;
+            flex-grow: 1;
+            justify-content: center;
         }
 
         .zone {
@@ -77,20 +87,38 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            padding: 10px 0;
+            padding: 1vh 0;
+            min-height: calc(var(--cell-size) * 2); /* Reserve space for pointers */
         }
 
         .label {
             position: absolute;
-            left: 0;
+            left: 5%; /* Responsive positioning */
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: var(--font-base);
+            transform: translateY(-50%);
+            top: 50%;
+        }
+
+        /* Mobile adjustment for labels */
+        @media (max-width: 600px) {
+            .label {
+                position: static;
+                margin-right: 1rem;
+                width: 40px;
+            }
+            .zone {
+                justify-content: flex-start;
+            }
         }
 
         /* --- ARRAYS & CELLS --- */
         .array-container {
             display: flex;
             gap: var(--gap);
+            position: relative;
+            /* Ensure pointer tracks align with this container */
+            padding: 0 10px; 
         }
 
         .cell {
@@ -100,25 +128,25 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: calc(var(--cell-size) * 0.5); /* Font scales with cell */
             font-weight: bold;
             background-color: var(--bg);
             transition: all 0.2s;
             position: relative;
+            flex-shrink: 0; /* Prevent squishing */
         }
 
         /* STATE: Active (Comparing) - Inverted */
         .cell.active {
             background-color: var(--fg);
             color: var(--bg);
-            box-shadow: 0 0 10px var(--fg);
+            box-shadow: 0 0 15px var(--fg);
         }
 
         /* STATE: Processed - Dithered Pattern */
         .cell.processed {
             color: var(--fg);
             border-color: var(--fg);
-            /* Dither Pattern: Diagonal Stripes to simulate grey */
             background-image: repeating-linear-gradient(
                 45deg,
                 var(--bg),
@@ -142,27 +170,39 @@
         }
 
         /* --- POINTERS --- */
-        .pointer-track {
-            height: 30px;
-            width: 100%; /* Matches array width dynamically via JS width setting or logic */
+        /* Pointers are now absolutely positioned relative to the array-container's parent (the zone) */
+        .pointer-container {
             position: relative;
-            display: flex;
-            justify-content: center;
+            width: fit-content;
+            margin: 0 auto;
+        }
+
+        .pointer-track {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 0; /* Don't take up flow space */
         }
 
         .pointer {
             position: absolute;
             width: var(--cell-size);
             text-align: center;
-            font-size: 1.5rem;
-            transition: left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            /* Initial left is calculated in JS */
+            font-size: calc(var(--cell-size) * 0.4);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s;
+            will-change: transform;
+            height: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         /* --- COMPARISON OPERATOR --- */
         .operator-zone {
-            height: 60px;
-            font-size: 2.5rem;
+            height: clamp(40px, 10vh, 80px);
+            min-height: auto;
+            font-size: clamp(2rem, 5vw, 3.5rem);
             font-weight: bold;
             text-shadow: 0 0 10px var(--fg);
         }
@@ -170,20 +210,20 @@
         /* --- RESULT AREA --- */
         .result-container {
             min-height: var(--cell-size);
+            min-width: calc(var(--cell-size) * 3); /* Minimum width for aesthetics */
             display: flex;
             gap: var(--gap);
             border: 1px dashed var(--fg);
             padding: 10px;
-            min-width: 300px;
             justify-content: center;
             position: relative;
+            flex-wrap: wrap; /* Allow wrapping if results get long */
         }
 
-        /* Ghost outline for duplicate check */
         .result-container::before {
             content: "LAST_INSERT";
             position: absolute;
-            top: -15px;
+            top: -1.2em;
             right: 0;
             font-size: 0.7rem;
             background: var(--bg);
@@ -202,8 +242,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: calc(var(--cell-size) * 0.5);
             transition: top 0.8s ease-in-out, left 0.8s ease-in-out;
+            pointer-events: none;
         }
 
         /* X Overlay for Duplicate */
@@ -213,7 +254,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 4rem;
+            font-size: clamp(2rem, 5vw, 4rem);
             color: var(--fg);
             background: repeating-linear-gradient(
                 135deg,
@@ -225,6 +266,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s;
+            z-index: 20;
         }
         .duplicate-overlay.visible {
             opacity: 1;
@@ -232,25 +274,25 @@
 
         /* --- LOG TERMINAL --- */
         .log-terminal {
-            margin-top: 20px;
+            margin-top: 2rem;
             width: 100%;
-            height: 150px;
+            max-width: 800px;
+            height: 15vh;
+            min-height: 100px;
             border: 2px solid var(--fg);
             background: #000;
             padding: 10px;
             overflow-y: auto;
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 1.5vw, 1rem);
             display: flex;
-            flex-direction: column-reverse; /* New logs at bottom, but stick to bottom */
+            flex-direction: column-reverse; 
         }
 
-        .log-entry {
-            margin-bottom: 4px;
-        }
+        .log-entry { margin-bottom: 4px; line-height: 1.4; }
         .log-entry::before { content: "> "; }
 
-        /* Scrollbar styling for ditherpunk feel */
-        ::-webkit-scrollbar { width: 10px; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--fg); }
         ::-webkit-scrollbar-thumb { background: var(--fg); }
 
@@ -259,6 +301,10 @@
             margin-top: 20px;
             display: flex;
             gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            padding-bottom: 20px;
         }
 
         button {
@@ -267,11 +313,12 @@
             border: 2px solid var(--fg);
             padding: 10px 20px;
             font-family: inherit;
-            font-size: 1.2rem;
+            font-size: var(--font-base);
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 4px 4px 0 var(--fg);
             transition: transform 0.1s, box-shadow 0.1s;
+            flex: 0 1 auto;
         }
 
         button:active {
@@ -282,26 +329,29 @@
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            /* Dithered disabled state */
             background-image: repeating-linear-gradient(45deg, var(--bg), var(--bg) 2px, var(--fg) 2px, var(--fg) 3px);
+            box-shadow: none;
+            transform: translate(2px, 2px);
         }
 
     </style>
 </head>
 <body>
 
-    <h1>SET_INTERSECTION<span style="font-size:0.5em; vertical-align: top;">[v2.0]</span></h1>
+    <h1>SET_INTERSECTION<span style="font-size:0.5em; vertical-align: top;">[v2.1]</span></h1>
 
     <div class="main-interface">
         
         <!-- Zone 1: Array A -->
         <div class="zone">
             <div class="label">A []</div>
-            <div class="pointer-track" style="position: absolute; top: -25px;">
-                <div id="ptr-i" class="pointer" style="left: 0;">v<br>i</div>
-            </div>
-            <div class="array-container" id="container-a">
-                <!-- Cells generated by JS -->
+            <div class="pointer-container">
+                <div class="pointer-track" style="top: -120%;"> <!-- Relative top -->
+                    <div id="ptr-i" class="pointer" style="left: 0;">v<br>i</div>
+                </div>
+                <div class="array-container" id="container-a">
+                    <!-- Cells generated by JS -->
+                </div>
             </div>
         </div>
 
@@ -314,16 +364,18 @@
         <!-- Zone 2: Array B -->
         <div class="zone">
             <div class="label">B []</div>
-            <div class="array-container" id="container-b">
-                <!-- Cells generated by JS -->
-            </div>
-            <div class="pointer-track" style="position: absolute; bottom: -25px;">
-                <div id="ptr-j" class="pointer" style="left: 0;">^<br>j</div>
+            <div class="pointer-container">
+                <div class="array-container" id="container-b">
+                    <!-- Cells generated by JS -->
+                </div>
+                <div class="pointer-track" style="bottom: -120%;">
+                    <div id="ptr-j" class="pointer" style="left: 0;">^<br>j</div>
+                </div>
             </div>
         </div>
 
         <!-- Spacer -->
-        <div style="height: 30px;"></div>
+        <div style="height: 2vh;"></div>
 
         <!-- Zone 3: Result -->
         <div class="zone">
@@ -336,7 +388,7 @@
 
         <!-- Zone 4: Log -->
         <div class="log-terminal" id="logger">
-            <div class="log-entry">System Initialized. Ready for input.</div>
+            <div class="log-entry">System Initialized. Ready.</div>
         </div>
 
         <!-- Controls -->
@@ -355,12 +407,6 @@
                 this.j = 0;
                 this.result = [];
                 
-                // Visualization constants
-                this.cellSize = 60;
-                this.gap = 15;
-                this.baseOffset = 0; // Calculated based on centering
-
-                // State Machine: 'IDLE' -> 'COMPARE' -> 'ACTION' -> 'MOVE'
                 this.state = 'IDLE'; 
                 
                 // DOM Elements
@@ -373,6 +419,11 @@
                 this.elLog = document.getElementById('logger');
                 this.elBtnStep = document.getElementById('btn-step');
                 this.elDupOverlay = document.getElementById('dup-overlay');
+
+                // Bind resize to update pointers dynamically
+                window.addEventListener('resize', () => {
+                    requestAnimationFrame(() => this.updatePointers());
+                });
 
                 this.init();
             }
@@ -394,48 +445,29 @@
                 });
             }
 
+            // COMPLETELY REWRITTEN FOR RESPONSIVENESS
+            // Uses DOM geometry instead of hardcoded constants
             updatePointers() {
-                // To center pointers over cells, we need to know cell positions relative to container
-                // but since we use flex gap, we can calculate strictly.
-                // However, to be safe against flex centering, let's use layout math.
-                
-                // Reset styling first
-                const cellsA = this.elContainerA.children;
-                const cellsB = this.elContainerB.children;
+                const updatePointer = (index, arrayLen, container, ptrEl) => {
+                    if (index < arrayLen) {
+                        const targetCell = container.children[index];
+                        if (targetCell) {
+                            // Calculate position relative to the container
+                            const cellLeft = targetCell.offsetLeft;
+                            // Center the pointer: cell left + half cell width - half pointer width
+                            const pos = cellLeft; 
+                            
+                            ptrEl.style.transform = `translateX(${pos}px)`;
+                            ptrEl.style.opacity = 1;
+                        }
+                    } else {
+                        // If index is out of bounds, fade out or move to end
+                        ptrEl.style.opacity = 0;
+                    }
+                };
 
-                // Calculate Position I
-                if (this.i < this.arrayA.length) {
-                    const currentCell = cellsA[this.i];
-                    // The pointer container is full width of zone. We need offset relative to zone start.
-                    // Simplified: Since centered, we can calculate offset from first cell
-                    const firstCell = cellsA[0];
-                    const offset = (this.i * (this.cellSize + this.gap));
-                    
-                    // We need to visually center the pointer track relative to the flex container
-                    // But simpler: Move pointer inside a relative container that matches array width exactly?
-                    // Let's use getBoundingClientRect for absolute precision relative to viewport, 
-                    // then adjust for the relative parent.
-                    
-                    // Quick fix: Set pointer track width to 0 and overflow visible, centered in zone.
-                    // Actually, let's stick to the calculated logic assuming CSS is stable.
-                    // The Pointer Track is absolute. Let's align it with the first cell.
-                    
-                    // Better approach: Calculate relative to start of array container.
-                    this.elPtrI.style.transform = `translateX(${offset}px)`;
-                    this.elPtrI.style.opacity = 1;
-                } else {
-                    // Out of bounds
-                    this.elPtrI.style.opacity = 0;
-                }
-
-                // Calculate Position J
-                if (this.j < this.arrayB.length) {
-                    const offset = (this.j * (this.cellSize + this.gap));
-                    this.elPtrJ.style.transform = `translateX(${offset}px)`;
-                    this.elPtrJ.style.opacity = 1;
-                } else {
-                    this.elPtrJ.style.opacity = 0;
-                }
+                updatePointer(this.i, this.arrayA.length, this.elContainerA, this.elPtrI);
+                updatePointer(this.j, this.arrayB.length, this.elContainerB, this.elPtrJ);
             }
 
             init() {
@@ -446,19 +478,20 @@
                 
                 this.renderArray(this.elContainerA, this.arrayA);
                 this.renderArray(this.elContainerB, this.arrayB);
-                this.elContainerRes.innerHTML = '<div class="duplicate-overlay" id="dup-overlay">X</div>'; // preserve overlay
-                this.elDupOverlay = document.getElementById('dup-overlay');
+                
+                // Reset Result Container but keep overlay
+                this.elContainerRes.innerHTML = '';
+                this.elContainerRes.appendChild(this.elDupOverlay);
+                this.elDupOverlay.classList.remove('visible');
                 
                 this.elOp.innerText = '';
                 this.elLog.innerHTML = '';
                 this.log("System Initialized. Arrays Loaded.");
                 
-                this.updatePointers();
                 this.elBtnStep.disabled = false;
                 
-                // Align pointers initially
-                // Hack: Wait for layout
-                setTimeout(() => this.updatePointers(), 50);
+                // Wait for layout to settle (CSS clamp/flex)
+                requestAnimationFrame(() => this.updatePointers());
             }
 
             getCell(arrName, index) {
@@ -467,7 +500,6 @@
                 return null;
             }
 
-            // The main state machine
             next() {
                 if (this.i >= this.arrayA.length || this.j >= this.arrayB.length) {
                     this.log("End of Array reached. Execution Complete.");
@@ -481,16 +513,15 @@
                 const cellA = this.getCell('A', this.i);
                 const cellB = this.getCell('B', this.j);
 
+                // Ensure pointers are perfectly aligned before action
+                this.updatePointers();
+
                 switch (this.state) {
                     case 'IDLE':
-                        // Transition to COMPARE
                         this.log(`Comparing A[${this.i}] (${valA}) vs B[${this.j}] (${valB})...`);
-                        
-                        // Highlight Active
                         cellA.classList.add('active');
                         cellB.classList.add('active');
-
-                        // Set Operator
+                        
                         if (valA < valB) this.elOp.innerText = '<';
                         else if (valA > valB) this.elOp.innerText = '>';
                         else this.elOp.innerText = '==';
@@ -499,38 +530,34 @@
                         break;
 
                     case 'ACTION':
-                        // Handle Logic based on values
                         if (valA < valB) {
-                            this.log(`A < B. Value ${valA} is smaller. Discarding.`);
+                            this.log(`A < B (${valA} < ${valB}). Discarding A.`);
                             cellA.classList.remove('active');
                             cellA.classList.add('processed');
-                            cellB.classList.remove('active'); // B goes back to idle
+                            cellB.classList.remove('active');
                             this.state = 'MOVE_A';
                         } 
                         else if (valA > valB) {
-                            this.log(`A > B. Value ${valB} is smaller. Discarding.`);
+                            this.log(`A > B (${valA} > ${valB}). Discarding B.`);
                             cellB.classList.remove('active');
                             cellB.classList.add('processed');
-                            cellA.classList.remove('active'); // A goes back to idle
+                            cellA.classList.remove('active');
                             this.state = 'MOVE_B';
                         } 
                         else {
-                            // Match
-                            this.log(`Match Found (${valA}). Checking for Duplicates in Result...`);
+                            this.log(`Match Found (${valA}). Checking Duplicates...`);
                             cellA.classList.add('match');
                             cellB.classList.add('match');
 
-                            // Duplicate Check Logic
                             const lastVal = this.result.length > 0 ? this.result[this.result.length - 1] : null;
 
                             if (valA === lastVal) {
-                                this.log(`ALERT: Duplicate ${valA} detected in Result. Ignoring.`);
-                                // Trigger Error Visual
+                                this.log(`ALERT: Duplicate ${valA} detected. Skipping.`);
                                 this.elDupOverlay.classList.add('visible');
                                 setTimeout(() => this.elDupOverlay.classList.remove('visible'), 600);
                                 this.state = 'MOVE_BOTH';
                             } else {
-                                this.log(`Unique Value ${valA}. Adding to Result.`);
+                                this.log(`Unique Value ${valA}. Inserting.`);
                                 this.spawnToResult(cellA, valA);
                                 this.result.push(valA);
                                 this.state = 'MOVE_BOTH';
@@ -540,82 +567,78 @@
 
                     case 'MOVE_A':
                         this.i++;
-                        this.resetCellStates();
-                        this.updatePointers();
-                        this.elOp.innerText = '';
-                        this.state = 'IDLE';
+                        this.finishStep();
                         break;
 
                     case 'MOVE_B':
                         this.j++;
-                        this.resetCellStates();
-                        this.updatePointers();
-                        this.elOp.innerText = '';
-                        this.state = 'IDLE';
+                        this.finishStep();
                         break;
 
                     case 'MOVE_BOTH':
-                        // Wait for animation if needed (duplicate blink or spawn)
-                        // Simple timeout to allow visual to register
                         setTimeout(() => {
                             this.i++;
                             this.j++;
-                            this.resetCellStates();
-                            this.updatePointers();
-                            this.elOp.innerText = '';
-                            this.state = 'IDLE';
+                            this.finishStep();
                         }, 800);
-                        // Prevent clicking while waiting
                         this.elBtnStep.disabled = true;
-                        setTimeout(() => this.elBtnStep.disabled = false, 850);
                         break;
                 }
             }
 
+            finishStep() {
+                this.resetCellStates();
+                this.updatePointers();
+                this.elOp.innerText = '';
+                this.state = 'IDLE';
+                this.elBtnStep.disabled = false;
+            }
+
             resetCellStates() {
-                // Remove active/match classes, keep processed
-                // Actually, if we moved past an index, ensure it is visually processed
+                // Ensure past cells are processed
                 for(let k=0; k<this.i; k++) this.getCell('A', k)?.classList.add('processed');
                 for(let k=0; k<this.j; k++) this.getCell('B', k)?.classList.add('processed');
                 
-                // Clear active/match from current (now previous)
-                Array.from(this.elContainerA.children).forEach(c => {
-                    c.classList.remove('active', 'match');
-                });
-                Array.from(this.elContainerB.children).forEach(c => {
-                    c.classList.remove('active', 'match');
-                });
+                // Clear active/match
+                Array.from(this.elContainerA.children).forEach(c => c.classList.remove('active', 'match'));
+                Array.from(this.elContainerB.children).forEach(c => c.classList.remove('active', 'match'));
             }
 
             spawnToResult(sourceEl, value) {
-                // Create floater
                 const rect = sourceEl.getBoundingClientRect();
                 const floater = document.createElement('div');
                 floater.className = 'floater';
                 floater.innerText = value;
+                
+                // Start position
                 floater.style.top = rect.top + 'px';
                 floater.style.left = rect.left + 'px';
                 document.body.appendChild(floater);
 
-                // Target position (approximate end of result container)
-                // We need to calculate where the NEW cell will be.
-                // It will be appended to container-res.
-                const resRect = this.elContainerRes.getBoundingClientRect();
-                // Determine offset based on current children count (excluding overlay)
-                const currentCount = this.result.length;
-                const targetLeft = resRect.left + 10 + (currentCount * (this.cellSize + this.gap));
-                const targetTop = resRect.top + 10; // Padding
-
-                // Force reflow
+                // Calculate destination dynamically
+                // We append a temp invisible cell to get the exact flex position
+                const tempCell = document.createElement('div');
+                tempCell.className = 'cell';
+                tempCell.style.visibility = 'hidden';
+                tempCell.style.position = 'absolute'; // Don't disrupt flow yet? No, we need flow.
+                tempCell.style.position = 'static';
+                this.elContainerRes.appendChild(tempCell);
+                
+                const destRect = tempCell.getBoundingClientRect();
+                
+                // Force Layout Recalc
                 floater.getBoundingClientRect();
 
-                // Animate
-                floater.style.top = targetTop + 'px';
-                floater.style.left = targetLeft + 'px';
+                // Animate to destination
+                floater.style.top = destRect.top + 'px';
+                floater.style.left = destRect.left + 'px';
 
-                // On Finish
+                // Cleanup
                 setTimeout(() => {
                     floater.remove();
+                    tempCell.remove(); // Remove temp
+                    
+                    // Add real cell
                     const newCell = document.createElement('div');
                     newCell.className = 'cell';
                     newCell.innerText = value;
@@ -624,14 +647,7 @@
             }
         }
 
-        // Initialize
         const visualizer = new DitherVisualizer();
-        
-        // Window Resize fix for pointers
-        window.addEventListener('resize', () => {
-            visualizer.updatePointers();
-        });
-
     </script>
 </body>
 </html>

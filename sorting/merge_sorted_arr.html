@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Protocol: Backward Merge // Ditherpunk // Responsive</title>
     <style>
         /* --- 1. CORE AESTHETICS & VARIABLES --- */
@@ -13,20 +13,28 @@
             --c-ghost: #112211;
             --font-stack: 'Courier New', 'VT323', monospace;
             
-            /* Responsive Sizing */
-            --block-size: clamp(40px, 8vw, 70px); 
-            --gap-size: clamp(5px, 1vw, 15px);
-            --border-width: 2px;
+            /* Responsive Sizing Logic:
+               Base block size scales between 35px and 80px depending on viewport width.
+            */
+            --block-size: clamp(35px, 9vw, 80px); 
+            --gap-size: clamp(4px, 1.5vw, 15px);
+            --ui-gap: clamp(10px, 2vw, 20px);
+            
+            --fs-base: clamp(0.9rem, 1.5vw, 1.2rem);
+            --fs-block: calc(var(--block-size) * 0.5);
+            
+            --border-width: clamp(1px, 0.2vw, 3px);
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             margin: 0;
-            padding: 20px;
+            padding: clamp(10px, 3vw, 30px);
             background-color: var(--c-void);
             color: var(--c-term);
             font-family: var(--font-stack);
@@ -35,23 +43,19 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow-x: hidden; /* Prevent horiz scroll from flying elements */
+            overflow-x: hidden;
             text-transform: uppercase;
         }
 
         /* --- CRT / DITHER TEXTURE OVERLAY --- */
         body::before {
             content: " ";
-            display: block;
             position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
+            inset: 0; /* Shorthand for top/right/bottom/left: 0 */
             background: 
                 linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
                 linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 100;
+            z-index: 999;
             background-size: 100% 2px, 3px 100%;
             pointer-events: none;
         }
@@ -66,32 +70,33 @@
         
         .container {
             width: 100%;
-            max-width: 1000px;
+            max-width: 1200px; /* Cap width on ultrawide monitors */
             position: relative;
             z-index: 1;
             animation: flicker 0.15s infinite;
             display: flex;
             flex-direction: column;
-            gap: 2rem;
+            gap: clamp(1.5rem, 4vw, 3rem);
         }
 
         h1 {
             text-align: center;
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-size: clamp(1.2rem, 5vw, 2.5rem);
             text-shadow: 2px 2px 0px var(--c-dim);
-            border-bottom: 2px dashed var(--c-term);
-            padding-bottom: 10px;
+            border-bottom: var(--border-width) dashed var(--c-term);
+            padding-bottom: 0.5em;
             margin: 0;
             letter-spacing: 2px;
+            word-break: break-word;
         }
 
         /* --- 2. VISUAL SETUP (THE TRACKS) --- */
         .stage {
             display: flex;
             flex-direction: column;
-            gap: calc(var(--block-size) * 1.5); /* Space for pointers */
-            padding: 20px;
-            border: 2px solid var(--c-term);
+            gap: calc(var(--block-size) * 1.2); /* Space for pointers relative to block size */
+            padding: clamp(10px, 2vw, 20px);
+            border: var(--border-width) solid var(--c-term);
             background: 
                 repeating-linear-gradient(
                     45deg,
@@ -101,39 +106,43 @@
                     #0a0a0a 4px
                 );
             position: relative;
+            /* Ensure container doesn't overflow on small screens */
+            width: 100%;
         }
 
         .track-label {
             font-weight: bold;
-            font-size: clamp(0.8rem, 2vw, 1rem);
+            font-size: var(--fs-base);
             display: flex;
             justify-content: space-between;
             position: absolute;
             top: 5px;
             left: 10px;
             right: 10px;
+            opacity: 0.8;
         }
 
         .array-row {
             display: flex;
-            justify-content: center; /* Center the array */
+            justify-content: center; 
             gap: var(--gap-size);
             position: relative;
-            margin-top: 20px; /* Space for label */
+            margin-top: calc(var(--fs-base) * 1.5);
             height: var(--block-size);
+            width: 100%;
         }
 
         /* BLOCKS */
         .block {
             width: var(--block-size);
             height: var(--block-size);
-            flex-shrink: 0; /* Prevent squishing */
+            flex-shrink: 0; 
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-size: var(--fs-block);
             font-weight: bold;
-            transition: background 0.1s, color 0.1s; /* Only colors animate via CSS */
+            transition: background 0.1s, color 0.1s;
             position: relative;
             z-index: 2;
         }
@@ -142,15 +151,15 @@
         .block.filled {
             background: var(--c-term);
             color: var(--c-void);
-            border: 2px solid var(--c-term);
-            box-shadow: 4px 4px 0px var(--c-dim);
+            border: var(--border-width) solid var(--c-term);
+            box-shadow: calc(var(--border-width)*2) calc(var(--border-width)*2) 0px var(--c-dim);
         }
 
         /* Ghost/Buffer Block */
         .block.ghost {
             background: var(--c-void);
             color: var(--c-dim);
-            border: 2px dashed var(--c-dim);
+            border: var(--border-width) dashed var(--c-dim);
             background-image: radial-gradient(var(--c-dim) 15%, transparent 16%);
             background-size: 4px 4px;
         }
@@ -168,7 +177,7 @@
         .block.locked {
             background: var(--c-dim);
             color: var(--c-term);
-            border: 2px solid var(--c-term);
+            border: var(--border-width) solid var(--c-term);
             background-image: 
                 linear-gradient(45deg, var(--c-ghost) 25%, transparent 25%), 
                 linear-gradient(-45deg, var(--c-ghost) 25%, transparent 25%), 
@@ -177,37 +186,37 @@
             background-size: 4px 4px;
         }
 
-        /* Flying Block (For Physical Animation) */
+        /* Flying Block */
         .flying-block {
-            position: absolute;
+            position: fixed; /* Fixed relative to viewport for accurate flight */
             width: var(--block-size);
             height: var(--block-size);
             background: var(--c-term);
             color: var(--c-void);
-            border: 2px solid #FFF;
+            border: var(--border-width) solid #FFF;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-size: var(--fs-block);
             z-index: 50;
             box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
             pointer-events: none;
+            will-change: top, left;
         }
 
         /* --- POINTERS --- */
-        /* Pointers are now positioned absolute relative to .array-row via JS */
         .pointer {
             position: absolute;
-            width: var(--block-size);
-            height: 40px;
+            width: var(--block-size); /* Matches block width exactly */
+            height: calc(var(--block-size) * 0.8);
             text-align: center;
             transition: left 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            font-size: clamp(0.6rem, 1.2vw, 0.8rem);
             color: var(--c-term);
             z-index: 20;
             white-space: nowrap;
@@ -215,16 +224,18 @@
 
         .pointer span {
             background: var(--c-void);
-            padding: 2px 4px;
+            padding: 1px 3px;
             border: 1px solid var(--c-dim);
+            line-height: 1;
         }
 
         .pointer i {
             font-style: normal;
-            font-size: 1.2rem;
+            font-size: 1.2em;
             font-weight: bold;
             display: block;
             line-height: 1;
+            margin: 2px 0;
         }
 
         /* --- SAFETY ZONE --- */
@@ -269,22 +280,22 @@
         /* --- 3. LOG & CONTROLS --- */
         .ui-panel {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 15px;
+            gap: var(--ui-gap);
+            grid-template-columns: 1fr; /* Default mobile stack */
         }
         
-        @media(min-width: 600px) {
+        /* Tablet & Desktop: Side by Side */
+        @media(min-width: 768px) {
             .ui-panel { grid-template-columns: 2fr 1fr; }
         }
 
         .console {
-            border: 2px solid var(--c-dim);
+            border: var(--border-width) solid var(--c-dim);
             background: #000;
-            height: 100px;
+            height: clamp(100px, 20vh, 150px);
             overflow-y: auto;
             padding: 10px;
             font-size: 0.85rem;
-            font-family: 'Courier New', monospace;
             box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
         }
 
@@ -297,27 +308,28 @@
             gap: 10px;
             background: var(--c-ghost);
             padding: 10px;
-            border: 2px solid var(--c-term);
+            border: var(--border-width) solid var(--c-term);
+            justify-content: center;
         }
 
         .btn-group {
             display: flex;
             gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
+            flex-wrap: wrap; /* Allow wrapping on very small screens */
         }
 
         button {
             background: var(--c-void);
             color: var(--c-term);
-            border: 2px solid var(--c-term);
-            padding: 8px 12px;
+            border: var(--border-width) solid var(--c-term);
+            padding: 10px 12px;
             font-family: var(--font-stack);
-            font-size: 0.9rem;
+            font-size: var(--fs-base);
             cursor: pointer;
             box-shadow: 4px 4px 0 var(--c-dim);
-            flex: 1;
-            min-width: 80px;
+            flex: 1; /* Grow to fill space */
+            min-width: 70px;
+            touch-action: manipulation;
         }
 
         button:active {
@@ -333,6 +345,7 @@
             gap: 10px;
             font-size: 0.8rem;
             justify-content: center;
+            margin-top: 5px;
         }
         
         input[type=range] {
@@ -367,42 +380,46 @@
 
         <!-- Track A -->
         <div class="stage">
-            <div class="track-label">MEMORY_BLOCK_A [DATA + BUFFER]</div>
+            <div class="track-label">
+                <span>MEM_A</span> 
+                <span style="opacity:0.5">[DATA+BUFFER]</span>
+            </div>
             <div class="array-row" id="row-a">
                 <!-- Safety Zone injected here -->
                 <div id="safety-zone" class="safety-zone">
-                    <div class="tooltip">MEMORY PROTECTION:<br>WRITE > READ</div>
+                    <div class="tooltip">PROTECTED REGION</div>
                 </div>
-                <!-- Pointers for A and Write injected here -->
-                <div id="ptr-write" class="pointer" style="top: -100%;">
+                <!-- Pointers injected here -->
+                <div id="ptr-write" class="pointer" style="top: calc(var(--block-size) * -1.1);">
                     <i>V</i>
                     <span>WRITE</span>
                 </div>
-                <div id="ptr-a" class="pointer" style="bottom: -100%;">
-                    <span>END A</span>
+                <div id="ptr-a" class="pointer" style="bottom: calc(var(--block-size) * -1.1);">
+                    <span>PTR_A</span>
                     <i>^</i>
                 </div>
-                <!-- Blocks injected via JS -->
             </div>
         </div>
 
         <!-- Track B -->
         <div class="stage">
-            <div class="track-label">MEMORY_BLOCK_B [INCOMING]</div>
+            <div class="track-label">
+                <span>MEM_B</span>
+                <span style="opacity:0.5">[INCOMING]</span>
+            </div>
             <div class="array-row" id="row-b">
-                <!-- Pointer for B -->
-                <div id="ptr-b" class="pointer" style="top: -100%;">
+                <div id="ptr-b" class="pointer" style="top: calc(var(--block-size) * -1.1);">
                     <i>V</i>
-                    <span>END B</span>
+                    <span>PTR_B</span>
                 </div>
-                <!-- Blocks injected via JS -->
             </div>
         </div>
 
         <!-- UI Panel -->
         <div class="ui-panel">
             <div class="console" id="console-output">
-                <div class="log-entry">SYSTEM READY. RESIZE SAFE.</div>
+                <div class="log-entry">SYSTEM READY.</div>
+                <div class="log-entry">VIEWPORT ADAPTIVE MODE: ACTIVE.</div>
             </div>
 
             <div class="controls">
@@ -420,14 +437,9 @@
     </div>
 
     <!-- Flight Layer for physical animations -->
-    <div id="flight-layer" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 9999;"></div>
+    <div id="flight-layer" style="position: fixed; inset: 0; pointer-events:none; z-index: 9999;"></div>
 
     <script>
-        /**
-         * RESIZABLE RETRO VISUALIZER
-         * Uses getBoundingClientRect for all coordinate math.
-         */
-
         const config = {
             initialA: [2, 5, 8],
             bufferSize: 3,
@@ -472,11 +484,11 @@
             btnStep.disabled = false;
             
             renderDOM();
-            updatePositions(); // Initial geometry calculation
+            // Allow DOM to settle before calculating geometry
+            requestAnimationFrame(() => updatePositions());
             log("SYSTEM INITIALIZED.");
         }
 
-        // --- Core Rendering (Creates Blocks) ---
         function renderDOM() {
             // Clear existing blocks (keep pointers)
             document.querySelectorAll('.block').forEach(e => e.remove());
@@ -486,7 +498,7 @@
                 const b = createBlock(val, i, 'a');
                 if(val === null) b.classList.add('ghost');
                 else b.classList.add('filled');
-                // Insert before the pointers to keep DOM order clean
+                // Insert before the safety zone div
                 elRowA.insertBefore(b, elSafetyZone);
             });
 
@@ -494,7 +506,6 @@
             state.B.forEach((val, i) => {
                 const b = createBlock(val, i, 'b');
                 b.classList.add('filled');
-                // Different styling logic can go here if needed
                 elRowB.appendChild(b);
             });
         }
@@ -507,24 +518,13 @@
             return div;
         }
 
-        // --- Geometric Positioning (Window Agnostic) ---
-        function getBlockRect(type, index) {
-            const el = document.getElementById(`blk-${type}-${index}`);
-            if(!el) return null;
-            // Get relative position within the container for pointers
-            // But flight animation needs global coordinates
-            return el; 
-        }
-
+        // --- Responsive Geometric Positioning ---
         function updatePositions() {
-            // Update Pointer A
+            // Update pointers based on current DOM geometry
             alignPointer(ptrA, 'a', state.ptrA);
-            // Update Pointer Write
             alignPointer(ptrWrite, 'a', state.writePtr);
-            // Update Pointer B
             alignPointer(ptrB, 'b', state.ptrB);
             
-            // Update Safety Zone
             updateSafetyZone();
         }
 
@@ -536,36 +536,29 @@
             const target = document.getElementById(`blk-${type}-${index}`);
             if (target) {
                 ptrEl.style.opacity = 1;
-                // Calculate position relative to parent row
-                // This assumes pointers are children of row-a/row-b
+                // Calculations relative to the parent row container
                 const parentRect = target.parentElement.getBoundingClientRect();
                 const targetRect = target.getBoundingClientRect();
                 
+                // Align left edge
                 const leftPos = targetRect.left - parentRect.left;
                 ptrEl.style.left = `${leftPos}px`;
             }
         }
 
         function updateSafetyZone() {
-            // Zone is between ptrA (exclusive) and writePtr (exclusive)
-            // But visually, it covers the gap.
-            if(state.ptrA < 0) {
+            // Hide zone if conditions aren't met
+            if(state.ptrA < 0 || state.writePtr <= state.ptrA + 1) {
                 elSafetyZone.style.width = '0px';
                 return;
             }
 
             const startIdx = state.ptrA + 1;
-            const endIdx = state.writePtr;
-            
-            if (startIdx > endIdx) {
-                elSafetyZone.style.width = '0px';
-                return;
-            }
+            const endIdx = state.writePtr; // Safe until write pointer
 
             const startEl = document.getElementById(`blk-a-${startIdx}`);
-            const endEl = document.getElementById(`blk-a-${endIdx}`); // Use end element to calculate width
+            const endEl = document.getElementById(`blk-a-${endIdx}`);
             
-            // If pointers meet, no zone
             if(!startEl || !endEl) {
                  elSafetyZone.style.width = '0px';
                  return;
@@ -575,38 +568,31 @@
             const startRect = startEl.getBoundingClientRect();
             const endRect = endEl.getBoundingClientRect();
 
-            // Left pos relative to container
+            // Calculate zone geometry
             const left = startRect.left - parentRect.left;
-            // Width spans from start of startBlock to end of endBlock? 
-            // Actually usually gap is strictly empty slots.
-            // Let's cover from Start of StartBlock to Start of WriteBlock (write ptr is at dest)
-            // The logic: Zone covers slots [ptrA+1 ... writePtr-1] + the gaps. 
-            // Visually simpler: Left of (ptrA+1) to Left of (writePtr)
             
-            const writeEl = document.getElementById(`blk-a-${state.writePtr}`);
-            const writeLeft = writeEl.getBoundingClientRect().left - parentRect.left;
-            
-            // Slight visual gap
-            const gap = 5; 
+            // The zone ends at the LEFT edge of the Write Pointer's block
+            // We subtract a small gap amount for visual separation
+            const width = (endRect.left - parentRect.left) - left;
             
             elSafetyZone.style.left = left + 'px';
-            elSafetyZone.style.width = Math.max(0, writeLeft - left - gap) + 'px';
+            elSafetyZone.style.width = Math.max(0, width - 5) + 'px'; // -5 for visual gap
         }
 
-        // --- Animations ---
+        // --- Animation Logic ---
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
         function animateFlight(sourceEl, targetEl, val) {
             return new Promise(resolve => {
+                // Get fresh coordinates immediately before animation
                 const sRect = sourceEl.getBoundingClientRect();
                 const tRect = targetEl.getBoundingClientRect();
 
-                // Create Flying Clone
                 const fly = document.createElement('div');
                 fly.className = 'flying-block';
                 fly.textContent = val;
                 
-                // Set Initial Position (Fixed to viewport)
+                // Set Initial Position (Fixed viewport coords)
                 fly.style.left = sRect.left + 'px';
                 fly.style.top = sRect.top + 'px';
                 fly.style.width = sRect.width + 'px';
@@ -614,15 +600,15 @@
                 
                 flightLayer.appendChild(fly);
 
-                // Force Reflow
+                // Force browser reflow to register start position
                 fly.getBoundingClientRect();
 
-                // Transition
-                fly.style.transition = `all ${state.delay * 0.4}ms ease-in-out`;
+                // Start Transition
+                fly.style.transition = `all ${state.delay * 0.4}ms cubic-bezier(0.45, 0, 0.55, 1)`;
                 fly.style.left = tRect.left + 'px';
                 fly.style.top = tRect.top + 'px';
 
-                // Cleanup after animation
+                // Cleanup
                 setTimeout(() => {
                     fly.remove();
                     resolve();
@@ -630,16 +616,16 @@
             });
         }
 
-        // --- Logic Step ---
+        // --- Step Logic ---
         async function step() {
             if (state.isFinished) return;
-
-            // Update geometrical positions just in case window moved
+            
+            // Recalculate immediately before step to ensure alignment
             updatePositions();
 
             // 1. Finish Condition
             if (state.ptrB < 0) {
-                log("OPTIMIZATION: A ALREADY SORTED. DONE.");
+                log("MERGE COMPLETE.");
                 state.isFinished = true;
                 state.isPlaying = false;
                 btnPlay.textContent = "DONE";
@@ -649,14 +635,12 @@
 
             const blockDest = document.getElementById(`blk-a-${state.writePtr}`);
 
-            // 2. Flush Condition (A Empty)
+            // 2. Flush B (if A is empty)
             if (state.ptrA < 0) {
-                log(`A DEPLETED. FLUSHING B[${state.ptrB}]`);
+                log(`A EMPTY. MOVING B[${state.ptrB}]`);
                 const blockB = document.getElementById(`blk-b-${state.ptrB}`);
                 
                 await animateFlight(blockB, blockDest, state.B[state.ptrB]);
-                
-                // Commit Data
                 finalizeMove('b', state.ptrB, state.B[state.ptrB]);
                 state.ptrB--;
                 state.writePtr--;
@@ -672,23 +656,20 @@
 
             blockA.classList.add('highlight');
             blockB.classList.add('highlight');
-            log(`> COMPARING: ${valA} vs ${valB}`);
+            log(`COMPARE: ${valA} vs ${valB}`);
             
             await sleep(state.delay * 0.4);
 
-            let picked = '';
-            
             if (valA > valB) {
-                log(`> ${valA} IS LARGER.`);
+                log(`${valA} > ${valB}. MOVE A.`);
                 blockA.classList.remove('highlight');
                 blockB.classList.remove('highlight');
                 
-                // Animate
                 await animateFlight(blockA, blockDest, valA);
                 finalizeMove('a', state.ptrA, valA);
                 state.ptrA--;
             } else {
-                log(`> ${valB} IS LARGER.`);
+                log(`${valB} >= ${valA}. MOVE B.`);
                 blockA.classList.remove('highlight');
                 blockB.classList.remove('highlight');
                 
@@ -702,7 +683,6 @@
         }
 
         function finalizeMove(sourceType, sourceIdx, val) {
-            // Update Source DOM
             const sourceEl = document.getElementById(`blk-${sourceType}-${sourceIdx}`);
             if(sourceType === 'a') {
                 sourceEl.classList.remove('filled');
@@ -714,7 +694,6 @@
                 sourceEl.style.borderStyle = 'dashed';
             }
 
-            // Update Dest DOM
             const destEl = document.getElementById(`blk-a-${state.writePtr}`);
             state.A[state.writePtr] = val;
             destEl.textContent = val;
@@ -730,11 +709,16 @@
             elConsole.scrollTop = elConsole.scrollHeight;
         }
 
-        // --- Event Listeners ---
+        // --- Responsive Listeners ---
         
-        // Window Resize Handler
+        // Handle window resizing to keep pointers aligned
         window.addEventListener('resize', () => {
             updatePositions();
+        });
+
+        // Handle device orientation changes (mobile)
+        window.addEventListener('orientationchange', () => {
+            setTimeout(updatePositions, 100);
         });
 
         btnPlay.addEventListener('click', async () => {
@@ -745,7 +729,7 @@
             
             while(state.isPlaying && !state.isFinished) {
                 await step();
-                if(state.isPlaying) await sleep(state.delay * 0.2); // Gap between steps
+                if(state.isPlaying) await sleep(state.delay * 0.2); 
             }
         });
 
@@ -754,7 +738,6 @@
         document.getElementById('btn-reset').addEventListener('click', () => {
             state.isPlaying = false;
             elConsole.innerHTML = '';
-            // Reset Styles
             document.querySelectorAll('.block').forEach(b => {
                 b.style.opacity = 1;
                 b.style.borderStyle = '';
