@@ -344,8 +344,38 @@ Analogy: Reading a Map
 
                 <div class="subsection">
                     <span class="subsection-title">In-Place Deduplication</span>
-                    <p><strong>Ontology:</strong> Reader (scout) and Writer (cursor for unique data).</p>
-                    <p><strong>Logic:</strong> Maintain a "valid prefix." Reader iterates. If A[reader] differs from A[writer-1], it is unique. Copy to A[writer] and increment.</p>
+                    <button class="eye-btn" onclick="const v=document.querySelector('.retro-viewport'); v.querySelector('iframe').src='Arrays/deduplication.html'; v.classList.add('active');">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                    <p><strong>Core idea:</strong> Remove duplicates from a <strong>sorted</strong> array <strong>in place</strong>, keeping only the first occurrence of each value. Uses two pointers and no extra space.</p>
+                    <p><strong>Pointers:</strong></p>
+                    <ul>
+                        <li>Reader (<code>i</code>): scans the array looking for new values</li>
+                        <li>Writer (<code>write_index</code>): marks the end of the "unique prefix" we're building</li>
+                    </ul>
+                    <p><strong>Steps:</strong></p>
+                    <ol>
+                        <li>Assume the array is already sorted (duplicates are next to each other).</li>
+                        <li>Start with <code>write_index = 1</code> (index 0 is always kept as unique).</li>
+                        <li>Loop the reader <code>i</code> from 1 to end of array:
+                            <ul>
+                                <li>If <code>A[i]</code> is different from <code>A[write_index - 1]</code>, it's a new value → copy <code>A[i]</code> to <code>A[write_index]</code> and increment <code>write_index</code></li>
+                                <li>Otherwise, skip (it's a duplicate)</li>
+                            </ul>
+                        </li>
+                        <li>At the end, <code>write_index</code> is the new length of the array with uniques only.</li>
+                    </ol>
+                    <p><strong>Result:</strong></p>
+                    <ul>
+                        <li>The first <code>write_index</code> elements contain all unique values in order.</li>
+                        <li>The rest of the array can be ignored.</li>
+                        <li>Time: O(n)</li>
+                        <li>Extra space: O(1)</li>
+                    </ul>
+                    <p><strong>Example:</strong> <code>[1,1,2,2,2,3,4,4]</code> → becomes <code>[1,2,3,4,?,?...]</code> and returns length 4</p>
                 </div>
 
                 <div class="subsection">
