@@ -265,7 +265,7 @@
                         </button>
                     </span>
                 
-                    <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                    
                         <strong>Concepts:</strong> Disjoint (non-overlapping), Union (combining sets), Closed Interval (inclusive endpoints <code>[a,b]</code>), Total Ordering (sorted data).
                     </p>
                 
@@ -316,13 +316,12 @@
                         <li><strong>Identify Key Moments:</strong> For each event (which has a start and end time), mark two crucial points in time: its start and its end. Think of these as "events begin" and "events end" markers.</li>
                         <li><strong>Create a Timeline of Markers:</strong> Collect all these start and end markers from all events.</li>
                         <li><strong>Order the Markers:</strong> Sort these markers chronologically.</li>
-                        <li><strong>Handle Simultaneous Events [Tie Breaker]:</strong> Process the start of Event B <em>before</em> the end of Event A. This ensures we correctly count both events as overlapping at that precise moment for our maximum count.</li>
-                        <li><strong>Sweep through Time:</strong> Track simultaneous events with a variable. Track how many events are currently active as you loop; go up by 1 for every 'Start' and down by 1 for every 'End' you encounter.</li>
+                        <li><strong>Handle Simultaneous Events [Tie Breaker]:</strong>  If one event starts exactly when another ends, handle the "Start" first. This pushes your counter up before it goes down, ensuring you count both events as active at that specific moment so you don't miss the peak overlap.</li>
+                        <li><strong>Sweep through Time:</strong> Walk through your sorted list of time markers from beginning to end. Keep a running tally of active events: add 1 for every "Start" marker you hit and subtract 1 for every "End" marker. This running total shows exactly how many events are happening at any given time.</li>
                         <li><strong>Track the Peak:</strong> As we sweep and update the counter, we also keep a separate record of the highest value the counter ever reached.</li>
                     </ul>
                     <p><strong>The Result:</strong> The highest value this counter ever attained is the answer. It represents the peak number of events that were simultaneously active at any single point in time.</p>
                 </div>
-
             </div>
         </details>
 
