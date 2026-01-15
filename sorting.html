@@ -310,9 +310,17 @@
                             </svg>
                         </button>
                     </span>
-                    <p>Find the peak number of events active at a single moment.</p>
-                    <p><strong>The How:</strong> Create a timeline of markers (Start/End) and sort them. <strong>Tie Breaker:</strong> Process START before END to count overlaps correctly.</p>
-                    <p><strong>Sweep:</strong> +1 for Start, -1 for End. Track the highest value reached.</p>
+                    <p>The goal is to find the maximum number of events that overlap at any single moment (peak concurrency).</p>
+                    <p><strong>The How:</strong></p>
+                    <ul>
+                        <li><strong>Identify Key Moments:</strong> For each event (which has a start and end time), mark two crucial points in time: its start and its end. Think of these as "events begin" and "events end" markers.</li>
+                        <li><strong>Create a Timeline of Markers:</strong> Collect all these start and end markers from all events.</li>
+                        <li><strong>Order the Markers:</strong> Sort these markers chronologically.</li>
+                        <li><strong>Handle Simultaneous Events [Tie Breaker]:</strong> Process the start of Event B <em>before</em> the end of Event A. This ensures we correctly count both events as overlapping at that precise moment for our maximum count.</li>
+                        <li><strong>Sweep through Time:</strong> Track simultaneous events with a variable. Track how many events are currently active as you loop; go up by 1 for every 'Start' and down by 1 for every 'End' you encounter.</li>
+                        <li><strong>Track the Peak:</strong> As we sweep and update the counter, we also keep a separate record of the highest value the counter ever reached.</li>
+                    </ul>
+                    <p><strong>The Result:</strong> The highest value this counter ever attained is the answer. It represents the peak number of events that were simultaneously active at any single point in time.</p>
                 </div>
 
             </div>
