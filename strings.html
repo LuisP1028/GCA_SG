@@ -183,8 +183,7 @@
         <details class="section">
             <summary>2. Pattern Matching</summary>
             <div class="section-content">
-                
-<div class="subsection">
+                <div class="subsection">
                     <div class="subsection-title">
                         REPLACE AND REMOVE [Two Pass Algorithm]
                         <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/replace_and_remove.html'; document.querySelector('.retro-viewport').classList.add('active');">
@@ -201,67 +200,27 @@
                         <li>Pass Two (Backward - "Expand and Substitute"):<br>Iterate from the end of the compacted data backwards. Move characters to their final positions. If the character is 'a', write two 'd's; otherwise, copy the character. This backward approach prevents the expansion of 'a' into 'dd' from overwriting subsequent characters that have not yet been moved.</li>
                     </ol>
                 </div>
-                    <p><strong>THE HOW: EXPANDED</strong></p>
-                    <p><strong>Phase 1: The Compaction Pass (Forward Iteration)</strong><br>
-                    Objective: Eliminate 'b's to create a dense block of valid characters and calculate the necessary storage for the next phase.</p>
-                    <ol>
-                        <li>Initialize Pointers:
-                            <ul>
-                                <li>Create a Read Pointer (to scan the input) and a Write Pointer (to place valid characters). Both start at the beginning of the array.</li>
-                                <li>(Read Pointer): Moves through every single slot to inspect the data.</li>
-                                <li>(Write Pointer): Marks the position where the next valid character belongs. It only moves after it successfully stores something.</li>
-                                <li>Initialize a counter to track the Occurrence Count of the character 'a'.</li>
-                            </ul>
-                        </li>
-                        <li>Filter and Compact:
-                            <ul>
-                                <li>Move the Read Pointer forward through each slot of the array.</li>
-                                <li>Conditional Check: If the character at the Read Pointer is not 'b', copy it to the slot at the Write Pointer. Then, advance the Write Pointer.</li>
-                                <li>Deletion Logic: If the character is 'b', do nothing. By not advancing the Write Pointer, the 'b' is effectively skipped and will be overwritten.
-                                    <ul>
-                                        <li>Instead of deleting characters in place, we're just not appending them.</li>
-                                    </ul>
-                                </li>
-                            </ul>
-                        </li>
-                        <li>Accumulate Metadata:
-                            <ul>
-                                <li>During this same scan, every time the Read Pointer encounters an 'a', increment the Occurrence Count.</li>
-                            </ul>
-                        </li>
-                        <li>End State:
-                            <ul>
-                                <li>The array is now compacted. All valid characters (including 'a's) are packed contiguously at the start. The Write Pointer currently sits at the end of this valid block.</li>
-                            </ul>
-                        </li>
-                    </ol>
-                    <p><strong>Phase 2: The Expansion Pass (Backward Iteration)</strong><br>
-                    Objective: Expand 'a's into 'dd's. We work backward to ensure we process data before we overwrite it (Collision Avoidance).</p>
-                    <ol>
-                        <li>Calculate Final Dimensions:<br>Calculate the total length by adding the count of 'a's to the current size. Position the Read Pointer at the end of the compacted data, and the Write Pointer at the very end of the new total length.
-                            <ul>
-                                <li>The write pointer’s position is calculated with the use of frequency counts of ‘a’ + current array length of valid data</li>
-                                <li>The 'a' is already counted once in the current length. 'dd' adds only one extra character. So we add 1 (the increase), not 2, for each 'a'.</li>
-                            </ul>
-                        </li>
-                        <li>Iterate Backward:
-                            <ul>
-                                <li>Loop until the Read Pointer reaches the start of the array.</li>
-                            </ul>
-                        </li>
-                        <li>Expand or Copy:
-                            <ul>
-                                <li>Expansion Logic: If the character at the Read Pointer is 'a', write 'd' and 'd' at the Write Pointer and the slot before it. Move the Write Pointer back by two.</li>
-                                <li>Copy Logic: If the character is not 'a', simply copy it to the Write Pointer. Move the Write Pointer back by one.</li>
-                            </ul>
-                        </li>
-                        <li>Final Output:
-                            <ul>
-                                <li>Return the New Logical Size. The array has now been mutated in-place: 'b's are gone, and 'a's are expanded, with no data lost to overwriting.</li>
-                            </ul>
-                        </li>
-                    </ol>
-                </div>
+                <p><strong>THE HOW: EXPANDED</strong></p>
+                <p><strong>Phase 1: Filter and Count</strong></p>
+                <ol>
+                    <li>Initialize a read pointer and a write pointer at the start of the array, and set an a_count variable to zero.</li>
+                    <li>Iterate through the array using the read pointer.</li>
+                    <li>If the current character is 'b', ignore it and continue.</li>
+                    <li>If the character is not 'b', copy it to the write pointer's location and move write forward.</li>
+                    <li>Whenever you copy an 'a', increment the a_count.</li>
+                    <li>Once finished, the write pointer marks the end of the compacted data, effectively deleting all 'b's.</li>
+                </ol>
+                <p><strong>Phase 2: Expand in Reverse</strong></p>
+                <ol>
+                    <li>Calculate the final string length by adding a_count to the current size of the compacted data.</li>
+                    <li>Place a read pointer at the end of the compacted data and a write pointer at the very end of the new total capacity.</li>
+                    <li>Iterate backward through the array.</li>
+                    <li>If the read pointer encounters an 'a', insert two 'd's at the write position and move write back two steps.</li>
+                    <li>If it encounters any other character, simply copy it to the write position and move write back one step.</li>
+                    <li>Continue until the read pointer reaches the start, ensuring expansion happens without overwriting unprocessed data.</li>
+                </ol>
+            </div>
+        </details>
 
                 <div class="subsection">
                     <div class="subsection-title">
