@@ -189,9 +189,6 @@
                         </button>
                     </div>
                     <p>If you run a long task first, every subsequent task must wait for that long task to finish, drastically increasing the cumulative waiting time.</p>
-                    <ul>
-                        <li>Conversely, if you run short tasks first, the subsequent tasks wait less. The solution requires arranging the input data to exploit this mathematical relationship.</li>
-                    </ul>
                     <p><strong>The Process:</strong></p>
                     <ol>
                         <li>Input: Receive an unsorted array of integers representing service durations.</li>
@@ -206,17 +203,7 @@
                         <li>A query processed last contributes its service time to zero other queries (no one is waiting behind it).</li>
                         <li>Therefore, to minimize the total sum, the values with the highest multiplier (processed earliest) must be the smallest numbers.</li>
                     </ul>
-                    <p><strong>THE HOW:</strong></p>
-                    <p><strong>Step 1: Sorting</strong><br>
-                    Sort the list of tasks from shortest to longest. This is the most critical step: running quick tasks first minimizes the total time everyone else spends sitting in the queue.</p>
-                    <p><strong>Step 2: The Loop</strong><br>
-                    Start a loop to look at each task in your sorted list one by one. This sets up the process where you will evaluate the specific cost of each task in the sequence.</p>
-                    <p><strong>Step 3: The Multiplier</strong><br>
-                    Count how many tasks are stuck waiting behind the current one. For example, if there are 5 tasks total and you are processing the first one, there are 4 tasks waiting behind it.</p>
-                    <p><strong>Step 4: The Math</strong><br>
-                    Multiply the current task's duration by the number of waiting tasks (from Step 3). Add this result to your total. This calculates exactly how much wait time this specific task causes.</p>
-                    <p><strong>Step 5: The Result</strong><br>
-                    Once the loop finishes, the final sum is your answer. Return this number. It represents the lowest possible total waiting time for the entire group of tasks.</p>
+                    
                 </div>
 
 <div class="subsection">
@@ -231,11 +218,9 @@
                     </div>
                     <p><strong>[STRATEGY]</strong></p>
                     <p><strong>A. Focus on the "First Ending" Interval</strong><br>
-                    Look at the entire set of intervals. Find the first task that ends earliest. (has the minimum right endpoint).</p>
+                    Look at the entire set of intervals. Find the first task that ends earliest (has the minimum right endpoint).</p>
                     <p><strong>B. Select the Rightmost Point (Extremal Point)</strong><br>
-                    To cover the interval identified in Step 1, pick its right endpoint.
-                    <br>- Why? This is the greedy choice. By picking the latest possible time that still covers the first-ending interval, we maximize the probability that this same point will also overlap with intervals starting later.</p>
-                    <p>IN OTHER WORDS: Tasks don't change; your visit time does.If you visit early, you miss tasks starting later.by waiting until the deadline, you wait for those later tasks to begin, so you can catch them and the first task simultaneously.</p>
+                    <br> By picking the right endpoint, still covering the first-ending interval, we maximize the probability that this same point will also overlap with intervals starting later.</p>
                     <p><strong>THE HOW:</strong></p>
                     <p><strong>Step 1: Sort the Data</strong><br>
                     To implement the above logic efficiently, sort all intervals in the list based on their right endpoints in ascending order.</p>
