@@ -287,28 +287,17 @@
                     </div>
                     <p>A Majority Element is rigorously defined as an element that appears in strictly more than half of the positions</p>
                     <p><strong>The Logic of "Mutual Destruction"</strong><br>
-                    The Boyer-Moore Voting Algorithm functions as a war of attrition.</p>
-                    <ul>
-                        <li>Every time the algorithm finds two different elements (a mismatch), it performs Elimination.</li>
-                        <li>It effectively says: "I will remove one Instance of the Candidate and one Instance of a Non-Candidate."</li>
-                    </ul>
-                    <p>If the Majority Element makes up more than 50% of the army, and every single enemy (Non-Candidate) manages to kill one Majority soldier, the Majority will still have soldiers left standing at the end.</p>
+                    The algorithm acts as a war of attrition. Mismatched elements are paired and eliminated. Since the Majority Element exceeds 50% of the input, even if every non-majority element successfully neutralizes one majority instance, the majority inevitably survives the elimination process to remain standing.</p>
                     <p><strong>Step 1: Establish State Variables</strong><br>
-                    We allocate memory for two variables only:<br>
-                    1. candidate: Stores the specific string currently suspected to be the majority.<br>
-                    2. candidate_count: An integer acting as a counter for the candidate.</p>
-                    <p><strong>Step 2: Begin Linear Scan (The Loop)</strong><br>
-                    We begin iterating through the input_stream. For every element it (iterator) in the sequence, we perform a logic check. It verifies whether the input stream contains a subsequent element to process.</p>
-                    <p><strong>Step 3: The Zero-Count Check (Reset Mechanism)</strong><br>
-                    Logic: If candidate_count is 0, it implies that all previous elements have effectively cancelled each other out (or we are at the start).</p>
+                    Initialize two variables: candidate to store the potential majority element, and count (integer) to track its current net surplus against other elements.</p>
+                    <p><strong>Step 2: Begin Linear Scan</strong><br>
+                    Iterate through the input_stream linearly. Process each element (it) sequentially, moving through the list one by one until the end of the stream is reached.</p>
+                    <p><strong>Step 3: The Zero-Count Check</strong><br>
+                    Check count. If it is 0, previous pairs have mutually destroyed each other. Immediately set the current element (it) as the new candidate and reset count to 1.</p>
                     <p><strong>Step 4: The Comparison</strong><br>
-                    If the count is positive, compare the current element (it) with the candidate:</p>
-                    <ul>
-                        <li>Scenario A (Match): If candidate == it, reinforce the current hypothesis by incrementing the count by 1.</li>
-                        <li>Scenario B (Mismatch): If candidate != it, pair the distinct elements to cancel them out by decrementing the count by 1. (A zero count will trigger a reset in the next step).</li>
-                    </ul>
+                    Compare it with candidate. If they match, increment count to reinforce the current hypothesis. If they differ, decrement count to pair and eliminate the distinct elements.</p>
                     <p><strong>Step 5: The Result</strong><br>
-                    When the list is finished, the string left in your candidate variable is the answer, thanks to the logic of mutual destruction.</p>
+                    Upon completing the scan, the value remaining in candidate is the Majority Element, as it is the only element mathematically capable of surviving the pairwise elimination.</p>
                 </div>
 
             </div>
