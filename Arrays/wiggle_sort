@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiggle Sort // Alternation Visualizer</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --fg: #00FF00;
+            --dim: #004400;
+            --highlight: #CCFFCC;
+            --err: #FF0000; /* Only used for bad slopes */
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Courier New', Courier, monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        /* DITHER PUNK OVERLAY */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        
+        /* Scanline effect */
+        .scanlines {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: repeating-radial-gradient(circle, transparent, transparent 2px, #000 4px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        /* HEADER & LOG */
+        header {
+            padding: 20px;
+            border-bottom: 2px solid var(--fg);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-shrink: 0;
+        }
+        
+        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; text-shadow: 0 0 5px var(--fg); }
+        
+        #log-container {
+            text-align: right;
+            max-width: 60%;
+        }
+        #status-main { font-weight: bold; font-size: 1.2rem; }
+        #status-sub { color: var(--fg); opacity: 0.8; font-size: 0.9rem; margin-top: 5px; }
+
+        /* MAIN STAGE */
+        #stage {
+            flex-grow: 1;
+            position: relative;
+            margin: 20px;
+            border: 1px dashed var(--dim);
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding-bottom: 0;
+        }
+
+        /* SVG LAYER FOR LINES */
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        line {
+            stroke-width: 2;
+            transition: all 0.3s;
+        }
+        .slope-line { stroke: var(--fg); opacity: 0.5; }
+        .slope-line.valid { stroke: var(--fg); opacity: 1; stroke-width: 2; }
+        .slope-line.invalid { stroke: var(--fg); stroke-dasharray: 5,5; opacity: 0.5; }
+        .ghost-line { stroke: var(--highlight); stroke-width: 2; stroke-dasharray: 4,4; }
+        .proof-line { stroke: var(--fg); stroke-width: 4; }
+
+        /* BARS */
+        .bar-container {
+            flex-grow: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            position: relative;
+            margin: 0 2px;
+        }
+
+        .bar {
+            width: 80%;
+            background: repeating-linear-gradient(45deg, var(--dim), var(--dim) 5px, var(--bg) 5px, var(--bg) 10px);
+            border: 2px solid var(--dim);
+            transition: height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.2s;
+            position: relative;
+        }
+
+        .bar-label {
+            margin-top: 5px;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        /* GHOST BAR */
+        .ghost-bar {
+            position: absolute;
+            bottom: 20px; /* aligns with label offset */
+            width: 80%;
+            border: 2px dashed var(--highlight);
+            background: transparent;
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* STATES */
+        .active .bar {
+            border-color: var(--highlight);
+            background: var(--fg);
+            box-shadow: 0 0 15px var(--fg);
+        }
+        
+        .verified .bar {
+            border-color: var(--dim);
+            opacity: 0.5;
+        }
+
+        /* CONTROLS */
+        #controls {
+            padding: 20px;
+            border-top: 2px solid var(--fg);
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            background: var(--bg);
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--fg);
+            color: var(--fg);
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0 var(--dim);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--dim);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* UTILS */
+        .blinking { animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <header>
+        <div>
+            <h1>> WIGGLE_SORT.EXE</h1>
+            <div style="font-size: 0.8rem; margin-top:5px;">OPTIMIZATION :: ALTERNATION STRATEGY</div>
+        </div>
+        <div id="log-container">
+            <div id="status-main">SYSTEM READY</div>
+            <div id="status-sub">WAITING FOR INPUT...</div>
+        </div>
+    </header>
+
+    <div id="stage">
+        <svg id="svg-layer"></svg>
+        <!-- Bars injected here via JS -->
+    </div>
+
+    <div id="controls">
+        <button onclick="init()">[ GENERATE NEW ]</button>
+        <button id="btn-step" onclick="step()">[ STEP ]</button>
+        <button id="btn-auto" onclick="toggleAuto()">[ AUTO-PLAY ]</button>
+    </div>
+
+    <script>
+        // CONFIG
+        const NUM_BARS = 12;
+        const SPEED = 800;
+        
+        // STATE
+        let array = [];
+        let currentIndex = 0;
+        let isRunning = false;
+        let autoInterval = null;
+        let isProcessing = false; // blocks interaction during animation
+
+        // DOM ELEMENTS
+        const stage = document.getElementById('stage');
+        const svgLayer = document.getElementById('svg-layer');
+        const statusMain = document.getElementById('status-main');
+        const statusSub = document.getElementById('status-sub');
+        
+        // INITIALIZATION
+        function init() {
+            stopAuto();
+            array = [];
+            currentIndex = 0;
+            isProcessing = false;
+            
+            // Generate random values
+            for(let i=0; i<NUM_BARS; i++) {
+                array.push(Math.floor(Math.random() * 80) + 10);
+            }
+
+            renderBars();
+            updateStatus("INITIALIZED", "GREEDY ALGORITHM READY. CLICK STEP.");
+            drawLines();
+        }
+
+        function renderBars() {
+            stage.innerHTML = '<svg id="svg-layer"></svg>'; // Reset but keep SVG
+            
+            array.forEach((val, idx) => {
+                const container = document.createElement('div');
+                container.className = 'bar-container';
+                container.id = `col-${idx}`;
+
+                // The Ghost Bar (Hidden by default)
+                const ghost = document.createElement('div');
+                ghost.className = 'ghost-bar';
+                ghost.id = `ghost-${idx}`;
+                
+                // The Real Bar
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.height = `${val}%`;
+                bar.id = `bar-${idx}`;
+
+                // Label
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.innerText = idx;
+
+                container.appendChild(ghost); // Ghost sits behind/same spot
+                container.appendChild(bar);
+                container.appendChild(label);
+                stage.appendChild(container);
+            });
+            
+            // Re-attach SVG ref after innerHTML wipe
+            const newSvg = document.getElementById('svg-layer');
+            // We need to keep the svg lines logic separated
+        }
+
+        // DRAWING CONNECTOR LINES
+        function drawLines(specialLines = []) {
+            const svg = document.getElementById('svg-layer');
+            svg.innerHTML = ''; // clear lines
+
+            // Draw standard slope lines
+            for(let i=0; i < array.length - 1; i++) {
+                const b1 = document.getElementById(`bar-${i}`).getBoundingClientRect();
+                const b2 = document.getElementById(`bar-${i+1}`).getBoundingClientRect();
+                const stageRect = stage.getBoundingClientRect();
+
+                // Calculate relative coordinates inside the stage
+                const x1 = b1.left + b1.width/2 - stageRect.left;
+                const y1 = b1.top - stageRect.top;
+                const x2 = b2.left + b2.width/2 - stageRect.left;
+                const y2 = b2.top - stageRect.top;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                
+                // Styling logic based on state
+                if (i < currentIndex) line.classList.add('valid');
+                else line.classList.add('slope-line');
+                
+                svg.appendChild(line);
+            }
+
+            // Draw Special Proof Lines (The Ghost Lines)
+            specialLines.forEach(sl => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', sl.x1);
+                line.setAttribute('y1', sl.y1);
+                line.setAttribute('x2', sl.x2);
+                line.setAttribute('y2', sl.y2);
+                line.setAttribute('class', sl.className);
+                svg.appendChild(line);
+            });
+        }
+
+        // CORE ALGORITHM STEP
+        async function step() {
+            if(currentIndex >= array.length - 1) {
+                updateStatus("COMPLETE", "ARRAY WIGGLE SORTED.");
+                stopAuto();
+                return;
+            }
+            if(isProcessing) return;
+            isProcessing = true;
+
+            const i = currentIndex;
+            const isEven = (i % 2 === 0);
+            const goal = isEven ? "VALLEY (<=)" : "PEAK (>=)";
+            
+            // Highlight active pair
+            document.getElementById(`col-${i}`).classList.add('active');
+            document.getElementById(`col-${i+1}`).classList.add('active');
+            
+            updateStatus(`INDEX ${i} vs ${i+1}`, `GOAL: ${goal}`);
+
+            // Wait for viewer to see selection
+            await wait(SPEED * 0.5);
+
+            const valCurrent = array[i];
+            const valNext = array[i+1];
+            let swapped = false;
+
+            if (isEven) {
+                // WE WANT VALLEY: Current <= Next
+                if (valCurrent > valNext) {
+                    swapData(i, i+1);
+                    swapped = true;
+                    updateStatus("SWAP NEEDED", "Current was > Next. Fixing Valley.");
+                } else {
+                    updateStatus("OK", "Valley Condition Met.");
+                }
+            } else {
+                // WE WANT PEAK: Current >= Next
+                if (valCurrent < valNext) {
+                    // *** THIS IS THE CRITICAL VISUALIZATION ***
+                    // We need to swap to make 'i' a peak. 
+                    // This creates a steeper slope from i-1.
+                    
+                    updateStatus("VIOLATION", "Current < Next. Must create PEAK.");
+                    
+                    // 1. Setup Ghost Visuals
+                    const ghostEl = document.getElementById(`ghost-${i}`); // The bar at i (currently small)
+                    const barEl = document.getElementById(`bar-${i}`);
+                    
+                    // Freeze ghost at current small height
+                    ghostEl.style.height = `${array[i]}%`;
+                    ghostEl.style.opacity = '1';
+                    
+                    // 2. Perform Swap Data
+                    swapData(i, i+1);
+                    swapped = true;
+                    
+                    // 3. Draw The Proof Lines
+                    // We need coordinates for i-1 (Previous), i (New Tall), and Ghost (Old Small)
+                    // Note: i-1 is safe to access because Peak logic happens at odd indices (i>=1)
+                    await wait(100); // let DOM update height
+                    
+                    const prevBar = document.getElementById(`bar-${i-1}`).getBoundingClientRect();
+                    const currBar = document.getElementById(`bar-${i}`).getBoundingClientRect();
+                    const stageRect = stage.getBoundingClientRect();
+                    
+                    // Center X of prev
+                    const xPrev = prevBar.left + prevBar.width/2 - stageRect.left;
+                    const yPrev = prevBar.top - stageRect.top;
+                    
+                    // Center X of current
+                    const xCurr = currBar.left + currBar.width/2 - stageRect.left;
+                    
+                    // Y of New Tall Bar
+                    const yNew = currBar.top - stageRect.top;
+                    
+                    // Y of Ghost (Old Small) - we calculate manually based on % because ghost is absolute
+                    // actually, easier to get the ghost element rect now
+                    const ghostRect = ghostEl.getBoundingClientRect();
+                    const yGhost = ghostRect.top - stageRect.top;
+
+                    const proofLines = [
+                        // Line to Ghost (Old Slope)
+                        { x1: xPrev, y1: yPrev, x2: xCurr, y2: yGhost, className: 'ghost-line' },
+                        // Line to New (Steeper Slope)
+                        { x1: xPrev, y1: yPrev, x2: xCurr, y2: yNew, className: 'proof-line' }
+                    ];
+
+                    drawLines(proofLines);
+                    updateStatus("LOCAL OPTIMALITY", "New slope is STEEPER. Previous valley preserved!");
+                    
+                    await wait(SPEED * 1.5); // Hold to show proof
+                    
+                    // Reset Ghost
+                    ghostEl.style.opacity = '0';
+                } else {
+                    updateStatus("OK", "Peak Condition Met.");
+                }
+            }
+
+            if(!swapped) {
+                 drawLines(); // Just refresh lines
+            }
+
+            // Cleanup visuals
+            await wait(SPEED * 0.5);
+            document.getElementById(`col-${i}`).classList.remove('active');
+            document.getElementById(`col-${i}`).classList.add('verified');
+            document.getElementById(`col-${i+1}`).classList.remove('active');
+            
+            // If we just swapped at the very end, ensure drawing is current
+            drawLines();
+
+            currentIndex++;
+            isProcessing = false;
+        }
+
+        function swapData(idx1, idx2) {
+            // Data Swap
+            let temp = array[idx1];
+            array[idx1] = array[idx2];
+            array[idx2] = temp;
+
+            // Visual Height Update
+            document.getElementById(`bar-${idx1}`).style.height = `${array[idx1]}%`;
+            document.getElementById(`bar-${idx2}`).style.height = `${array[idx2]}%`;
+        }
+
+        function updateStatus(main, sub) {
+            statusMain.innerText = `> ${main}`;
+            statusSub.innerText = sub;
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // AUTO PLAY CONTROLS
+        function toggleAuto() {
+            if(isRunning) stopAuto();
+            else startAuto();
+        }
+
+        function startAuto() {
+            isRunning = true;
+            document.getElementById('btn-auto').innerText = "[ STOP ]";
+            document.getElementById('btn-auto').classList.add('blinking');
+            if(currentIndex >= array.length -1) init(); // restart if done
+            
+            async function loop() {
+                if(!isRunning) return;
+                await step();
+                if(isRunning && currentIndex < array.length - 1) {
+                    setTimeout(loop, 200);
+                } else {
+                    stopAuto();
+                }
+            }
+            loop();
+        }
+
+        function stopAuto() {
+            isRunning = false;
+            document.getElementById('btn-auto').innerText = "[ AUTO-PLAY ]";
+            document.getElementById('btn-auto').classList.remove('blinking');
+        }
+
+        // Handle Window Resize to redraw SVG lines
+        window.addEventListener('resize', () => {
+            drawLines();
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
