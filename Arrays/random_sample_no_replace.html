@@ -2,453 +2,658 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Part I: Arrays // Study Guide</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Partial Shuffle // Ditherpunk Responsive</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
     <style>
-        /*
-        --- STYLE CONFIGURATION ---
-        (Identical to Main Shell)
-        */
+        /* --- CSS VARIABLES & RESET --- */
         :root {
-            --bg-color: #000000;
-            --text-color: #00ff41;
-            --accent-color: #00ff41;
-            --dim-color: #003b00;
-            --border-color: #00ff41;
-            --font-main: 'Courier New', Courier, monospace;
-            --font-header: 'Arial Black', Impact, sans-serif;
+            --color-bg: #111111;
+            --color-fg: #00FF41;
+            --color-dim: #003B00;
+            --font-stack: 'VT323', monospace;
+            
+            /* Dynamic sizing using clamp(min, preferred, max) */
+            --cell-size: clamp(28px, 7vw, 70px);
+            --gap-size: clamp(4px, 1vw, 15px);
+            --font-base: clamp(1rem, 2.5vw, 1.5rem);
+            --header-size: clamp(1.5rem, 5vw, 2.5rem);
+            
+            --glow: 0 0 10px rgba(0, 255, 65, 0.5);
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-main);
-            line-height: 1.5;
-            overflow-x: hidden;
+            background-color: var(--color-bg);
+            color: var(--color-fg);
+            font-family: var(--font-stack);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Prevent body scroll, handle inside app */
+            text-shadow: 0 0 4px var(--color-dim);
         }
 
-        .dither-layer {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: -1;
-            background-image: radial-gradient(circle, #003b00 1px, transparent 1px);
-            background-size: 4px 4px;
-            opacity: 0.4;
-        }
-
+        /* --- SCANLINES & CRT EFFECTS --- */
         .scanlines {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to bottom, rgba(0, 255, 65, 0), rgba(0, 255, 65, 0) 50%, rgba(0, 20, 0, 0.2) 50%, rgba(0, 20, 0, 0.2));
-            background-size: 100% 4px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
-            z-index: 9999;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 999;
+            box-shadow: inset 0 0 5vmax rgba(0,0,0,0.7);
         }
 
-        .container {
-            max-width: 900px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 40px 20px;
-            border-left: 2px dashed var(--dim-color);
-            border-right: 2px dashed var(--dim-color);
-            background-color: rgba(0, 10, 0, 0.9);
-            min-height: 100vh;
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+            opacity: 0.98;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+
+        /* --- LAYOUT STRUCTURE --- */
+        #app {
+            display: flex;
+            flex-direction: column;
+            width: 95%;
+            max-width: 1200px;
+            height: 95%; /* Leave breathing room */
+            max-height: 900px;
+            border: 2px solid var(--color-fg);
+            padding: clamp(10px, 2vh, 20px);
+            position: relative;
+            background: var(--color-bg);
+            box-shadow: 0 0 20px var(--color-dim);
+            transition: height 0.3s;
+        }
+
+        header {
+            border-bottom: 2px solid var(--color-fg);
+            padding-bottom: 10px;
+            margin-bottom: 2vh;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
         }
 
         h1 {
-            font-family: var(--font-header);
+            margin: 0;
+            font-size: var(--header-size);
             text-transform: uppercase;
-            font-size: 2.5rem;
-            border-bottom: 5px solid var(--accent-color);
-            margin-bottom: 40px;
-            color: var(--accent-color);
-            text-align: center;
+            letter-spacing: 2px;
+            line-height: 1;
         }
 
-        strong { color: var(--accent-color); }
-        em { font-style: normal; color: #50c878; }
-
-        /* ACCORDION STYLES */
-        details.section {
-            margin-bottom: 15px;
-            border: 1px solid var(--dim-color);
-            background: #050505;
+        .header-info {
+            display: flex;
+            flex-direction: column;
         }
 
-        details.section > summary {
-            font-family: var(--font-main);
-            font-weight: bold;
-            padding: 12px;
-            background: #0a0a0a;
-            color: var(--text-color);
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: black;
+            color: var(--color-fg);
+            border: 1px solid var(--color-fg);
+            font-family: var(--font-stack);
+            font-size: var(--font-base);
+            padding: 0.2em 0.8em;
             cursor: pointer;
-            list-style: none;
-            border-bottom: 1px solid transparent;
+            transition: all 0.2s;
             text-transform: uppercase;
-            font-size: 1.1rem;
+            flex: 1 1 auto; /* Grow to fill space on mobile */
+            white-space: nowrap;
         }
 
-        details.section > summary:hover { background: var(--dim-color); color: var(--accent-color); }
-        details.section[open] > summary {
-            border-bottom: 1px solid var(--dim-color);
-            background: #0f0f0f;
-            color: var(--accent-color);
-            text-shadow: 0px 0px 5px var(--accent-color);
+        button:hover:not(:disabled) {
+            background: var(--color-fg);
+            color: black;
+            box-shadow: var(--glow);
         }
 
-        .section-content { padding: 20px; }
-
-        .subsection {
-            margin-bottom: 25px;
-            border-left: 4px solid var(--dim-color);
-            padding-left: 15px;
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-style: dashed;
         }
 
-        .subsection-title {
-            background: var(--dim-color);
-            color: var(--accent-color);
-            padding: 2px 6px;
-            font-weight: bold;
-            text-transform: uppercase;
-            display: inline-block;
+        /* --- VISUALIZATION AREA --- */
+        #viz-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center vertically */
+            align-items: center;
+            position: relative;
+            width: 100%;
+            overflow: hidden; /* Prevent spillover */
+            min-height: 200px; /* Ensure space for graph */
+        }
+
+        #status-label {
+            font-size: calc(var(--font-base) * 1.2);
+            margin-bottom: 3vh;
+            text-align: center;
+            min-height: 1.5em;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* The Array Row */
+        .array-container {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding-top: 40px; /* Space for marker */
+        }
+
+        .array-row {
+            display: flex;
+            gap: var(--gap-size);
+            position: relative;
             margin-bottom: 10px;
-            font-size: 0.9rem;
+            /* Ensure it doesn't break line */
+            flex-wrap: nowrap;
+            justify-content: center;
         }
 
-        p { margin-bottom: 12px; margin-top: 0; text-align: justify; }
-        ul { padding-left: 20px; margin-bottom: 15px; }
-        li { margin-bottom: 5px; }
+        /* SVG Overlay */
+        #connector-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            overflow: visible;
+        }
+        
+        line, path {
+            stroke: var(--color-fg);
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke; /* Keep line width consistent */
+        }
 
-        .code-block {
-            background: #020a02;
-            border: 1px dashed var(--dim-color);
+        /* --- CELL STYLES --- */
+        .cell-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: var(--cell-size);
+            /* Important for swap animation positioning */
+            flex-shrink: 0; 
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: 2px solid var(--color-fg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: calc(var(--cell-size) * 0.5); /* Font scales with cell */
+            font-weight: bold;
+            position: relative;
+            background-color: black;
+            z-index: 2;
+        }
+
+        .index-label {
+            margin-top: 8px;
+            font-size: calc(var(--cell-size) * 0.3);
+            opacity: 0.7;
+        }
+
+        /* STATES */
+        .cell.selected {
+            background-color: var(--color-fg);
+            color: black;
+            box-shadow: var(--glow);
+        }
+
+        .cell.pool {
+            background-image: radial-gradient(var(--color-dim) 20%, transparent 20%);
+            background-size: 4px 4px;
+            color: var(--color-fg);
+        }
+
+        .cell.discarded {
+            opacity: 0.3;
+            border-style: dotted;
+        }
+
+        .cell.target {
+            border: 4px double var(--color-fg);
+            animation: pulse-border 0.8s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            from { box-shadow: 0 0 2px var(--color-fg); transform: scale(1); }
+            to { box-shadow: 0 0 15px var(--color-fg); transform: scale(1.05); }
+        }
+
+        .cell.source {
+            animation: strobe 0.1s infinite;
+        }
+
+        @keyframes strobe {
+            0% { background-color: var(--color-fg); color: black; }
+            50% { background-color: black; color: var(--color-fg); }
+            100% { background-color: var(--color-fg); color: black; }
+        }
+
+        /* --- BRACKET MARKER --- */
+        .boundary-marker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            pointer-events: none;
+        }
+        
+        .boundary-text {
+            position: absolute;
+            transition: left 0.5s ease;
+            white-space: nowrap;
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            transform: translateX(-50%); /* Center the text on the point */
+        }
+
+        /* --- LOG TERMINAL --- */
+        #console-log {
+            height: 25%;
+            min-height: 100px;
+            max-height: 200px;
+            border-top: 2px solid var(--color-fg);
+            background: rgba(0, 0, 0, 0.8);
             padding: 10px;
-            margin: 10px 0;
-            font-family: 'Courier New', monospace;
-            color: var(--accent-color);
-            overflow-x: auto;
-            white-space: pre-wrap;
+            font-family: var(--font-stack);
+            font-size: var(--font-base);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            /* Custom Scrollbar for Webkit */
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-fg) var(--color-bg);
         }
+        
+        #console-log::-webkit-scrollbar { width: 8px; }
+        #console-log::-webkit-scrollbar-track { background: var(--color-bg); }
+        #console-log::-webkit-scrollbar-thumb { background: var(--color-dim); border: 1px solid var(--color-fg); }
 
-        /* EYE BUTTON (Visual Only) */
-        .eye-btn {
-            position: relative; width: 20px; height: 20px;
-            background: #000; border: 1px solid var(--accent-color);
-            display: inline-flex; align-items: center; justify-content: center;
-            margin-left: 8px; vertical-align: middle; cursor: default;
+        .log-entry { margin-bottom: 4px; line-height: 1.2; }
+        .log-entry::before { content: "> "; opacity: 0.5; }
+
+        /* Media Query for Extremely Small Heights (Landscape Mobile) */
+        @media (max-height: 500px) {
+            #app { height: 100vh; max-height: none; padding: 5px; border: none; }
+            header { margin-bottom: 5px; }
+            #viz-container { min-height: 120px; }
+            .array-container { padding-top: 25px; }
+            h1 { font-size: 1.5rem; }
+            #console-log { display: none; } /* Hide log to save space on tiny landscape */
         }
-        .eye-btn svg { width: 100%; height: 100%; fill: var(--accent-color); }
     </style>
 </head>
 <body>
 
-<div class="dither-layer"></div>
-<div class="scanlines"></div>
+    <div class="scanlines"></div>
 
-<div class="container">
-    <h1>Part I: Arrays</h1>
-
-    <!-- MAIN CONTENT BUCKET -->
-    <div class="part-content">
-        
-        <!-- ============================================== -->
-        <!-- SECTION 1: TRAVERSAL & LOGIC -->
-        <!-- ============================================== -->
-        <details class="section">
-            <summary>1. Traversal & Matrix Logic</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <span class="subsection-title">
-                        Array Spiraling
-                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Arrays/array_spiral.html'; v.classList.add('active');">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                        </button>
-                    </span>
-                    <p><strong>Layer-by-Layer:</strong> Treats the matrix as concentric rectangular rings (shells). You iterate through the top row, right column, bottom row, and left column of the outermost ring, then shrink the boundary.</p>
-                    <p><strong>The How:</strong> Read the first row normally, transpose for columns. When reading bottom rows, traverse from <code>[-1]</code> to keep order. <em>Crucial Detail:</em> Stop one cell early when traversing columns/rows to ensure corners aren't counted twice. Mathematically: For a side of length L, process L-1 elements.</p>
-                    <div class="code-block">
-Analogy: Reading a Map
-• East: Hold map normally.
-• South: Turn head sideways.
-• West: Straighten head back to normal.
-                    </div>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Advancing Through an Array (Jump Game)</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/Greedy_Visual.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    
-                    <p>The problem asks if you can navigate from the start of a list to the end, where the number at each position represents your maximum “jump” length.</p>
-                    
-                    <p><strong>Naive Approach (Simulating Every Path):</strong> This method creates "parallel universes" for every move. It fails because it creates a branching tree of possibilities that explodes exponentially, causing the program to freeze (Time Limit Exceeded).</p>
-                    
-                    <p><strong>Optimal Approach (The Greedy Horizon):</strong> Instead of tracking specific paths, we track the boundary. We walk one step at a time asking: <em>"Does the current stone allow me to extend the boundary further?"</em></p>
-                    
-                    <ul>
-                        <li><strong>Reach & Horizon:</strong> <em>Reach</em> is your current index + jump capacity ($i + A[i]$). The <em>Horizon</em> is the maximum Reach calculated so far.</li>
-                        <li><strong>Gap:</strong> If <code>Current Position > Horizon</code>, you have hit a dead end (a gap in the bridge).</li>
-                    </ul>
-                    
-                    
-                </div>
-
+    <div id="app" class="crt-flicker">
+        <header>
+            <div class="header-info">
+                <h1>PARTIAL_SHUFFLE</h1>
+                <small style="opacity: 0.7">STATUS: <span id="sys-status">IDLE</span></small>
             </div>
-        </details>
-
-        <!-- ============================================== -->
-        <!-- SECTION 2: SAMPLING & RANDOMIZATION -->
-        <!-- ============================================== -->
-        <details class="section">
-            <summary>2. Sampling & Randomization</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <span class="subsection-title">Compute Random Subset</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/random_subset.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>To select 𝐤 unique numbers from a massive range 𝐧 without creating a huge array, use a HashMap to simulate a partial Fisher-Yates shuffle.</p>
-                    
-                    <p>It is called "virtual" because you never actually build this list. You just assume it exists. The process works like this:</p>
-                    <ul>
-                        <li><strong>The Randomizer:</strong> Generates a random index (e.g., 5).</li>
-                        <li><strong>The Virtual Array:</strong> Tells you "Index 5 contains the number 5" (unless the Map says otherwise).</li>
-                        <li><strong>The Limit:</strong> Defines how much of the array is still "in play" (the pool of available numbers).</li>
-                    </ul>
-                    <p>So, the virtual array is the data source (initially ordered 0 to N), and the randomizer is just the tool used to grab an index from it.</p>
-                
-                    <p><strong>Solution:</strong> Imagine a virtual array with fixed points (Value = Index). When you randomly pick an index (e.g., 10), you extract that value. To ensure 10 is never picked again without forcing you to repeatedly generate new random numbers until you find an unused one, you fill the hole immediately. You take the value from the very last available spot in the range (the limit) and move it to Index 10.</p>
-                    <p>The HashMap records this swap: <code>Map[10] = ValueAtLimit</code>.</p>
-                    <p>If you randomly roll Index 10 again later, the map intercepts and provides the moved value instead. After each pick, you shrink the range size by one. This guarantees that every single random generation lands on a valid, unpicked number, making the process highly efficient.</p>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Sample Online Data (Reservoir Sampling)</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/Fisher_Yates.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>Think of a VIP list with <strong>k</strong> spots. As the crowd (<strong>n</strong>) grows, entry becomes harder.</p>
-                    
-                        <li><strong>The Odds:</strong> For the n-th person, roll an n-sided die. If number ≤ k, they get in. (Chance = k/n).</li>
-                        <li><strong>The Swap:</strong> If they get in, randomly kick out a current VIP to maintain size k.</li>
-                        <li><strong>Early items enter easily but face many swap risks. Late items enter rarely but face few. These opposing forces balance out perfectly to k/n odds.</li>
-                    
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Sample Offline Data (Fisher Yates)</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/random_sample_no_replace.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p><strong>Logic:</strong> Partition the array into "Chosen" (Left) and "Pool" (Right).</p>
-                    <ol>
-                        <li>Place finger on index 0.</li>
-                        <li>Pick random index between finger and end.</li>
-                        <li>Swap the value at random index with finger.</li>
-                        <li>Advance finger. Repeat k times.</li>
-                    </ol>
-                    <p><em>Use Case:</em> Defense Ammunition Lot Acceptance (Testing without destroying inventory).</p>
-                </div>
-
+            <div class="controls">
+                <button id="btn-step">STEP</button>
+                <button id="btn-auto">AUTO</button>
+                <button id="btn-reset">RESET</button>
             </div>
-        </details>
+        </header>
 
-        <!-- ============================================== -->
-        <!-- SECTION 3: PERMUTATIONS & ORDERING -->
-        <!-- ============================================== -->
-        <details class="section">
-            <summary>3. Permutations & Ordering</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <span class="subsection-title">Next Permutation</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/next_permutation.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>Rearrange digits to form the <strong>smallest number that is larger</strong> than the current one (lexicographically larger).</p>
-                    <ul>
-                        <li><strong>Suffix:</strong> The tail end of the list.</li>
-                        <li><strong>Inversion Point:</strong> The first number (scanning right-to-left) smaller than its right neighbor.</li>
-                    </ul>
-                    <ol>
-                        <li><strong>Locate the Inversion Point:</strong> Scan the list from right to left. Stop at the first number smaller than the one to its right. (If no such number exists, the list is at its maximum; reverse it to reset to the minimum).</li>
-                        <li><strong>Identify the Successor:</strong> Within the Suffix, find the smallest number that is strictly larger than the Inversion Point.</li>
-                        <li><strong>Swap:</strong> Exchange the Inversion Point with the Successor.</li>
-                        <li><strong>Minimize the Suffix:</strong> Reverse the Suffix. Since the tail was descending, reversing it creates an ascending sequence. This ensures the new permutation is the smallest possible increment over the previous one.</li>
-                    </ol>
-                    <p><em>Use Case:</em> Cryptographic auditing (Brute-force key generation).</p>
+        <div id="viz-container">
+            <div id="status-label">INITIALIZED.</div>
+            
+            <div class="array-container">
+                <!-- Boundary Marker Text -->
+                <div class="boundary-marker">
+                    <span id="boundary-indicator" class="boundary-text">▼ BOUNDARY</span>
                 </div>
 
-                <div class="subsection">
-                    <span class="subsection-title">In-Place Permutations</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/permutations_array.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>Shuffle a list of items (A) according to specific instructions (P) without using an in-memory buffer.</p>
-                    <p><strong>Cyclic Permutation:</strong> A chain of moves that loops back to the start (e.g., Position 0 &rarr; 2 &rarr; 1 &rarr; 0). All permutations are made of these disjoint cycles.</p>
-                    <p><strong>In-Place:</strong> Modifying the input structure directly without using significant extra memory (O(1) space).</p>
-                    <p><strong>Anchor (i):</strong> The main loop index moves sequentially (0, 1, 2…) through the list. It acts as a "holding buffer" for displaced items to ensure every position is processed. We cycle elements through <em>i</em> until the specific cycle closes.</p>
-                    <p><strong>Cycle Pointer (next):</strong> A variable that jumps non-sequentially around the array. It follows the chain of instructions, tracing the specific path of a loop until it returns to the start.</p>
-                    <p><strong>Sentinel:</strong> Use a sentinel to mark visited spots by subtracting the array length from the index value. Since array indices are non-negative, this allows state tracking without extra storage.</p>
+                <!-- Array Elements -->
+                <div class="array-row" id="array-root">
+                    <!-- JS will populate this -->
                 </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Alternations (Wiggle Sort)</span>
-                    <p>In formal math, this is called an Alternation. In computer science interviews, this is often called a Wiggle Sort.</p>
-                    <p><strong>The Purpose:</strong> Breaking down optimization problems into smaller subproblems and optimizing them alternately.</p>
-                    <p><strong>The Pattern:</strong></p>
-                    <ul>
-                        <li>The 1st number should be smaller than (or equal to) the 2nd.</li>
-                        <li>The 2nd number should be bigger than (or equal to) the 3rd.</li>
-                        <li>The 3rd number should be smaller than (or equal to) the 4th.</li>
-                    </ul>
-                    <p><strong>Vocabulary:</strong></p>
-                    <p><strong>State:</strong> The list A is a mutable object. Its state changes every time the loop runs.</p>
-                    <p><strong>Local Optimality:</strong> The algorithm doesn't "look ahead." It looks only at the current pair (i and i+1). It assumes that fixing the current pair won't break the previous pair in a way that matters.</p>
-                    <p><em>Why doesn't it break the previous pair?</em></p>
-                    <p>If index i is even, we ensure A[i] &lt; A[i+1]. In the next step (index i+1 is odd), we ensure A[i+1] &gt; A[i+2]. Because we made A[i+1] larger in the current step, it actually helps satisfy the requirement for the previous step!</p>
-                    <p><strong>Online Processing:</strong> The text mentions this code is "online." This means the algorithm processes data as it arrives (sequentially) without needing to see the entire future of the list to make a decision about the current element.</p>
-                    <p><strong>Infrastructure Example (Smart Grid Load Scheduling):</strong> In smart energy grids, "wiggle" logic applies to task scheduling for demand response. By interleaving high-wattage industrial processes with low-wattage background tasks (High-Low-High), controllers prevent aggregate power spikes that trip breakers. This alternating current-draw profile flattens the demand curve, ensuring grid stability without requiring massive battery reserves to handle simultaneous peak loads.</p>
-                </div>
-
             </div>
-        </details>
+            
+            <!-- SVG Layer attached to container, not row, for easier coordinate math -->
+            <svg id="connector-svg"></svg>
+        </div>
 
-        <!-- ============================================== -->
-        <!-- SECTION 4: OPTIMIZATION & DP -->
-        <!-- ============================================== -->
-        <details class="section">
-            <summary>4. Optimization & DP</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <span class="subsection-title">Bidirectional Dynamic Programming</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/bidirectional_DP.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>Optimizing two sequential, non-overlapping events (e.g., Stock Trading).</p>
-                    
-                    <ul>
-                        <li><strong>Forward Pass:</strong> Scan left-to-right to calculate the best possible result for the first event ending by each specific day.</li>
-                        <li><strong>Backward Pass:</strong> Scan right-to-left to calculate the best result for the second event starting from each specific day.</li>
-                        <li><strong>Combine:</strong> Sum the two values at every index. By comparing every possible split, you identify the exact moment where the total of the past maximum and future maximum is highest.</li>
-                    </ul>
-                
-                    <p><strong>Stock Example:</strong> Prices <code>[3, 5, 8, 1, 9]</code></p>
-                    <ul>
-                        <li><strong>Phase 1 (Forward Pass):</strong> Track min price so far, compute max profit up to each day.<br><code>Left_Profit = [0, 2, 5, 5, 8]</code></li>
-                        <li><strong>Phase 2 (Backward Pass):</strong> Track max price from end, compute max profit from each day onward.<br><code>Right_Profit = [8, 8, 8, 8, 0]</code></li>
-                        <li><strong>Phase 3 (Combine):</strong> For each possible split day i, total profit = Left + Right.<br><code>Results: 8, 10, 13, 13, 8</code> → <strong>Max = 13</strong></li>
-                    </ul>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Maximum Difference</span>
-                    <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/max_diff.html'; document.querySelector('.retro-viewport').classList.add('active');">
-                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                    </button>
-                    <p>The Maximum Difference problem finds the largest value of <code>A[j] - A[i]</code> in an array, where <code>j</code> must come after <code>i</code> (<code>j > i</code>). It's about finding the biggest rise from an earlier element to a later one.</p>
-                    <p><strong>Process:</strong> Single-pass greedy traversal. Track <code>min_seen</code> and <code>max_diff</code>. Update <code>min_seen</code> if current value is lower; update <code>max_diff</code> if (current - min_seen) is a new record.</p>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">In-Place Deduplication</span>
-                    <button class="eye-btn" onclick="const v=document.querySelector('.retro-viewport'); v.querySelector('iframe').src='Arrays/deduplication.html'; v.classList.add('active');">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-                    <p><strong>Core idea:</strong> Remove duplicates from a <strong>sorted</strong> array <strong>in place</strong>, keeping only the first occurrence of each value. Uses two pointers and no extra space.</p>
-                    <p><strong>Pointers:</strong></p>
-                    <ul>
-                        <li>Reader (<code>i</code>): scans the array looking for new values</li>
-                        <li>Writer (<code>write_index</code>): marks the end of the "unique prefix" we're building</li>
-                    </ul>
-                    <p><strong>Steps:</strong></p>
-                    <ol>
-                        <li>Assume the array is already sorted (duplicates are next to each other).</li>
-                        <li>Start with <code>write_index = 1</code> (index 0 is always kept as unique).</li>
-                        <li>Loop the reader <code>i</code> from 1 to end of array:
-                            <ul>
-                                <li>If <code>A[i]</code> is different from <code>A[write_index - 1]</code>, it's a new value → copy <code>A[i]</code> to <code>A[write_index]</code> and increment <code>write_index</code></li>
-                                <li>Otherwise, skip (it's a duplicate)</li>
-                            </ul>
-                        </li>
-                        <li>At the end, <code>write_index</code> is the new length of the array with uniques only.</li>
-                    </ol>
-                    <p><strong>Result:</strong></p>
-                    <ul>
-                        <li>The first <code>write_index</code> elements contain all unique values in order.</li>
-                        <li>The rest of the array can be ignored.</li>
-                        <li>Time: O(n)</li>
-                        <li>Extra space: O(1)</li>
-                    </ul>
-                    <p><strong>Example:</strong> <code>[1,1,2,2,2,3,4,4]</code> → becomes <code>[1,2,3,4,?,?...]</code> and returns length 4</p>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Enumerate Primes (Sieve)</span>
-                    <p>Assume all numbers are prime and progressively eliminate multiples.</p>
-                    <p><strong>Why Faster?</strong> Computers find division/modulus expensive. The Sieve uses <strong>Jumping</strong> (Addition) to mark indices, which is much faster for a CPU.</p>
-                </div>
-
-            </div>
-        </details>
-
-        <!-- ============================================== -->
-        <!-- SECTION 5: THEORY & IMPLEMENTATION -->
-        <!-- ============================================== -->
-        <details class="section">
-            <summary>5. Theory & Implementation</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <span class="subsection-title">Array Based Sequences: GameEntry</span>
-                    <p>A blueprint for objects storing records (Name + Score) in a single container, avoiding parallel lists.</p>
-                    <div class="code-block">
-class GameEntry:
-def init(self, name, score):
-self.name = name
-self.score = score
-def str(self):
-return '({0}, {1})'.format(self.name, self.score)
-                    </div>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Searching & Lexicographic Comparisons</span>
-                    <p><strong>Lexicographic:</strong> "Sudden Death" comparison.</p>
-                    <ol>
-                        <li>Line lists up side-by-side.</li>
-                        <li>Compare pairs. If equal, continue.</li>
-                        <li>If different, the list with the smaller item is strictly smaller. Comparison ends immediately.</li>
-                    </ol>
-                </div>
-
-                <div class="subsection">
-                    <span class="subsection-title">Array Theory</span>
-                    <p><strong>Referential Array:</strong> Stores memory addresses (pointers). Allows variable-length objects in fixed slots.</p>
-                    <p><strong>Compact Array:</strong> Stores bits/values directly in slots.</p>
-                    <p><strong>Deep vs Shallow Copy:</strong> Shallow references existing objects (aliasing); Deep recursively clones everything.</p>
-                </div>
-
-            </div>
-        </details>
-
+        <div id="console-log"></div>
     </div>
-</div>
 
+    <script>
+        // --- CONSTANTS & CONFIG ---
+        const N = 10;
+        const K = 5;
+        const SPEED = 1200; // ms per action
+
+        // --- STATE ---
+        let array = [];
+        let currentIndex = 0; 
+        let isRunning = false;
+        let isAuto = false;
+        let autoInterval = null;
+        let state = 'IDLE'; 
+
+        // --- DOM ELEMENTS ---
+        const domRoot = document.getElementById('array-root');
+        const logContainer = document.getElementById('console-log');
+        const statusLabel = document.getElementById('status-label');
+        const sysStatus = document.getElementById('sys-status');
+        const btnStep = document.getElementById('btn-step');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
+        const boundaryInd = document.getElementById('boundary-indicator');
+        const svgLayer = document.getElementById('connector-svg');
+        const vizContainer = document.getElementById('viz-container');
+
+        // --- INITIALIZATION ---
+        function init() {
+            array = Array.from({length: N}, (_, i) => i);
+            currentIndex = 0;
+            state = 'IDLE';
+            isRunning = false;
+            isAuto = false;
+            clearInterval(autoInterval);
+            
+            renderArray();
+            updateBoundary();
+            
+            logContainer.innerHTML = '';
+            log("SYSTEM INITIALIZED. DATA LOADED.");
+            log(`Params: N=${N}, K=${K}. Goal: Randomize first ${K}.`);
+            
+            sysStatus.innerText = "IDLE";
+            statusLabel.innerText = "READY.";
+            
+            btnStep.disabled = false;
+            btnAuto.disabled = false;
+            
+            svgLayer.innerHTML = '';
+        }
+
+        // --- CORE RENDERING ---
+        function renderArray() {
+            domRoot.innerHTML = '';
+            
+            array.forEach((val, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'cell-wrapper';
+                wrapper.id = `wrap-${idx}`;
+
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.innerText = val;
+                
+                if (idx < currentIndex) {
+                    cell.classList.add('selected');
+                } else {
+                    cell.classList.add('pool');
+                }
+
+                if (state === 'DONE' && idx >= K) {
+                    cell.classList.add('discarded');
+                    cell.classList.remove('pool');
+                }
+
+                const label = document.createElement('div');
+                label.className = 'index-label';
+                label.innerText = idx;
+
+                wrapper.appendChild(cell);
+                wrapper.appendChild(label);
+                domRoot.appendChild(wrapper);
+            });
+        }
+
+        // Calculate Position Logic (Responsive)
+        function updateBoundary() {
+            // We need to position the marker essentially "between" currentIndex-1 and currentIndex.
+            // If currentIndex is 0, it points to the start.
+            
+            // Get the reference container position
+            const rootRect = domRoot.getBoundingClientRect();
+            
+            // Default to start of array
+            let targetLeft = 0; 
+
+            if (currentIndex < N) {
+                const targetCell = document.getElementById(`wrap-${currentIndex}`);
+                if (targetCell) {
+                    // Position relative to the array-row
+                    targetLeft = targetCell.offsetLeft;
+                }
+            } else {
+                // If we are at the end, point to right edge of last element
+                const lastCell = document.getElementById(`wrap-${N-1}`);
+                if (lastCell) {
+                    targetLeft = lastCell.offsetLeft + lastCell.offsetWidth;
+                }
+            }
+
+            // Apply calculated left position. 
+            // The CSS translateX(-50%) centers it on this point.
+            // We adjust slightly to account for the gap visually.
+            // Gap is dynamic, so we try to aim for center of the left edge plus half a gap roughly.
+            // Simplified: Just point to the left edge of the current index (start of the pool).
+            boundaryInd.style.left = `${targetLeft}px`;
+            
+            if (currentIndex >= K) boundaryInd.innerText = "COMPLETE";
+            else boundaryInd.innerText = "▼ BOUNDARY";
+        }
+
+        // Handle Window Resize to keep boundary correct
+        window.addEventListener('resize', () => {
+            updateBoundary();
+            // Clear lines on resize as they might drift
+            svgLayer.innerHTML = '';
+        });
+
+        // --- LOGGING ---
+        function log(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            logContainer.appendChild(entry);
+            // Auto scroll
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // --- ALGORITHM STEPS ---
+        async function performStep() {
+            if (state === 'DONE') return;
+
+            btnStep.disabled = true;
+            if (!isAuto) sysStatus.innerText = "EXECUTING...";
+
+            // 1. PICK
+            const r = Math.floor(Math.random() * (N - currentIndex)) + currentIndex;
+            
+            const cellI = document.querySelector(`#wrap-${currentIndex} .cell`);
+            const cellR = document.querySelector(`#wrap-${r} .cell`);
+            
+            cellI.classList.add('target');
+            cellR.classList.add('source');
+
+            statusLabel.innerText = `Swapping Index [${currentIndex}] <-> [${r}]`;
+            log(`Iter ${currentIndex}: Swapping with index ${r}.`);
+
+            drawConnector(currentIndex, r);
+
+            await wait(SPEED);
+
+            // 2. SWAP ANIMATION
+            if (currentIndex !== r) {
+                await animateSwap(currentIndex, r);
+            } else {
+                await wait(SPEED / 2);
+            }
+
+            // 3. LOGIC UPDATE
+            [array[currentIndex], array[r]] = [array[r], array[currentIndex]];
+            
+            currentIndex++;
+            state = (currentIndex === K) ? 'DONE' : 'IDLE';
+            
+            svgLayer.innerHTML = '';
+            
+            renderArray();
+            updateBoundary();
+
+            if (state === 'DONE') {
+                log("PROCESS COMPLETE.");
+                statusLabel.innerText = "HALTED.";
+                sysStatus.innerText = "COMPLETE";
+                btnAuto.disabled = true;
+                btnStep.disabled = true;
+            } else {
+                btnStep.disabled = false;
+                if (!isAuto) sysStatus.innerText = "WAITING";
+            }
+        }
+
+        // --- ANIMATION UTILS ---
+        function drawConnector(idx1, idx2) {
+            if (idx1 === idx2) return; 
+
+            // Calculate positions relative to the Viz Container
+            const rect1 = document.getElementById(`wrap-${idx1}`).getBoundingClientRect();
+            const rect2 = document.getElementById(`wrap-${idx2}`).getBoundingClientRect();
+            const containerRect = vizContainer.getBoundingClientRect();
+
+            const x1 = rect1.left + rect1.width/2 - containerRect.left;
+            const y1 = rect1.top - containerRect.top; // Point to top of cell
+            const x2 = rect2.left + rect2.width/2 - containerRect.left;
+            const y2 = rect2.top - containerRect.top;
+
+            // Arc height based on distance
+            const distance = Math.abs(x2 - x1);
+            const arcHeight = Math.min(distance * 0.5, 100); 
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            
+            // Draw curve upwards
+            const d = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${y1 - arcHeight - 20} ${x2} ${y2}`;
+            
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "#00FF41");
+            path.setAttribute("stroke-width", "2");
+            path.setAttribute("stroke-dasharray", "5,5");
+
+            const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
+            animate.setAttribute("attributeName", "stroke-dashoffset");
+            animate.setAttribute("from", "20");
+            animate.setAttribute("to", "0");
+            animate.setAttribute("dur", "0.5s");
+            animate.setAttribute("repeatCount", "indefinite");
+
+            path.appendChild(animate);
+            svgLayer.appendChild(path);
+        }
+
+        async function animateSwap(idx1, idx2) {
+            const el1 = document.getElementById(`wrap-${idx1}`);
+            const el2 = document.getElementById(`wrap-${idx2}`);
+
+            // Use simple offset calculation based on DOM
+            // This works regardless of window size
+            const dist = el2.offsetLeft - el1.offsetLeft;
+
+            el1.style.transform = `translateX(${dist}px)`;
+            el2.style.transform = `translateX(${-dist}px)`; // Negative for the second one
+
+            await wait(SPEED);
+            
+            el1.style.transform = '';
+            el2.style.transform = '';
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // --- EVENT HANDLERS ---
+        btnStep.addEventListener('click', () => {
+            if (state !== 'DONE') performStep();
+        });
+
+        btnAuto.addEventListener('click', () => {
+            if (isAuto) return;
+            isAuto = true;
+            btnAuto.disabled = true;
+            btnStep.disabled = true;
+            sysStatus.innerText = "AUTO_RUN";
+            
+            const runLoop = async () => {
+                if (state !== 'DONE' && isAuto) {
+                    await performStep();
+                    setTimeout(runLoop, 200); 
+                }
+            };
+            runLoop();
+        });
+
+        btnReset.addEventListener('click', () => {
+            isAuto = false;
+            init();
+        });
+
+        // Start
+        init();
+
+    </script>
 </body>
 </html>
