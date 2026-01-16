@@ -164,32 +164,18 @@
                             </svg>
                         </button>
                     </div>
+                
                     <p><strong>Step 1: Pre-Processing (Sorting)</strong></p>
-                    <ul>
-                        <li>Logic: To make efficient decisions, we need immediate access to the extremal values (the shortest and longest tasks).</li>
-                        <li>Action: Apply a sorting algorithm to the input array task_durations.</li>
-                        <li>Result: The array is now ordered 𝐭₁ ≤ 𝐭₂ ≤ … ≤ 𝐭ₙ<br>This transforms the data from a random collection into a rank-ordered sequence, at a cost of O(𝑁 log 𝑁) time.</li>
-                    </ul>
-                    <p><strong>Step 2: Applying the Greedy Heuristic</strong></p>
-                    <ul>
-                        <li>Logic: The core insight is that the longest-duration task creates the highest risk of a bottleneck. To mitigate this risk, it must be paired with the task that adds the least additional time.</li>
-                        <li>Action: Pair the element at index 0 (absolute minimum) with the element at index 𝑛−1 (absolute maximum).</li>
-                        <li>Validation — Example durations: 1, 8, 9, 10
-                        <br>- Pairing longest (10) with second-longest (9) → burden = ₁₉
-                        <br>- Pairing longest (10) with shortest (1) → burden = ₁₁
-                        <br>Crucial distinction: The optimum makespan is not necessarily achieved by always taking min + max.
-                        <br>In this case the correct pairing is (1,10) and (8,9) → sums 11 and 17 → makespan = 17.
-                        <br>Even though 11 is low, this strategy keeps the highest pair sum (17) as small as possible.</li>
-                    </ul>
+                    <p>Sort the task durations in ascending order. This ranks the data, granting immediate access to the shortest and longest tasks required for the optimization strategy.</p>
+                
+                    <p><strong>Step 2: Greedy (Pairing short and long tasks)</strong></p>
+                    <p>Pair the longest task with the shortest. This offsets the heaviest load with the lightest available addition, ensuring the combined pair total stays as low as possible.</p>
+                
                     <p><strong>Step 3: Iterative Construction</strong></p>
-                    <ul>
-                        <li>Logic: Once the current longest and shortest tasks are paired, they are removed from consideration. This leaves a sub-problem of size 𝑛−2 that has the same structure as the original problem.</li>
-                        <li>Action: Proceed inward using two pointers (or a single index 𝑖).
-                        <br>For iteration 𝑖 (starting from 0):
-                        <br>Pair array[𝑖] with array[𝑛−1−𝑖]</li>
-                        <li>This process continues for ⌊𝑛/2⌋ iterations (or until the middle is reached when 𝑛 is odd).</li>
-                    </ul>
-                    <p>The final pairing is therefore:<br>(𝐭₁, 𝐭ₙ), (𝐭₂, 𝐭ₙ₋₁), (𝐭₃, 𝐭ₙ₋₂), …</p>
+                    <p>Continue this pattern by moving inward from both ends of the list. Match the next shortest task with the next longest until every task is paired and the schedule is complete.</p>
+                
+                    <p><strong>Validation: Why This Works</strong></p>
+                    <p>Pairing extremes prevents heavy tasks from stacking. This balances the load, ensuring the maximum pair sum is minimized to achieve the lowest possible bottleneck for the schedule.</p>
                 </div>
 
                 <div class="subsection">
