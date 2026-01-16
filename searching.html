@@ -353,47 +353,6 @@
                         <li>Move the pivot back to the front of the new index, where all values larger than it are to the left of</li>
                         <li>Compare the pivot to the target. If found, you're done. if Pivot < Target, go Left. If Pivot > Target, go Right.</li>
                     </ol>
-                    <p><strong>THE HOW:</strong></p>
-                    <p><strong>Phase 1: Setup</strong><br>
-                    We start by looking at the whole array. We define a “search window” with a Left boundary (the start) and a Right boundary (the end).</p>
-                    <p><strong>Phase 2: The Loop (Divide and Conquer)</strong><br>
-                    We repeat the following steps until the target is found.</p>
-                    <ul>
-                        <li><strong>Step A: Pick a Random Pivot</strong>
-                        <br>◦ Inside our current search window, we select one index at random.</li>
-                        <li><strong>Step B: The Partition</strong>
-                        <br>◦ Now, we reorganize the array around the Pivot so that larger numbers move to the left and smaller numbers move to the right.</li>
-                    </ul>
-                    <div class="code-block">Hide the Pivot: We swap the Pivot to the very end of the window so it doesn't get in the way while we work.
-
-Partition Process: We scan the current window from left to right.
-- If a number is larger than the Pivot, we move it to the “left side” of our window.
-- If a number is smaller, we leave it alone (it will naturally end up on the right).
-
-Place the Pivot:
-Once the scan is finished, we take the Pivot from the end and swap it into the slot right after the “larger” numbers.</div>
-                    <ul>
-                        <li><strong>Step C: The Check (Pruning)</strong><br>
-                        We look at where the Pivot landed (new_pivot_idx) and compare it to our target rank.</li>
-                    </ul>
-                    <div class="code-block">- Scenario 1: Exact Match
-- Is new_pivot_idx equal to target [k − 1]?
-- Yes. We found it. Return the value at this index.
-
-- Scenario 2: Overshoot (Too far right)
-- Is new_pivot_idx greater than k − 1?
-- This means the Pivot we found is too small (it is ranked lower than our target). The answer must be one of the larger numbers to the left.
-- Action: Shrink the window. Move the Right boundary to new_pivot_idx − 1. Ignore the right side.
-
-- Scenario 3: Undershoot (Too far left)
-- Is new_pivot_idx less than target [k − 1]?
-- This means the Pivot is too big (it is ranked higher than our target). The answer must be one of the smaller numbers to the right.
-- Action: Shrink the window. Move the Left boundary to new_pivot_idx + 1. Ignore the left side.</div>
-                    <p><strong>Phase 3: Conclusion</strong><br>
-                    We repeat Phase 2 with the newly shrunk window. Because the search area gets smaller (roughly by half) every time, we converge on the specific answer very quickly.</p>
-                    <p><strong>REAL-WORLD USE CASE</strong><br>
-                    Infrastructure<br>
-                    In smart grids, this quickly identifies the top k highest-load transformers to trigger immediate load shedding. It avoids the latency of sorting millions of grid data points, preventing cascading blackouts during critical usage spikes.</p>
                 </div>
 
             </div>
@@ -412,35 +371,25 @@ Once the scan is finished, we take the Pivot from the end and swap it into the s
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
-                    </div>
-                    <p><strong>Step 1: Divide the Search Space (Pass 1 Setup)</strong><br>
-                    We cannot store all IP addresses in memory. Instead, we partition the entire 4-billion-integer address space into smaller chunks called buckets.
-                    <br>- We allocate an array of integers in RAM to act as counters.
-                    <br>- We index this array using the 16 Most Significant Bits (MSBs)—the “prefix” of the IP address.
-                    <br>- This creates 𝟐¹⁶ (65,536) buckets. Each bucket represents a specific prefix range.</p>
-                    <p><strong>Step 2: Count the Prefixes (Pass 1 Execution)</strong><br>
-                    We stream through the file of 1 billion IP addresses one by one.
-                    <br>- For every IP address, we isolate its top 16 bits (the prefix).
-                    <br>- We increment the counter in the array index corresponding to that prefix.
-                    <br>- Logic: We are not storing the IPs yet; we are simply counting how many IPs fall into each prefix category.</p>
-                    <p><strong>Step 3: Locate the “Candidate Bucket”</strong><br>
-                    We apply the Pigeonhole Principle to identify where the missing number hides.
-                    <br>- Each bucket covers a range of exactly 𝟐¹⁶ (65,536) possible numbers.
-                    <br>- Since there are fewer IPs in the file (1 billion) than total possible IPs (4 billion), many buckets will be full, but at least one bucket must contain fewer than 65,536 entries.
-                    <br>- We scan our counter array and select a bucket where the count is less than the bucket capacity. We call the prefix associated with this bucket the Candidate Prefix.</p>
-                    <p><strong>Step 4: Prepare the Checklist (Pass 2 Setup)</strong> We have identified the Candidate Prefix (the "Bucket") that is missing at least one IP address. Now, we need to find exactly which address is missing inside that bucket.
-                    <br>• We clear our previous counters from RAM to free up space.
-                    <br>• We allocate a Bit Vector. Think of this as a digital checklist with 65,536 checkboxes.
-                    <br>• Each checkbox represents one possible Suffix (the lower 16 bits) that could be attached to our Candidate Prefix.
-                    <br>• We start with every box unchecked (set to 0).</p>
-                    <p><strong>Step 5: Fill in the Blanks (Pass 2 Execution)</strong> We read through the hard drive file a second time.
-                    <br>• Filter: We look at every IP address. If an IP does not start with our Candidate Prefix, we ignore it completely. It’s not in the bucket we care about.
-                    <br>• Map: If the IP does start with our prefix, we look at its bottom 16 bits (the Suffix). We go to that specific number on our checklist (Bit Vector) and check the box (change the bit to 1).</p>
-                    <p><strong>Step 6: Identify and Reconstruct</strong> After checking every relevant IP in the file, we look at our checklist.
-                    <br>• Because we proved in Step 3 that this bucket was not full, there must be at least one box still unchecked (set to 0).
-                    <br>• Identify: We find the index of that 0. This is our Missing Suffix.
-                    <br>• Reconstruct: We take the Candidate Prefix (the top half) and glue it to the Missing Suffix (the bottom half). This combination is the specific IP address that was missing from the file.</p>
-                </div>
+                        <div>
+                            <p><strong>Step 1: Divide the Search Space</strong><br>
+                            Create an array of 65,536 counters to partition the search space. Since the top 16 bits of an IP evaluate to a number between 0 and 65,535, we use that number as the direct array index. Each slot acts as a bucket to count how many IPs share that specific prefix.</p>
+                        
+                            <p><strong>Step 2: Count the Prefixes</strong><br>
+                            Stream the file. Use the top 16 bits of each IP as an array index and increment that slot's counter to tally the group's population.</p>
+                        
+                            <p><strong>Step 3: Locate the Candidate Bucket</strong><br>
+                            Scan the array. A full group has exactly 65,536 IPs. Find a slot with a count lower than this; the missing IP is hiding in that specific prefix range.</p>
+                        
+                            <p><strong>Step 4: Prepare the Checklist</strong><br>
+                            Clear memory and allocate a bit vector with 65,536 positions. Each bit represents a possible "Local Number" (Suffix) within our target "Area Code" (Prefix). Initialize all bits to zero.</p>
+                        
+                            <p><strong>Step 5: Reading the suffix</strong><br>
+                            Stream the original file from the hard drive. For each IP, check the "Area Code" (Prefix). If it matches our target group, look at the "Local Number" (Suffix). Use that number to find the corresponding spot on your Bit Vector checklist and mark it as present (set to 1). You are strictly crossing off every number that exists in the file for that specific group.</p>
+                        
+                            <p><strong>Step 6: Identify and Reconstruct</strong><br>
+                            Scan the bit vector. The bit remaining at '0' reveals the specific missing Suffix. Combine that with your known Candidate Prefix to yield the exact missing IP address.</p>
+                        </div>
 
             </div>
         </details>
