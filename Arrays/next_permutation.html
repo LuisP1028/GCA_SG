@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DITHERPUNK // PERMUTATION</title>
     <style>
         /* 
@@ -17,22 +17,28 @@
             --term-green: #00FF41;
             --term-dim: #003b0f;
             --scan-line: rgba(0, 255, 65, 0.05);
+            
+            /* Spacing Variables */
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background-color: var(--bg-color);
             color: var(--term-green);
             font-family: 'VT323', monospace;
-            height: 100vh;
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            width: 100vw;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             overflow: hidden;
@@ -41,20 +47,24 @@
 
         /* 
          * -----------------------------------------------------------
-         * 2. CRT / TERMINAL EFFECTS
+         * 2. RESPONSIVE CRT CONTAINER
          * -----------------------------------------------------------
          */
         
         /* The CRT Screen Container */
         .crt-frame {
-            width: 100%;
-            max-width: 800px;
-            height: 90vh;
-            border: 4px solid var(--term-green);
-            padding: 20px;
+            /* Responsive Sizing */
+            width: 95vw;
+            height: 95dvh;
+            max-width: 1600px; /* Cap for ultrawide */
+            
+            border: clamp(2px, 0.5vw, 6px) solid var(--term-green);
+            padding: clamp(10px, 2vh, 30px);
+            
             position: relative;
             display: flex;
             flex-direction: column;
+            
             box-shadow: 0 0 20px var(--term-green), inset 0 0 20px var(--term-dim);
             background: radial-gradient(circle, #0a0a0a 0%, #000000 100%);
         }
@@ -76,7 +86,7 @@
             background-size: 100% 4px;
             pointer-events: none;
             z-index: 10;
-            animation: scanline-scroll 0.5s linear infinite; /* Subtle jitter */
+            animation: scanline-scroll 0.5s linear infinite;
             opacity: 0.6;
         }
 
@@ -94,69 +104,84 @@
         }
 
         /* Text Glow */
-        h1, .log-text, .bar-val, .bar-idx {
+        h1, .log-text, .bar-val, .bar-idx, #sys-status {
             text-shadow: 0 0 4px var(--term-green);
         }
 
         /* 
          * -----------------------------------------------------------
-         * 3. VISUALIZATION COMPONENTS
+         * 3. FLEXIBLE VISUALIZATION COMPONENTS
          * -----------------------------------------------------------
          */
 
         header {
             border-bottom: 2px dashed var(--term-green);
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-sm);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0; /* Prevent header from squashing */
         }
 
         h1 {
             margin: 0;
-            font-size: 2rem;
-            letter-spacing: 2px;
+            /* Fluid typography: min 1.2rem, pref 4vw, max 3rem */
+            font-size: clamp(1.2rem, 4vw, 3rem); 
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        #sys-status {
+            font-size: clamp(0.8rem, 2vw, 1.5rem);
         }
 
+        /* The Chart area takes all remaining available space */
         .chart-container {
-            flex-grow: 1;
+            flex-grow: 1; 
             display: flex;
             align-items: flex-end;
-            justify-content: space-around;
-            padding: 20px 0;
+            justify-content: space-between; /* Distribute bars evenly */
+            padding: var(--spacing-md) 0;
             border: 1px solid var(--term-dim);
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-md);
             position: relative;
+            width: 100%;
+            min-height: 0; /* Crucial for flex containers to shrink */
+            gap: 2%; /* Gap relative to container width */
         }
 
         /* The Bars */
         .bar-wrapper {
             display: flex;
+            flex: 1; /* Each bar takes equal width */
             flex-direction: column;
             align-items: center;
-            width: 8%;
             height: 100%;
             justify-content: flex-end;
+            min-width: 0; /* Allows shrinking below content size */
             transition: transform 0.3s ease;
         }
 
         .bar {
             width: 100%;
-            border: 2px solid var(--term-green);
+            border: clamp(1px, 0.3vw, 3px) solid var(--term-green);
             position: relative;
             transition: all 0.2s;
         }
 
         /* Bar Text */
         .bar-val {
-            margin-bottom: 5px;
-            font-size: 1.5rem;
+            margin-bottom: 0.5vh;
+            font-size: clamp(1rem, 3vh, 2.5rem); /* Responsive to height */
             font-weight: bold;
         }
 
         .bar-idx {
-            margin-top: 5px;
-            font-size: 0.8rem;
+            margin-top: 0.5vh;
+            font-size: clamp(0.6rem, 1.5vh, 1rem);
             opacity: 0.7;
         }
 
@@ -166,29 +191,16 @@
          * -----------------------------------------------------------
          */
 
-        /* Neutral: Hollow */
-        .style-neutral {
-            background: transparent;
-        }
-
-        /* Active Scan: Inverted / Blinking */
+        .style-neutral { background: transparent; }
         .style-active {
             background-color: var(--term-green);
             animation: blink-invert 0.2s steps(2, start) infinite;
         }
-        
-        .active-text {
-            color: #000;
-            background: var(--term-green);
-        }
-
-        /* Pivot: Solid Fill */
+        .active-text { color: #000; background: var(--term-green); }
         .style-pivot {
             background-color: var(--term-green);
             box-shadow: 0 0 10px var(--term-green);
         }
-
-        /* Successor: Checkerboard Dither */
         .style-successor {
             background-image: 
                 linear-gradient(45deg, var(--term-green) 25%, transparent 25%), 
@@ -199,8 +211,6 @@
             background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
             border-color: var(--term-green);
         }
-
-        /* Tail: Diagonal Stripes */
         .style-tail {
             background: repeating-linear-gradient(
                 45deg,
@@ -210,11 +220,7 @@
                 #000 6px
             );
         }
-
-        /* Completion Flash */
-        .flash-anim {
-            animation: full-flash 0.5s ease-out;
-        }
+        .flash-anim { animation: full-flash 0.5s ease-out; }
 
         /* 
          * -----------------------------------------------------------
@@ -223,26 +229,33 @@
          */
 
         .terminal-log {
-            height: 80px;
+            /* Responsive height: at least 60px, but up to 15% of screen */
+            flex-basis: clamp(60px, 15dvh, 150px);
             border-top: 2px solid var(--term-green);
-            padding: 10px;
-            font-size: 1.1rem;
+            padding: var(--spacing-sm);
+            font-size: clamp(0.8rem, 1.5vw, 1.1rem);
             overflow-y: auto;
             background: rgba(0, 255, 65, 0.05);
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
+            justify-content: flex-end; /* Keeps latest log at bottom */
+            flex-shrink: 0;
+            margin-bottom: var(--spacing-sm);
         }
 
-        .log-entry::before {
-            content: "> ";
+        .log-entry {
+            margin-bottom: 2px;
+            word-wrap: break-word;
         }
+
+        .log-entry::before { content: "> "; }
 
         .controls {
             display: flex;
-            gap: 20px;
-            margin-top: 10px;
+            gap: var(--spacing-md);
             justify-content: center;
+            flex-shrink: 0;
+            flex-wrap: wrap; /* Buttons stack on narrow screens */
         }
 
         button {
@@ -250,12 +263,16 @@
             border: 2px solid var(--term-green);
             color: var(--term-green);
             font-family: 'VT323', monospace;
-            font-size: 1.2rem;
-            padding: 5px 20px;
+            font-size: clamp(1rem, 2vw, 1.3rem);
+            padding: 0.5em 1.5em; /* relative padding */
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 4px 4px 0px var(--term-dim);
             transition: transform 0.1s, box-shadow 0.1s;
+            flex: 1; /* Buttons grow evenly */
+            min-width: 100px; /* Prevent becoming too thin */
+            max-width: 200px;
+            white-space: nowrap;
         }
 
         button:hover {
@@ -276,15 +293,23 @@
 
         /* 
          * -----------------------------------------------------------
-         * 6. ANIMATIONS
+         * 6. SCROLLBARS
+         * -----------------------------------------------------------
+         */
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: var(--term-dim); border: 1px solid var(--term-green); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--term-green); }
+
+        /* 
+         * -----------------------------------------------------------
+         * 7. ANIMATIONS
          * -----------------------------------------------------------
          */
 
         @keyframes blink-invert {
-            to {
-                background-color: transparent;
-                border-color: var(--term-green);
-            }
+            to { background-color: transparent; border-color: var(--term-green); }
         }
 
         @keyframes full-flash {
@@ -306,7 +331,7 @@
         
         <header>
             <h1>Next_Permutation.exe</h1>
-            <div>SYS.STATUS: <span id="sys-status">ONLINE</span></div>
+            <div>SYS:<span id="sys-status">ONLINE</span></div>
         </header>
 
         <div class="chart-container" id="chart">
@@ -390,6 +415,7 @@
 
                 const bar = document.createElement('div');
                 bar.className = 'bar style-neutral';
+                // Height in % is safe for responsive layouts
                 bar.style.height = `${(val / maxVal) * 60}%`;
 
                 const idxDisplay = document.createElement('div');
@@ -455,7 +481,7 @@
                 
                 // STAGE 0: INITIALIZATION
                 case STAGES.INIT:
-                    log("INITIALIZED. GOAL: FIND NEXT LEXICOGRAPHICAL PERMUTATION.");
+                    log("INITIALIZED. FIND NEXT PERMUTATION.");
                     state.stage = STAGES.FIND_PIVOT;
                     state.i = state.arr.length - 2;
                     break;
@@ -466,18 +492,19 @@
                     state.activeIndices = [state.i, state.i + 1];
                     
                     if (state.i < 0) {
-                        log("NO PIVOT FOUND. ARRAY IS DESCENDING. REVERSING WHOLE ARRAY.");
+                        log("NO PIVOT. REVERSING WHOLE ARRAY.");
                         state.pivotIdx = -1; // Special case for last permutation
                         state.stage = STAGES.REVERSE_TAIL;
                         state.activeIndices = [];
                         break;
                     }
 
-                    log(`SCANNING: Is arr[${state.i}] (${state.arr[state.i]}) < arr[${state.i+1}] (${state.arr[state.i+1]})?`);
+                    // Log shortened for mobile readability
+                    log(`SCAN [${state.i}]: ${state.arr[state.i]} < ${state.arr[state.i+1]}?`);
 
                     if (state.arr[state.i] < state.arr[state.i + 1]) {
                         state.pivotIdx = state.i;
-                        log(`PIVOT DETECTED AT INDEX [${state.pivotIdx}]. VALUE: ${state.arr[state.pivotIdx]}.`);
+                        log(`PIVOT DETECTED @ [${state.pivotIdx}]. VAL: ${state.arr[state.pivotIdx]}.`);
                         state.activeIndices = [];
                         state.stage = STAGES.FIND_SUCCESSOR;
                         state.j = state.arr.length - 1;
@@ -489,11 +516,11 @@
                 // STAGE 2: FIND SUCCESSOR (Right to Left)
                 case STAGES.FIND_SUCCESSOR:
                     state.activeIndices = [state.j];
-                    log(`SEARCHING SUCCESSOR: Is arr[${state.j}] (${state.arr[state.j]}) > Pivot (${state.arr[state.pivotIdx]})?`);
+                    log(`SEARCH: ${state.arr[state.j]} > Pivot(${state.arr[state.pivotIdx]})?`);
 
                     if (state.arr[state.j] > state.arr[state.pivotIdx]) {
                         state.successorIdx = state.j;
-                        log(`SUCCESSOR FOUND AT INDEX [${state.successorIdx}]. VALUE: ${state.arr[state.successorIdx]}.`);
+                        log(`SUCCESSOR FOUND @ [${state.successorIdx}]. VAL: ${state.arr[state.successorIdx]}.`);
                         state.activeIndices = [];
                         state.stage = STAGES.SWAP;
                     } else {
@@ -503,14 +530,13 @@
 
                 // STAGE 3: SWAP
                 case STAGES.SWAP:
-                    log(`SWAPPING PIVOT (${state.arr[state.pivotIdx]}) AND SUCCESSOR (${state.arr[state.successorIdx]}).`);
+                    log(`SWAP PIVOT(${state.arr[state.pivotIdx]}) & SUCC(${state.arr[state.successorIdx]}).`);
                     
                     // Logic Swap
                     let temp = state.arr[state.pivotIdx];
                     state.arr[state.pivotIdx] = state.arr[state.successorIdx];
                     state.arr[state.successorIdx] = temp;
 
-                    // Visual Swap update happens in render
                     state.stage = STAGES.REVERSE_TAIL;
                     break;
 
@@ -519,7 +545,7 @@
                     let start = state.pivotIdx + 1;
                     let end = state.arr.length - 1;
                     
-                    log(`REVERSING SUFFIX FROM INDEX ${start} TO END.`);
+                    log(`REVERSING TAIL [${start} -> ${end}].`);
                     
                     // Logic Reverse
                     while (start < end) {
@@ -535,7 +561,7 @@
 
                 // STAGE 5: COMPLETION
                 case STAGES.COMPLETION:
-                    log("SEQUENCE COMPLETE. NEXT PERMUTATION GENERATED.");
+                    log("SEQUENCE COMPLETE.");
                     state.pivotIdx = -1;
                     state.successorIdx = -1;
                     state.activeIndices = [];
@@ -579,8 +605,8 @@
         function startAutoPlay() {
             if (state.stage === STAGES.FINISHED) return;
             state.autoPlaying = true;
-            elStatus.innerText = "EXECUTING...";
-            btnAuto.innerText = "RUNNING...";
+            elStatus.innerText = "RUNNING";
+            btnAuto.innerText = "STOP";
             render(); // update buttons
 
             state.timer = setInterval(() => {
@@ -595,7 +621,8 @@
         function stopAutoPlay() {
             state.autoPlaying = false;
             clearInterval(state.timer);
-            btnAuto.innerText = "Auto-Run";
+            btnAuto.innerText = "AUTO-RUN";
+            elStatus.innerText = "PAUSED";
             render();
         }
 
