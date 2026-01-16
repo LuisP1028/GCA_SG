@@ -195,10 +195,10 @@ Analogy: Reading a Map
                     
                     <p><strong>Optimal Approach (The Greedy Horizon):</strong> Instead of tracking specific paths, we track the boundary. We walk one step at a time asking: <em>"Does the current stone allow me to extend the boundary further?"</em></p>
                     
-                    <ul>
+                    
                         <li><strong>Reach & Horizon:</strong> <em>Reach</em> is your current index + jump capacity ($i + A[i]$). The <em>Horizon</em> is the maximum Reach calculated so far.</li>
                         <li><strong>Gap:</strong> If <code>Current Position > Horizon</code>, you have hit a dead end (a gap in the bridge).</li>
-                    </ul>
+                    
                     
                     
                 </div>
@@ -221,11 +221,11 @@ Analogy: Reading a Map
                     <p>To select 𝐤 unique numbers from a massive range 𝐧 without creating a huge array, use a HashMap to simulate a partial Fisher-Yates shuffle.</p>
                     
                     <p>It is called "virtual" because you never actually build this list. You just assume it exists. The process works like this:</p>
-                    <ul>
+                    
                         <li><strong>The Randomizer:</strong> Generates a random index (e.g., 5).</li>
                         <li><strong>The Virtual Array:</strong> Tells you "Index 5 contains the number 5" (unless the Map says otherwise).</li>
                         <li><strong>The Limit:</strong> Defines how much of the array is still "in play" (the pool of available numbers).</li>
-                    </ul>
+                    
                     <p>So, the virtual array is the data source (initially ordered 0 to N), and the randomizer is just the tool used to grab an index from it.</p>
                 
                     <p><strong>Solution:</strong> Imagine a virtual array with fixed points (Value = Index). When you randomly pick an index (e.g., 10), you extract that value. To ensure 10 is never picked again without forcing you to repeatedly generate new random numbers until you find an unused one, you fill the hole immediately. You take the value from the very last available spot in the range (the limit) and move it to Index 10.</p>
@@ -277,10 +277,10 @@ Analogy: Reading a Map
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
                     <p>Rearrange digits to form the <strong>smallest number that is larger</strong> than the current one (lexicographically larger).</p>
-                    <ul>
+                    
                         <li><strong>Suffix:</strong> The tail end of the list.</li>
                         <li><strong>Inversion Point:</strong> The first number (scanning right-to-left) smaller than its right neighbor.</li>
-                    </ul>
+                    
                     <ol>
                         <li><strong>Locate the Inversion Point:</strong> Scan the list from right to left. Stop at the first number smaller than the one to its right. (If no such number exists, the list is at its maximum; reverse it to reset to the minimum).</li>
                         <li><strong>Identify the Successor:</strong> Within the Suffix, find the smallest number that is strictly larger than the Inversion Point.</li>
@@ -316,11 +316,11 @@ Analogy: Reading a Map
                     <p>In formal math, this is called an Alternation. In computer science interviews, this is often called a Wiggle Sort.</p>
                     <p><strong>The Purpose:</strong> Breaking down optimization problems into smaller subproblems and optimizing them alternately.</p>
                     <p><strong>The Pattern:</strong></p>
-                    <ul>
+                    
                         <li>The 1st number should be smaller than (or equal to) the 2nd.</li>
                         <li>The 2nd number should be bigger than (or equal to) the 3rd.</li>
                         <li>The 3rd number should be smaller than (or equal to) the 4th.</li>
-                    </ul>
+                    
                     <p><strong>Vocabulary:</strong></p>
                     <p><strong>State:</strong> The list A is a mutable object. Its state changes every time the loop runs.</p>
                     <p><strong>Local Optimality:</strong> The algorithm doesn't "look ahead." It looks only at the current pair (i and i+1). It assumes that fixing the current pair won't break the previous pair in a way that matters.</p>
@@ -347,18 +347,12 @@ Analogy: Reading a Map
                     </button>
                     <p>Optimizing two sequential, non-overlapping events (e.g., Stock Trading).</p>
                     
-                    <ul>
+                    
                         <li><strong>Forward Pass:</strong> Scan left-to-right to calculate the best possible result for the first event ending by each specific day.</li>
                         <li><strong>Backward Pass:</strong> Scan right-to-left to calculate the best result for the second event starting from each specific day.</li>
                         <li><strong>Combine:</strong> Sum the two values at every index. By comparing every possible split, you identify the exact moment where the total of the past maximum and future maximum is highest.</li>
-                    </ul>
+                    
                 
-                    <p><strong>Stock Example:</strong> Prices <code>[3, 5, 8, 1, 9]</code></p>
-                    <ul>
-                        <li><strong>Phase 1 (Forward Pass):</strong> Track min price so far, compute max profit up to each day.<br><code>Left_Profit = [0, 2, 5, 5, 8]</code></li>
-                        <li><strong>Phase 2 (Backward Pass):</strong> Track max price from end, compute max profit from each day onward.<br><code>Right_Profit = [8, 8, 8, 8, 0]</code></li>
-                        <li><strong>Phase 3 (Combine):</strong> For each possible split day i, total profit = Left + Right.<br><code>Results: 8, 10, 13, 13, 8</code> → <strong>Max = 13</strong></li>
-                    </ul>
                 </div>
 
                 <div class="subsection">
@@ -380,29 +374,29 @@ Analogy: Reading a Map
                     </button>
                     <p><strong>Core idea:</strong> Remove duplicates from a <strong>sorted</strong> array <strong>in place</strong>, keeping only the first occurrence of each value. Uses two pointers and no extra space.</p>
                     <p><strong>Pointers:</strong></p>
-                    <ul>
+                    
                         <li>Reader (<code>i</code>): scans the array looking for new values</li>
                         <li>Writer (<code>write_index</code>): marks the end of the "unique prefix" we're building</li>
-                    </ul>
+                    
                     <p><strong>Steps:</strong></p>
                     <ol>
                         <li>Assume the array is already sorted (duplicates are next to each other).</li>
                         <li>Start with <code>write_index = 1</code> (index 0 is always kept as unique).</li>
                         <li>Loop the reader <code>i</code> from 1 to end of array:
-                            <ul>
+                            
                                 <li>If <code>A[i]</code> is different from <code>A[write_index - 1]</code>, it's a new value → copy <code>A[i]</code> to <code>A[write_index]</code> and increment <code>write_index</code></li>
                                 <li>Otherwise, skip (it's a duplicate)</li>
-                            </ul>
+                            
                         </li>
                         <li>At the end, <code>write_index</code> is the new length of the array with uniques only.</li>
                     </ol>
                     <p><strong>Result:</strong></p>
-                    <ul>
+                    
                         <li>The first <code>write_index</code> elements contain all unique values in order.</li>
                         <li>The rest of the array can be ignored.</li>
                         <li>Time: O(n)</li>
                         <li>Extra space: O(1)</li>
-                    </ul>
+                    
                     <p><strong>Example:</strong> <code>[1,1,2,2,2,3,4,4]</code> → becomes <code>[1,2,3,4,?,?...]</code> and returns length 4</p>
                 </div>
 
