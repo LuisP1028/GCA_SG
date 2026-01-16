@@ -219,6 +219,15 @@ Analogy: Reading a Map
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
                     <p>To select 𝐤 unique numbers from a massive range 𝐧 without creating a huge array, use a HashMap to simulate a partial Fisher-Yates shuffle.</p>
+                    
+                    <p>It is called "virtual" because you never actually build this list. You just assume it exists. The process works like this:</p>
+                    <ul>
+                        <li><strong>The Randomizer:</strong> Generates a random index (e.g., 5).</li>
+                        <li><strong>The Virtual Array:</strong> Tells you "Index 5 contains the number 5" (unless the Map says otherwise).</li>
+                        <li><strong>The Limit:</strong> Defines how much of the array is still "in play" (the pool of available numbers).</li>
+                    </ul>
+                    <p>So, the virtual array is the data source (initially ordered 0 to N), and the randomizer is just the tool used to grab an index from it.</p>
+                
                     <p><strong>Solution:</strong> Imagine a virtual array with fixed points (Value = Index). When you randomly pick an index (e.g., 10), you extract that value. To ensure 10 is never picked again without forcing you to repeatedly generate new random numbers until you find an unused one, you fill the hole immediately. You take the value from the very last available spot in the range (the limit) and move it to Index 10.</p>
                     <p>The HashMap records this swap: <code>Map[10] = ValueAtLimit</code>.</p>
                     <p>If you randomly roll Index 10 again later, the map intercepts and provides the moved value instead. After each pick, you shrink the range size by one. This guarantees that every single random generation lands on a valid, unpicked number, making the process highly efficient.</p>
