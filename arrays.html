@@ -390,20 +390,36 @@ Analogy: Reading a Map
                         </li>
                         <li>At the end, <code>write_index</code> is the new length of the array with uniques only.</li>
                     </ol>
-                    <p><strong>Result:</strong></p>
+                  
                     
-                        <li>The first <code>write_index</code> elements contain all unique values in order.</li>
-                        <li>The rest of the array can be ignored.</li>
-                        <li>Time: O(n)</li>
-                        <li>Extra space: O(1)</li>
-                    
-                    <p><strong>Example:</strong> <code>[1,1,2,2,2,3,4,4]</code> → becomes <code>[1,2,3,4,?,?...]</code> and returns length 4</p>
                 </div>
 
                 <div class="subsection">
                     <span class="subsection-title">Enumerate Primes (Sieve)</span>
-                    <p>Assume all numbers are prime and progressively eliminate multiples.</p>
-                    <p><strong>Why Faster?</strong> Computers find division/modulus expensive. The Sieve uses <strong>Jumping</strong> (Addition) to mark indices, which is much faster for a CPU.</p>
+                    <p>Instead of asking "Is X prime?" for every number (Brute Force), we assume all numbers are prime and progressively eliminate non-primes.</p>
+                    <p>We start with 2, keep it, and cross out all multiples of 2. Then we find the next non-crossed number (3), keep it, and cross out its multiples. Repeat until finished.</p>
+                    
+                    <h3>WHY THIS IS FASTER THAN BRUTE FORCING</h3>
+                    <p><strong>The Operation: Division vs. Jumping</strong></p>
+                
+                    <p><strong>Method A: Trial Division (Brute Force)</strong></p>
+                    <p>To check if the number <strong>97</strong> is prime, you have to ask:</p>
+                    <ul>
+                        <li>Is <strong>97%2==0</strong> ? (Division operation)</li>
+                        <li>Is <strong>97%3==0</strong> ? (Division operation)</li>
+                        <li>Is <strong>97%4==0</strong> ? ...</li>
+                        <li>... all the way up to <strong>√97</strong>.</li>
+                    </ul>
+                    <p>Computers find division (and modulus) relatively "expensive" (slow). You are doing this heavy math for every single number from 1 to <strong>N</strong>.</p>
+                
+                    <p><strong>Method B: The Sieve</strong></p>
+                    <p>When we find that <strong>2</strong> is prime, we do not do any division. We just jump through the array indices: index <strong>4</strong>, index <strong>6</strong>, index <strong>8</strong>.</p>
+                    <ul>
+                        <li>We are just setting a value to False.</li>
+                        <li>We find the next index by simple addition: current_index + <strong>2</strong>.</li>
+                    </ul>
+                
+                    <p><strong>Verdict:</strong> Adding and marking is much faster for a CPU than dividing and checking remainders.</p>
                 </div>
 
             </div>
