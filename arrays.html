@@ -174,7 +174,7 @@
                         </button>
                     </span>
                     <p><strong>Layer-by-Layer:</strong> Treats the matrix as concentric rectangular rings (shells). You iterate through the top row, right column, bottom row, and left column of the outermost ring, then shrink the boundary.</p>
-                    <p><strong>The How:</strong> Read the first row normally, transpose for columns. When reading bottom rows, traverse from <code>[-1]</code> to keep order. <em>Crucial Detail:</em> Stop one cell early when traversing columns/rows to ensure corners aren't counted twice.</p>
+                    <p><strong>The How:</strong> Read the first row normally, transpose for columns. When reading bottom rows, traverse from <code>[-1]</code> to keep order. <em>Crucial Detail:</em> Stop one cell early when traversing columns/rows to ensure corners aren't counted twice. Mathematically: For a side of length L, process L-1 elements.</p>
                     <div class="code-block">
 Analogy: Reading a Map
 • East: Hold map normally.
