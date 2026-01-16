@@ -151,7 +151,7 @@
                 
                 <div class="subsection">
                     <div class="subsection-title">Searching Basics</div>
-                    <p>Custom types (like a Student object) require user-defined Comparators.</p>
+                    <p>Custom types require user-defined Comparators.</p>
                     <p>"Comparable" simply means you have written a specific rule (a function) that tells the computer exactly how to decide which of two objects comes first.</p>
                     <p>Transitivity = Logical Consistency</p>
                 </div>
@@ -192,8 +192,8 @@
                     </div>
                     <p><strong>Rephrasing and Definition</strong><br>
                     The problem asks you to find a "fixed point" in an array: a specific location (index) where the number stored there (value) is identical to the location number itself.</p>
-                    <p><strong>Algorithm Adaptation</strong>: It requires modifying a standard template (Binary Search) rather than simply implementing it.<br>
-                    The adaptation is simple: In standard Binary Search, you compare A[mid] to a fixed number (e.g., target). Here, you compare A[mid] to the index mid itself.</p>
+                    <p><strong>Algorithm Adaptation</strong>: 
+                    The adaptation is simple: Compare A[mid] to the index mid itself, by taking the difference as [Value − Index].</p>
                     <p>Mid is the index (the slot number or address, e.g., 5).<br>
                     A[mid] is the value stored inside that slot (e.g., 7).</p>
                     <p><strong>THE HOW</strong></p>
