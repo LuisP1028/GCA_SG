@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Partial Shuffle // Ditherpunk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Partial Shuffle // Ditherpunk Responsive</title>
     
-    <!-- Import Retro Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
@@ -17,14 +16,20 @@
             --color-fg: #00FF41;
             --color-dim: #003B00;
             --font-stack: 'VT323', monospace;
-            --cell-size: 60px;
+            
+            /* Dynamic sizing using clamp(min, preferred, max) */
+            --cell-size: clamp(28px, 7vw, 70px);
+            --gap-size: clamp(4px, 1vw, 15px);
+            --font-base: clamp(1rem, 2.5vw, 1.5rem);
+            --header-size: clamp(1.5rem, 5vw, 2.5rem);
+            
             --glow: 0 0 10px rgba(0, 255, 65, 0.5);
-            --scanline-color: rgba(0, 0, 0, 0.5);
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -34,10 +39,11 @@
             color: var(--color-fg);
             font-family: var(--font-stack);
             height: 100vh;
+            width: 100vw;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            overflow: hidden; /* Prevent body scroll, handle inside app */
             text-shadow: 0 0 4px var(--color-dim);
         }
 
@@ -56,7 +62,7 @@
             );
             background-size: 100% 4px;
             z-index: 999;
-            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+            box-shadow: inset 0 0 5vmax rgba(0,0,0,0.7);
         }
 
         .crt-flicker {
@@ -74,35 +80,47 @@
         #app {
             display: flex;
             flex-direction: column;
-            width: 90%;
-            max-width: 800px;
-            height: 90vh;
+            width: 95%;
+            max-width: 1200px;
+            height: 95%; /* Leave breathing room */
+            max-height: 900px;
             border: 2px solid var(--color-fg);
-            padding: 20px;
+            padding: clamp(10px, 2vh, 20px);
             position: relative;
             background: var(--color-bg);
             box-shadow: 0 0 20px var(--color-dim);
+            transition: height 0.3s;
         }
 
         header {
             border-bottom: 2px solid var(--color-fg);
             padding-bottom: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 2vh;
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
         }
 
         h1 {
             margin: 0;
-            font-size: 2rem;
+            font-size: var(--header-size);
             text-transform: uppercase;
             letter-spacing: 2px;
+            line-height: 1;
+        }
+
+        .header-info {
+            display: flex;
+            flex-direction: column;
         }
 
         .controls {
             display: flex;
-            gap: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         button {
@@ -110,11 +128,13 @@
             color: var(--color-fg);
             border: 1px solid var(--color-fg);
             font-family: var(--font-stack);
-            font-size: 1.2rem;
-            padding: 5px 15px;
+            font-size: var(--font-base);
+            padding: 0.2em 0.8em;
             cursor: pointer;
             transition: all 0.2s;
             text-transform: uppercase;
+            flex: 1 1 auto; /* Grow to fill space on mobile */
+            white-space: nowrap;
         }
 
         button:hover:not(:disabled) {
@@ -134,27 +154,45 @@
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: center; /* Center vertically */
             align-items: center;
             position: relative;
+            width: 100%;
+            overflow: hidden; /* Prevent spillover */
+            min-height: 200px; /* Ensure space for graph */
         }
 
         #status-label {
-            font-size: 1.4rem;
-            margin-bottom: 30px;
+            font-size: calc(var(--font-base) * 1.2);
+            margin-bottom: 3vh;
             text-align: center;
             min-height: 1.5em;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* The Array Row */
-        .array-row {
-            display: flex;
-            gap: 10px;
+        .array-container {
             position: relative;
-            margin-bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding-top: 40px; /* Space for marker */
         }
 
-        /* SVG Overlay for Lines */
+        .array-row {
+            display: flex;
+            gap: var(--gap-size);
+            position: relative;
+            margin-bottom: 10px;
+            /* Ensure it doesn't break line */
+            flex-wrap: nowrap;
+            justify-content: center;
+        }
+
+        /* SVG Overlay */
         #connector-svg {
             position: absolute;
             top: 0;
@@ -166,15 +204,10 @@
             overflow: visible;
         }
         
-        line {
+        line, path {
             stroke: var(--color-fg);
             stroke-width: 2;
-            stroke-dasharray: 5;
-            animation: dash 1s linear infinite;
-        }
-
-        @keyframes dash {
-            to { stroke-dashoffset: -10; }
+            vector-effect: non-scaling-stroke; /* Keep line width consistent */
         }
 
         /* --- CELL STYLES --- */
@@ -183,7 +216,9 @@
             flex-direction: column;
             align-items: center;
             width: var(--cell-size);
-            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bounce effect */
+            /* Important for swap animation positioning */
+            flex-shrink: 0; 
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
         .cell {
@@ -193,7 +228,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 2rem;
+            font-size: calc(var(--cell-size) * 0.5); /* Font scales with cell */
             font-weight: bold;
             position: relative;
             background-color: black;
@@ -202,32 +237,28 @@
 
         .index-label {
             margin-top: 8px;
-            font-size: 0.9rem;
+            font-size: calc(var(--cell-size) * 0.3);
             opacity: 0.7;
         }
 
-        /* 1. SELECTION (LOCKED) STATE: Inverted Green */
+        /* STATES */
         .cell.selected {
             background-color: var(--color-fg);
             color: black;
             box-shadow: var(--glow);
         }
 
-        /* 2. POOL STATE: Dithered Texture */
         .cell.pool {
-            /* Dither pattern using radial gradient */
             background-image: radial-gradient(var(--color-dim) 20%, transparent 20%);
             background-size: 4px 4px;
             color: var(--color-fg);
         }
 
-        /* 3. DISCARDED STATE: Dimmed */
         .cell.discarded {
             opacity: 0.3;
             border-style: dotted;
         }
 
-        /* 4. CURRENT (i) TARGET: Pulsing Border */
         .cell.target {
             border: 4px double var(--color-fg);
             animation: pulse-border 0.8s infinite alternate;
@@ -238,7 +269,6 @@
             to { box-shadow: 0 0 15px var(--color-fg); transform: scale(1.05); }
         }
 
-        /* 5. RANDOM (r) SOURCE: Strobe/Glitch */
         .cell.source {
             animation: strobe 0.1s infinite;
         }
@@ -252,11 +282,10 @@
         /* --- BRACKET MARKER --- */
         .boundary-marker {
             position: absolute;
-            top: -30px;
-            font-size: 1rem;
-            text-align: center;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 20px;
+            height: 30px;
             pointer-events: none;
         }
         
@@ -264,53 +293,68 @@
             position: absolute;
             transition: left 0.5s ease;
             white-space: nowrap;
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            transform: translateX(-50%); /* Center the text on the point */
         }
 
         /* --- LOG TERMINAL --- */
         #console-log {
-            height: 150px;
+            height: 25%;
+            min-height: 100px;
+            max-height: 200px;
             border-top: 2px solid var(--color-fg);
             background: rgba(0, 0, 0, 0.8);
             padding: 10px;
             font-family: var(--font-stack);
-            font-size: 1rem;
+            font-size: var(--font-base);
             overflow-y: auto;
             display: flex;
-            flex-direction: column-reverse; /* Newest at bottom visually if we prepend, but sticking to standard append */
+            flex-direction: column;
+            flex-shrink: 0;
+            /* Custom Scrollbar for Webkit */
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-fg) var(--color-bg);
         }
+        
+        #console-log::-webkit-scrollbar { width: 8px; }
+        #console-log::-webkit-scrollbar-track { background: var(--color-bg); }
+        #console-log::-webkit-scrollbar-thumb { background: var(--color-dim); border: 1px solid var(--color-fg); }
 
-        .log-entry {
-            margin-bottom: 4px;
-        }
-        .log-entry::before {
-            content: "> ";
-            opacity: 0.5;
+        .log-entry { margin-bottom: 4px; line-height: 1.2; }
+        .log-entry::before { content: "> "; opacity: 0.5; }
+
+        /* Media Query for Extremely Small Heights (Landscape Mobile) */
+        @media (max-height: 500px) {
+            #app { height: 100vh; max-height: none; padding: 5px; border: none; }
+            header { margin-bottom: 5px; }
+            #viz-container { min-height: 120px; }
+            .array-container { padding-top: 25px; }
+            h1 { font-size: 1.5rem; }
+            #console-log { display: none; } /* Hide log to save space on tiny landscape */
         }
     </style>
 </head>
 <body>
 
-    <!-- CRT Overlay -->
     <div class="scanlines"></div>
 
     <div id="app" class="crt-flicker">
         <header>
-            <div>
-                <h1>PARTIAL_SHUFFLE_ALG</h1>
+            <div class="header-info">
+                <h1>PARTIAL_SHUFFLE</h1>
                 <small style="opacity: 0.7">STATUS: <span id="sys-status">IDLE</span></small>
             </div>
             <div class="controls">
-                <button id="btn-step">STEP_SEQ</button>
-                <button id="btn-auto">AUTO_RUN</button>
+                <button id="btn-step">STEP</button>
+                <button id="btn-auto">AUTO</button>
                 <button id="btn-reset">RESET</button>
             </div>
         </header>
 
         <div id="viz-container">
-            <!-- Dynamic Status Text -->
-            <div id="status-label">INITIALIZED. WAITING FOR INPUT.</div>
+            <div id="status-label">INITIALIZED.</div>
             
-            <div style="position: relative; padding-top: 40px;">
+            <div class="array-container">
                 <!-- Boundary Marker Text -->
                 <div class="boundary-marker">
                     <span id="boundary-indicator" class="boundary-text">▼ BOUNDARY</span>
@@ -320,15 +364,13 @@
                 <div class="array-row" id="array-root">
                     <!-- JS will populate this -->
                 </div>
-                
-                <!-- SVG Layer for drawing lines between swaps -->
-                <svg id="connector-svg"></svg>
             </div>
+            
+            <!-- SVG Layer attached to container, not row, for easier coordinate math -->
+            <svg id="connector-svg"></svg>
         </div>
 
-        <div id="console-log">
-            <!-- Logs go here -->
-        </div>
+        <div id="console-log"></div>
     </div>
 
     <script>
@@ -339,11 +381,11 @@
 
         // --- STATE ---
         let array = [];
-        let currentIndex = 0; // i
+        let currentIndex = 0; 
         let isRunning = false;
         let isAuto = false;
         let autoInterval = null;
-        let state = 'IDLE'; // IDLE, PICK, SWAP, LOCK, DONE
+        let state = 'IDLE'; 
 
         // --- DOM ELEMENTS ---
         const domRoot = document.getElementById('array-root');
@@ -355,6 +397,7 @@
         const btnReset = document.getElementById('btn-reset');
         const boundaryInd = document.getElementById('boundary-indicator');
         const svgLayer = document.getElementById('connector-svg');
+        const vizContainer = document.getElementById('viz-container');
 
         // --- INITIALIZATION ---
         function init() {
@@ -367,15 +410,17 @@
             
             renderArray();
             updateBoundary();
+            
+            logContainer.innerHTML = '';
             log("SYSTEM INITIALIZED. DATA LOADED.");
-            log(`Params: N=${N}, K=${K}. Goal: Randomize first ${K} elements.`);
+            log(`Params: N=${N}, K=${K}. Goal: Randomize first ${K}.`);
+            
             sysStatus.innerText = "IDLE";
             statusLabel.innerText = "READY.";
             
             btnStep.disabled = false;
             btnAuto.disabled = false;
             
-            // Clear SVG
             svgLayer.innerHTML = '';
         }
 
@@ -386,20 +431,18 @@
             array.forEach((val, idx) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'cell-wrapper';
-                wrapper.id = `wrap-${idx}`; // ID based on position
+                wrapper.id = `wrap-${idx}`;
 
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.innerText = val;
                 
-                // Styling Logic
                 if (idx < currentIndex) {
-                    cell.classList.add('selected'); // 0 to i-1
+                    cell.classList.add('selected');
                 } else {
-                    cell.classList.add('pool'); // i to n-1
+                    cell.classList.add('pool');
                 }
 
-                // If finished, discard the rest
                 if (state === 'DONE' && idx >= K) {
                     cell.classList.add('discarded');
                     cell.classList.remove('pool');
@@ -415,17 +458,48 @@
             });
         }
 
+        // Calculate Position Logic (Responsive)
         function updateBoundary() {
-            // Move the boundary text indicator
-            // Calculation assumes 60px cell + 10px gap.
-            // Center of gap before index i is: (i * 70) - 5.
-            const px = (currentIndex * 70) - 5;
-            boundaryInd.style.left = `${px}px`;
+            // We need to position the marker essentially "between" currentIndex-1 and currentIndex.
+            // If currentIndex is 0, it points to the start.
             
-            if (currentIndex === 0) boundaryInd.style.left = "-10px";
+            // Get the reference container position
+            const rootRect = domRoot.getBoundingClientRect();
+            
+            // Default to start of array
+            let targetLeft = 0; 
+
+            if (currentIndex < N) {
+                const targetCell = document.getElementById(`wrap-${currentIndex}`);
+                if (targetCell) {
+                    // Position relative to the array-row
+                    targetLeft = targetCell.offsetLeft;
+                }
+            } else {
+                // If we are at the end, point to right edge of last element
+                const lastCell = document.getElementById(`wrap-${N-1}`);
+                if (lastCell) {
+                    targetLeft = lastCell.offsetLeft + lastCell.offsetWidth;
+                }
+            }
+
+            // Apply calculated left position. 
+            // The CSS translateX(-50%) centers it on this point.
+            // We adjust slightly to account for the gap visually.
+            // Gap is dynamic, so we try to aim for center of the left edge plus half a gap roughly.
+            // Simplified: Just point to the left edge of the current index (start of the pool).
+            boundaryInd.style.left = `${targetLeft}px`;
+            
             if (currentIndex >= K) boundaryInd.innerText = "COMPLETE";
             else boundaryInd.innerText = "▼ BOUNDARY";
         }
+
+        // Handle Window Resize to keep boundary correct
+        window.addEventListener('resize', () => {
+            updateBoundary();
+            // Clear lines on resize as they might drift
+            svgLayer.innerHTML = '';
+        });
 
         // --- LOGGING ---
         function log(msg) {
@@ -433,110 +507,97 @@
             entry.className = 'log-entry';
             entry.innerText = msg;
             logContainer.appendChild(entry);
+            // Auto scroll
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
         // --- ALGORITHM STEPS ---
-        
         async function performStep() {
             if (state === 'DONE') return;
 
             btnStep.disabled = true;
             if (!isAuto) sysStatus.innerText = "EXECUTING...";
 
-            // 1. PICK (State A)
-            // Select random index r from [i, n-1]
+            // 1. PICK
             const r = Math.floor(Math.random() * (N - currentIndex)) + currentIndex;
             
-            // Update Visuals for Selection
             const cellI = document.querySelector(`#wrap-${currentIndex} .cell`);
             const cellR = document.querySelector(`#wrap-${r} .cell`);
             
-            cellI.classList.add('target'); // The cursor (i)
-            cellR.classList.add('source'); // The picked element (r)
+            cellI.classList.add('target');
+            cellR.classList.add('source');
 
-            statusLabel.innerText = `Current Index [${currentIndex}] | Selected Random [${r}]`;
-            log(`Iter ${currentIndex}: Randomly selected index ${r} from pool.`);
+            statusLabel.innerText = `Swapping Index [${currentIndex}] <-> [${r}]`;
+            log(`Iter ${currentIndex}: Swapping with index ${r}.`);
 
-            // Draw Connector Line
             drawConnector(currentIndex, r);
 
             await wait(SPEED);
 
-            // 2. SWAP ANIMATION (State B)
-            statusLabel.innerText = "Swapping values...";
-            log(`Swapping values ${array[currentIndex]} <-> ${array[r]}...`);
-
+            // 2. SWAP ANIMATION
             if (currentIndex !== r) {
                 await animateSwap(currentIndex, r);
             } else {
-                log("Self-swap (No movement needed).");
                 await wait(SPEED / 2);
             }
 
-            // 3. LOCK & UPDATE (State C)
-            // Perform Logic Swap
+            // 3. LOGIC UPDATE
             [array[currentIndex], array[r]] = [array[r], array[currentIndex]];
             
-            // Re-render to clear styles and lock selection
             currentIndex++;
             state = (currentIndex === K) ? 'DONE' : 'IDLE';
             
-            // Clear SVG
             svgLayer.innerHTML = '';
             
-            renderArray(); // Re-builds DOM, applying 'Selected' style to new currentIndex-1
+            renderArray();
             updateBoundary();
 
             if (state === 'DONE') {
-                log("PROCESS COMPLETE. UNIFORM SAMPLE GENERATED.");
+                log("PROCESS COMPLETE.");
                 statusLabel.innerText = "HALTED.";
                 sysStatus.innerText = "COMPLETE";
                 btnAuto.disabled = true;
                 btnStep.disabled = true;
-                clearInterval(autoInterval);
             } else {
-                log(`Index ${currentIndex-1} locked. Pool size: ${N - currentIndex}.`);
                 btnStep.disabled = false;
                 if (!isAuto) sysStatus.innerText = "WAITING";
             }
         }
 
         // --- ANIMATION UTILS ---
-        
         function drawConnector(idx1, idx2) {
-            if (idx1 === idx2) return; // No line needed
+            if (idx1 === idx2) return; 
 
+            // Calculate positions relative to the Viz Container
             const rect1 = document.getElementById(`wrap-${idx1}`).getBoundingClientRect();
             const rect2 = document.getElementById(`wrap-${idx2}`).getBoundingClientRect();
-            const containerRect = document.getElementById('viz-container').getBoundingClientRect();
+            const containerRect = vizContainer.getBoundingClientRect();
 
-            // Calculate centers relative to SVG container
             const x1 = rect1.left + rect1.width/2 - containerRect.left;
-            const y1 = rect1.top - containerRect.top - 20; // Above boxes
+            const y1 = rect1.top - containerRect.top; // Point to top of cell
             const x2 = rect2.left + rect2.width/2 - containerRect.left;
-            const y2 = rect2.top - containerRect.top - 20;
+            const y2 = rect2.top - containerRect.top;
 
-            // Create SVG path (Arc)
+            // Arc height based on distance
+            const distance = Math.abs(x2 - x1);
+            const arcHeight = Math.min(distance * 0.5, 100); 
+
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            // Curve logic: M x1 y1 Q controlPointX controlPointY x2 y2
-            const cpY = y1 - 60; // Control point height
-            const cpX = (x1 + x2) / 2;
             
-            const d = `M ${x1} ${y1+20} Q ${cpX} ${cpY} ${x2} ${y2+20}`;
+            // Draw curve upwards
+            const d = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${y1 - arcHeight - 20} ${x2} ${y2}`;
             
             path.setAttribute("d", d);
             path.setAttribute("fill", "none");
             path.setAttribute("stroke", "#00FF41");
             path.setAttribute("stroke-width", "2");
-            path.setAttribute("stroke-dasharray", "5,5"); // Dashed styling
+            path.setAttribute("stroke-dasharray", "5,5");
 
-            // Add animation class
             const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
             animate.setAttribute("attributeName", "stroke-dashoffset");
-            animate.setAttribute("from", "50");
+            animate.setAttribute("from", "20");
             animate.setAttribute("to", "0");
-            animate.setAttribute("dur", "1s");
+            animate.setAttribute("dur", "0.5s");
             animate.setAttribute("repeatCount", "indefinite");
 
             path.appendChild(animate);
@@ -547,22 +608,15 @@
             const el1 = document.getElementById(`wrap-${idx1}`);
             const el2 = document.getElementById(`wrap-${idx2}`);
 
-            // Get positions
-            const rect1 = el1.getBoundingClientRect();
-            const rect2 = el2.getBoundingClientRect();
+            // Use simple offset calculation based on DOM
+            // This works regardless of window size
+            const dist = el2.offsetLeft - el1.offsetLeft;
 
-            // Calculate translation distance
-            const dist1 = rect2.left - rect1.left;
-            const dist2 = rect1.left - rect2.left;
+            el1.style.transform = `translateX(${dist}px)`;
+            el2.style.transform = `translateX(${-dist}px)`; // Negative for the second one
 
-            // Apply Transform
-            el1.style.transform = `translateX(${dist1}px)`;
-            el2.style.transform = `translateX(${dist2}px)`;
-
-            // Wait for transition
             await wait(SPEED);
             
-            // Reset (The actual logic swap happens after this function returns)
             el1.style.transform = '';
             el2.style.transform = '';
         }
@@ -572,7 +626,6 @@
         }
 
         // --- EVENT HANDLERS ---
-        
         btnStep.addEventListener('click', () => {
             if (state !== 'DONE') performStep();
         });
@@ -584,11 +637,9 @@
             btnStep.disabled = true;
             sysStatus.innerText = "AUTO_RUN";
             
-            // Recursive approach to handle async/await in loop
             const runLoop = async () => {
                 if (state !== 'DONE' && isAuto) {
                     await performStep();
-                    // Small pause between steps for readability
                     setTimeout(runLoop, 200); 
                 }
             };

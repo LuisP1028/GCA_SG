@@ -219,7 +219,7 @@ Analogy: Reading a Map
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
                     <p>To select 𝐤 unique numbers from a massive range 𝐧 without creating a huge array, use a HashMap to simulate a partial Fisher-Yates shuffle.</p>
-                    <p><strong>Solution:</strong> Imagine a virtual list where initially Value = Index. When you randomly pick an index (e.g., 10), you extract that value. To ensure 10 is never picked again without forcing you to repeatedly generate new random numbers until you find an unused one, you fill the hole immediately. You take the value from the very last available spot in the range (the limit) and move it to Index 10.</p>
+                    <p><strong>Solution:</strong> Imagine a virtual array with fixed points (Value = Index). When you randomly pick an index (e.g., 10), you extract that value. To ensure 10 is never picked again without forcing you to repeatedly generate new random numbers until you find an unused one, you fill the hole immediately. You take the value from the very last available spot in the range (the limit) and move it to Index 10.</p>
                     <p>The HashMap records this swap: <code>Map[10] = ValueAtLimit</code>.</p>
                     <p>If you randomly roll Index 10 again later, the map intercepts and provides the moved value instead. After each pick, you shrink the range size by one. This guarantees that every single random generation lands on a valid, unpicked number, making the process highly efficient.</p>
                 </div>
@@ -230,11 +230,11 @@ Analogy: Reading a Map
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
                     <p>Think of a VIP list with <strong>k</strong> spots. As the crowd (<strong>n</strong>) grows, entry becomes harder.</p>
-                    <ul>
+                    
                         <li><strong>The Odds:</strong> For the n-th person, roll an n-sided die. If number ≤ k, they get in. (Chance = k/n).</li>
                         <li><strong>The Swap:</strong> If they get in, randomly kick out a current VIP to maintain size k.</li>
                         <li><strong>Early items enter easily but face many swap risks. Late items enter rarely but face few. These opposing forces balance out perfectly to k/n odds.</li>
-                    </ul>
+                    
                 </div>
 
                 <div class="subsection">
