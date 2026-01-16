@@ -164,7 +164,15 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Array Spiraling</span>
+                    <span class="subsection-title">
+                        Array Spiraling
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Arrays/array_spiral.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p><strong>Layer-by-Layer:</strong> Treats the matrix as concentric rectangular rings (shells). You iterate through the top row, right column, bottom row, and left column of the outermost ring, then shrink the boundary.</p>
                     <p><strong>The How:</strong> Read the first row normally, transpose for columns. When reading bottom rows, traverse from <code>[-1]</code> to keep order. <em>Crucial Detail:</em> Stop one cell early when traversing columns/rows to ensure corners aren't counted twice.</p>
                     <div class="code-block">

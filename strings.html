@@ -162,13 +162,13 @@
                     <p>A sequence of characters that reads the exact same forwards and backwards.</p>
                     <p><strong>THE HOW:</strong></p>
                     <p><strong>Step 1: Initialization (Defining the State Space)</strong><br>
-                    We define the boundaries of our search. We establish two separate variables (pointers):
+                    We establish two separate variables (pointers):
                     <br>• Left Index (i): Initialized to 0 (the start of the string).
                     <br>• Right Index (j): Initialized to len(s) - 1 (the very last character of the string).</p>
                     <p><strong>Step 2: The Convergence Loop</strong><br>
-                    We begin a loop that continues only as long as the Left Index is numerically smaller than the Right Index (i < j).</p>
+                    We begin a loop that continues only as long as the Left Index is numerically smaller than the Right Index.</p>
                     <p><strong>Step 3: Left-Side Sanitization (The Inner Scan)</strong><br>
-                    At the start of every major loop iteration, we must ensure the Left Index points to meaningful data. We enter a conditional "while" loop to check the character at the current Left Index.</p>
+                    At the start of every major loop iteration, we must ensure the Left Index points to meaningful data.</p>
                     <ul>
                         <li>The Check: Is the character at s[i] non-alphanumeric? (Is it punctuation or whitespace?)</li>
                         <li>The Action: If it is non-alphanumeric, it is irrelevant. We increment the Left Index (i) by 1 to skip it.</li>
