@@ -177,7 +177,15 @@
             <summary>2. Backtracking</summary>
             <div class="section-content">
                 <div class="subsection">
-                    <div class="subsection-title">[RECURSIVE BACKTRACKING] GENERATE EVERY PERMUTATION FOR A GIVEN ARRAY</div>
+                    <div class="subsection-title">
+                        [RECURSIVE BACKTRACKING] GENERATE EVERY PERMUTATION FOR A GIVEN ARRAY
+                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src='Recursion/backtracking.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
                     <p>The goal is to take a list of unique numbers (an array of distinct integers) and produce every possible ordering (permutation) of those numbers. If the input has n numbers, you must find all n! (n-factorial) unique arrangements.</p>
                     <p>1 Recursive Backtracking (Optimal Solution A): A "divide and conquer" strategy where you fix the first number, then recursively permute the remaining numbers. This involves swapping elements to place them in the "fixed" position, recursing, and then swapping them back (backtracking) to restore the array to its previous state.</p>
                 </div>
@@ -204,10 +212,6 @@
             </div>
         </details>
 
-        <details class="section">
-            <summary>3. Dynamic Programming</summary>
-            <div class="section-content">
-                <!-- Placeholder -->
             </div>
         </details>
 

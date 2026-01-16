@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DITHERPUNK PERMUTATIONS // RESPONSIVE</title>
+    <style>
+        :root {
+            /* --- COLOR PALETTE --- */
+            --bg-color: #050505;
+            --fg-color: #00FF41;
+            --fg-dim: #004400;
+            --fg-highlight: #ccffcc;
+            
+            /* --- FLUID TYPOGRAPHY --- */
+            /* Scales between 14px and 20px based on screen width */
+            --font-stack: 'Courier New', Courier, monospace;
+            --font-base: clamp(0.875rem, 1.5vw, 1.25rem);
+            
+            /* --- FLUID DIMENSIONS --- */
+            --header-h: clamp(3rem, 8vh, 5rem);
+            --footer-h: clamp(4rem, 10vh, 6rem);
+            --gap-std: clamp(0.5rem, 2vw, 1.5rem);
+            
+            /* --- BOX MODEL SCALING --- */
+            /* Boxes resize intelligently: min 40px, max 100px */
+            --box-size: clamp(2.5rem, 15vw, 6rem); 
+            
+            /* --- Z-LAYERS --- */
+            --z-crt: 999;
+            --z-ui: 100;
+            --z-stage: 10;
+        }
+
+        /* --- RESET --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-stack);
+            font-size: var(--font-base);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 0.5rem; height: 0.5rem; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); border-left: 1px solid var(--fg-dim); }
+        ::-webkit-scrollbar-thumb { background: var(--fg-dim); border: 1px solid var(--fg-color); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--fg-color); }
+
+        /* --- VISUAL FX --- */
+        .crt-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: var(--z-crt);
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+        }
+        .glow { text-shadow: 0 0 0.3rem var(--fg-color), 0 0 0.6rem var(--fg-dim); }
+        
+        /* --- MAIN LAYOUT --- */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - var(--header-h) - var(--footer-h));
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 2px solid var(--fg-color);
+            background: var(--bg-color);
+            flex-shrink: 0;
+            z-index: var(--z-ui);
+        }
+        h1 { 
+            font-size: clamp(1rem, 4vw, 1.5rem); 
+            letter-spacing: 0.15em; 
+            text-transform: uppercase; 
+        }
+
+        /* --- SIDE PANELS (Stack & Output) --- */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-color);
+            overflow-y: auto;
+            border-right: 1px solid var(--fg-dim);
+            transition: width 0.3s ease;
+        }
+        
+        /* Responsive Widths */
+        #zone-stack { width: clamp(160px, 20vw, 300px); }
+        #zone-output { width: clamp(160px, 20vw, 300px); border-right: none; border-left: 1px solid var(--fg-dim); }
+        
+        .panel-label {
+            position: sticky; top: 0;
+            background: var(--bg-color);
+            border-bottom: 1px dashed var(--fg-dim);
+            padding: 0.5rem;
+            font-size: 0.8em; font-weight: bold;
+            z-index: 5;
+        }
+        .panel-content { padding: 0.5rem; }
+
+        .stack-item {
+            padding-left: 0.5rem; border-left: 2px solid var(--fg-dim);
+            margin-bottom: 0.25rem; color: var(--fg-dim);
+            font-size: 0.85em; word-break: keep-all; white-space: nowrap;
+        }
+        .stack-item.active {
+            border-left-color: var(--fg-color);
+            color: var(--fg-color); background: rgba(0, 255, 65, 0.05);
+        }
+
+        .log-item {
+            border-bottom: 1px solid var(--fg-dim);
+            padding: 0.25rem 0; font-size: 0.85em;
+        }
+
+        /* --- STAGE (Center) --- */
+        #zone-stage {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* Allow vertical scrolling on very small screens if content overflows */
+            overflow-y: auto; 
+            background: radial-gradient(circle at center, #001100 0%, #000000 70%);
+            position: relative;
+            padding: var(--gap-std);
+        }
+
+        /* Phase Display (Step Info) */
+        #phase-display {
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid var(--fg-dim);
+            background: rgba(0, 20, 0, 0.8);
+            padding: 1rem;
+            margin-bottom: auto; /* Pushes to top */
+            text-align: center;
+            backdrop-filter: blur(2px);
+            flex-shrink: 0;
+        }
+        #phase-title {
+            font-size: 1.2em; font-weight: bold;
+            color: var(--fg-color); margin-bottom: 0.5rem;
+            text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        #phase-desc {
+            font-size: 0.9em; color: var(--fg-highlight);
+            line-height: 1.4;
+        }
+
+        /* Visualization Wrapper */
+        .stage-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            /* Allocate vertical space for pointers so they don't clip */
+            padding-top: 3rem; 
+            padding-bottom: 3rem;
+            margin: auto 0; /* Vertically center in available space */
+        }
+
+        .layer { display: flex; gap: var(--gap-std); justify-content: center; }
+        
+        .cards-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 2;
+            align-items: center; /* Center cards vertically in wrapper */
+        }
+        .slots-layer { 
+            display: flex; gap: var(--gap-std); justify-content: center;
+            z-index: 1; 
+        }
+
+        /* Box Components */
+        .slot, .card {
+            width: var(--box-size); height: var(--box-size);
+            display: flex; align-items: center; justify-content: center;
+            font-size: calc(var(--box-size) * 0.5); font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .slot {
+            border: 1px dashed var(--fg-dim); color: var(--fg-dim);
+            position: relative;
+        }
+        /* Index label inside slot */
+        .slot span {
+            position: absolute; bottom: 2px; right: 5px;
+            font-size: 0.3em; opacity: 0.6;
+        }
+        
+        /* --- POINTERS --- */
+        /* Top Pointer (i) */
+        .slot.is-ptr-i::before {
+            content: 'PTR[i] \25BC';
+            white-space: pre; position: absolute;
+            /* Use EM to stay relative to font size, not box height */
+            top: -2.5em; left: 50%; transform: translateX(-50%);
+            color: var(--fg-color); font-weight: bold;
+            text-shadow: 0 0 5px var(--fg-color);
+            font-size: 0.35em; /* Scale relative to box */
+        }
+        .slot.is-ptr-i {
+            border: 1px solid var(--fg-color);
+            box-shadow: 0 0 1rem rgba(0, 255, 65, 0.15);
+        }
+
+        /* Bottom Pointer (j) - Explicitly labeled SCANNER[j] */
+        .slot.is-scanner::after {
+            content: '\25B2 SCANNER[j]';
+            position: absolute;
+            /* Use EM to stay relative to font size */
+            bottom: -2.5em; left: 50%; transform: translateX(-50%);
+            color: var(--fg-highlight); 
+            font-size: 0.35em; /* Scale relative to box */
+            white-space: nowrap; 
+        }
+
+        .card {
+            background: #000; border: 2px solid var(--fg-color);
+            box-shadow: 4px 4px 0 #002200; color: var(--fg-color);
+            will-change: transform;
+        }
+        .card.locked {
+            background: var(--fg-color); color: #000; border-color: #000;
+        }
+
+        /* --- FOOTER --- */
+        footer {
+            height: var(--footer-h);
+            display: flex; align-items: center; justify-content: space-between;
+            border-top: 2px solid var(--fg-color);
+            background: var(--bg-color); padding: 0 1rem;
+            flex-shrink: 0; z-index: var(--z-ui);
+        }
+        .controls { 
+            display: flex; gap: 0.5rem; flex-wrap: wrap; 
+            justify-content: center; flex: 1; 
+        }
+        
+        button {
+            background: transparent; border: 1px solid var(--fg-color);
+            color: var(--fg-color); font-family: var(--font-stack);
+            font-size: clamp(0.7rem, 1.2vw, 1rem);
+            padding: 0.5rem 1rem; cursor: pointer;
+            transition: all 0.2s; text-transform: uppercase;
+            white-space: nowrap;
+        }
+        button:hover { background: var(--fg-dim); }
+        button:active { transform: translateY(2px); }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+        
+        button.mode-active { background: var(--fg-color); color: #000; border-color: #000; }
+        
+        /* NO BLINK ANIMATION for step button, just highlight */
+        button.step-ready { 
+            border-color: #fff; 
+            background: rgba(255, 255, 255, 0.1); 
+            box-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }
+
+        .status { 
+            font-size: 0.75em; color: var(--fg-dim); 
+            margin-left: 1rem; display: none; 
+        }
+
+        /* --- MEDIA QUERIES --- */
+        /* Breakpoint: Mobile/Portrait (Stack vertically) */
+        @media (max-width: 900px) {
+            .main-layout { flex-direction: column; }
+            
+            .side-panel {
+                width: 100%;
+                max-height: 15vh; /* Limit height of logs on mobile */
+                border-right: none;
+                border-bottom: 1px solid var(--fg-dim);
+            }
+            
+            #zone-stack { order: 1; }
+            #zone-stage { order: 2; border-bottom: 1px solid var(--fg-dim); }
+            #zone-output { order: 3; border-left: none; }
+            
+            /* Adjust pointers for mobile tightness */
+            .stage-wrapper { padding-top: 2.5rem; padding-bottom: 2.5rem; }
+        }
+        
+        /* Desktop: Show status text */
+        @media (min-width: 901px) {
+            .status { display: block; }
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes flash { 0% { background: var(--fg-color); color: #000; } 100% { background: transparent; color: var(--fg-color); } }
+    </style>
+</head>
+<body>
+    
+    <!-- VFX Layers -->
+    <div class="crt-overlay"></div>
+    <!-- SVG Noise Filter -->
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.08; z-index: 998; background-image: url('data:image/svg+xml;utf8,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
+
+    <header>
+        <h1 class="glow">Permutation::Vis</h1>
+    </header>
+
+    <div class="main-layout">
+        <!-- LEFT: STACK -->
+        <div class="side-panel" id="zone-stack">
+            <div class="panel-label">STACK_TRACE</div>
+            <div class="panel-content" id="stack-content"></div>
+        </div>
+
+        <!-- CENTER: STAGE -->
+        <div id="zone-stage">
+            <!-- Phase / Step Display -->
+            <div id="phase-display" class="glow">
+                <div id="phase-title">STANDING BY</div>
+                <div id="phase-desc">System Ready. Select Mode.</div>
+            </div>
+
+            <!-- Visualization Area -->
+            <div class="stage-wrapper">
+                <div class="layer slots-layer" id="slots-container">
+                    <!-- JS Injects Slots Here -->
+                </div>
+                <div class="layer cards-layer" id="cards-container">
+                    <!-- JS Injects Cards Here -->
+                </div>
+            </div>
+            
+            <div style="margin-top:auto; padding-bottom:0.5rem; color: var(--fg-dim); font-size: 0.75em; text-align: center;">
+                DEPTH [i] locks SLOT // SCANNER [j] swaps
+            </div>
+        </div>
+
+        <!-- RIGHT: OUTPUT -->
+        <div class="side-panel" id="zone-output">
+            <div class="panel-label">RESULTS_LOG</div>
+            <div class="panel-content" id="output-content"></div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="controls">
+            <button id="btn-mode" onclick="viz.toggleMode()">MODE: AUTO</button>
+            <button id="btn-start" onclick="viz.init()">INIT_SEQ</button>
+            
+            <!-- Manual Step Button -->
+            <button id="btn-step" onclick="viz.triggerStep()" style="display:none;">NEXT STEP &gt;&gt;</button>
+            
+            <!-- Auto Controls -->
+            <button id="btn-pause" onclick="viz.togglePause()">PAUSE</button>
+            <button id="btn-speed" onclick="viz.cycleSpeed()">SPEED: 1x</button>
+        </div>
+        <div class="status" id="status-msg">AWAITING INPUT</div>
+    </footer>
+
+    <script>
+        class PermutationEngine {
+            constructor() {
+                // Core State
+                this.initialArr = ['A', 'B', 'C'];
+                this.arrState = []; 
+                this.isRunning = false;
+                this.isPaused = false;
+                
+                // Manual Step State
+                this.isManualMode = false;
+                this.waitingForStep = false;
+                this.stepResolver = null;
+
+                // Timing
+                this.speedMult = 1;
+                this.baseDelay = 1500; 
+
+                // Text Descriptions
+                this.STEPS = {
+                    INIT: { title: "Step 1: Initialize", desc: "Focusing on index [i]. We need to fill this slot." },
+                    BASE: { title: "Step 2: Base Case", desc: "Index [i] is at end. Path complete. Snapshotting." },
+                    BRANCH: { title: "Step 3: Branching", desc: "Scanner [j] looks for available candidates." },
+                    MUTATE: { title: "Step 4: Mutate State", desc: "Swapping Candidate [j] into Slot [i]." },
+                    RECURSE: { title: "Step 5: Recursive Descent", desc: "Slot filled. Moving deeper to depth i+1." },
+                    BACKTRACK: { title: "Step 6: Backtrack", desc: "Path explored. Undoing swap to restore state." }
+                };
+
+                // Elements
+                this.slotsEl = document.getElementById('slots-container');
+                this.cardsEl = document.getElementById('cards-container');
+                this.stackEl = document.getElementById('stack-content');
+                this.outputEl = document.getElementById('output-content');
+                this.statusEl = document.getElementById('status-msg');
+                
+                this.btnMode = document.getElementById('btn-mode');
+                this.btnStep = document.getElementById('btn-step');
+                this.btnPause = document.getElementById('btn-pause');
+                this.btnSpeed = document.getElementById('btn-speed');
+                this.btnStart = document.getElementById('btn-start');
+            }
+
+            // --- UI HELPER ---
+            log(msg) { this.statusEl.innerText = `>> ${msg}`; }
+            
+            setPhase(stepKey, extraInfo = "") {
+                const pTitle = document.getElementById('phase-title');
+                const pDesc = document.getElementById('phase-desc');
+                
+                if (this.STEPS[stepKey]) {
+                    pTitle.innerText = this.STEPS[stepKey].title;
+                    pDesc.innerText = this.STEPS[stepKey].desc + (extraInfo ? " " + extraInfo : "");
+                }
+            }
+
+            // --- TIMING & STEPPING ENGINE ---
+            async wait(factor = 1) {
+                // Manual Mode Block
+                if (this.isManualMode) {
+                    this.waitingForStep = true;
+                    this.btnStep.disabled = false;
+                    this.btnStep.classList.add('step-ready'); // Highlight (no blink)
+                    this.log("WAITING FOR USER INPUT...");
+                    
+                    // Wait for Promise resolution via button click
+                    await new Promise(resolve => {
+                        this.stepResolver = resolve;
+                    });
+                    
+                    // Reset
+                    this.waitingForStep = false;
+                    this.stepResolver = null;
+                    this.btnStep.disabled = true;
+                    this.btnStep.classList.remove('step-ready');
+                    return;
+                }
+
+                // Auto Mode Block
+                const ms = (this.baseDelay * factor) / this.speedMult;
+                const chunks = 10;
+                for (let k=0; k<chunks; k++) {
+                    // Check pause
+                    while(this.isPaused && this.isRunning) {
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                    await new Promise(r => setTimeout(r, ms/chunks));
+                }
+            }
+
+            // --- INPUT HANDLERS ---
+            toggleMode() {
+                if (this.isRunning) return; 
+                this.isManualMode = !this.isManualMode;
+                
+                if (this.isManualMode) {
+                    this.btnMode.innerText = "MODE: MANUAL";
+                    this.btnMode.classList.add('mode-active');
+                    this.btnStep.style.display = "inline-block";
+                    this.btnStep.disabled = true;
+                    this.btnPause.style.display = "none";
+                    this.btnSpeed.style.display = "none";
+                } else {
+                    this.btnMode.innerText = "MODE: AUTO";
+                    this.btnMode.classList.remove('mode-active');
+                    this.btnStep.style.display = "none";
+                    this.btnPause.style.display = "inline-block";
+                    this.btnSpeed.style.display = "inline-block";
+                }
+            }
+
+            triggerStep() {
+                if (this.waitingForStep && this.stepResolver) {
+                    this.stepResolver();
+                }
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                this.btnPause.innerText = this.isPaused ? "RESUME" : "PAUSE";
+                this.btnPause.style.borderColor = this.isPaused ? "#ffaa00" : "var(--fg-color)";
+            }
+            
+            cycleSpeed() {
+                const speeds = [1, 2, 4, 10];
+                const idx = speeds.indexOf(this.speedMult);
+                this.speedMult = speeds[(idx + 1) % speeds.length];
+                this.btnSpeed.innerText = `SPEED: ${this.speedMult}x`;
+            }
+
+            // --- VISUALIZATION DRAWING ---
+            drawStage(ptrI, ptrJ) {
+                // 1. Draw Slots (Grid + Pointers)
+                this.slotsEl.innerHTML = '';
+                this.arrState.forEach((_, idx) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    if (idx === ptrI) slot.classList.add('is-ptr-i');
+                    if (idx === ptrJ) slot.classList.add('is-scanner');
+                    // Index number
+                    slot.innerHTML = `<span>${idx}</span>`;
+                    this.slotsEl.appendChild(slot);
+                });
+
+                // 2. Draw Cards (Moving Values)
+                this.cardsEl.innerHTML = '';
+                this.arrState.forEach((item, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'card glow';
+                    card.innerText = item.val;
+                    card.id = `card-${item.id}`; // Persist ID for FLIP
+                    
+                    // Visual Lock
+                    if (ptrI !== null && idx < ptrI) card.classList.add('locked');
+                    
+                    this.cardsEl.appendChild(card);
+                });
+            }
+
+            addStack(depth, arr) {
+                const div = document.createElement('div');
+                div.className = 'stack-item active';
+                div.id = `frame-${depth}`;
+                div.innerText = `d[${depth}]: [${arr.join('')}]`;
+                
+                // Unmark previous
+                const prev = this.stackEl.querySelector('.active');
+                if(prev) prev.classList.remove('active');
+                
+                this.stackEl.appendChild(div);
+                div.scrollIntoView({behavior:'smooth'});
+            }
+
+            popStack(depth) {
+                const el = document.getElementById(`frame-${depth}`);
+                if(el) el.remove();
+                const last = this.stackEl.lastElementChild;
+                if(last) last.classList.add('active');
+            }
+
+            addOutput(arr) {
+                const div = document.createElement('div');
+                div.className = 'log-item glow';
+                div.innerText = `> ${arr.join('')}`;
+                this.outputEl.appendChild(div);
+                div.scrollIntoView({behavior:'smooth'});
+            }
+
+            // --- ANIMATION (FLIP) ---
+            async animateSwap(idxA, idxB) {
+                // If same index, just pulse
+                if (idxA === idxB) {
+                    const card = this.cardsEl.children[idxA];
+                    card.style.transform = "scale(1.1)";
+                    card.style.borderColor = "#fff";
+                    await this.wait(0.5);
+                    card.style.transform = "";
+                    card.style.borderColor = "";
+                    return;
+                }
+
+                // Get Elements
+                const elA = this.cardsEl.children[idxA];
+                const elB = this.cardsEl.children[idxB];
+                
+                // Calculate distance
+                const rectA = elA.getBoundingClientRect();
+                const rectB = elB.getBoundingClientRect();
+                const distX = rectB.left - rectA.left;
+
+                // Duration logic
+                const duration = this.isManualMode ? 0.4 : (0.6 / this.speedMult);
+                
+                // Apply Transform
+                elA.style.transition = `transform ${duration}s ease-in-out`;
+                elB.style.transition = `transform ${duration}s ease-in-out`;
+                elA.style.transform = `translateX(${distX}px)`;
+                elB.style.transform = `translateX(${-distX}px)`;
+
+                // Wait
+                const waitTime = this.isManualMode ? (duration * 1000) : (600 / this.speedMult);
+                await new Promise(r => setTimeout(r, waitTime));
+
+                // Swap Logic
+                [this.arrState[idxA], this.arrState[idxB]] = [this.arrState[idxB], this.arrState[idxA]];
+                
+                // Reset
+                elA.style.transition = 'none'; elB.style.transition = 'none';
+                elA.style.transform = 'none'; elB.style.transform = 'none';
+                
+                // Re-draw to snap to grid
+                this.drawStage(-1, -1); 
+            }
+
+            // --- MAIN ALGORITHM ---
+            async init() {
+                if(this.isRunning) return;
+                this.isRunning = true;
+                this.btnStart.disabled = true;
+                this.btnMode.disabled = true;
+                
+                // Clean UI
+                this.outputEl.innerHTML = '';
+                this.stackEl.innerHTML = '';
+                this.arrState = this.initialArr.map((v, i) => ({val: v, id: i}));
+                
+                this.setPhase('INIT', "Starting Sequence.");
+                this.drawStage(0, 0);
+                await this.wait(1);
+                
+                await this.permute(0);
+                
+                // Complete
+                document.getElementById('phase-title').innerText = "SEQUENCE COMPLETE";
+                document.getElementById('phase-desc').innerText = "All permutations generated.";
+                this.drawStage(-1, -1);
+                
+                this.isRunning = false;
+                this.btnStart.disabled = false;
+                this.btnMode.disabled = false;
+            }
+
+            async permute(i) {
+                // 1. INIT
+                const currentVals = this.arrState.map(x => x.val);
+                this.addStack(i, currentVals);
+                this.drawStage(i, i);
+                this.setPhase('INIT', `Depth is ${i}.`);
+                this.log(`DEPTH ${i}: Focusing on Slot ${i}`);
+                await this.wait(1);
+
+                // 2. BASE CASE
+                if (i === this.arrState.length - 1) {
+                    this.setPhase('BASE');
+                    this.log("BASE CASE: Permutation Found");
+                    
+                    // Flash cards
+                    const cards = document.querySelectorAll('.card');
+                    cards.forEach(c => { c.style.background = 'var(--fg-color)'; c.style.color='black'; });
+                    await this.wait(0.5);
+                    this.addOutput(this.arrState.map(x => x.val));
+                    cards.forEach(c => { c.style.background = ''; c.style.color=''; });
+                    await this.wait(0.5);
+                    
+                    this.popStack(i);
+                    return;
+                }
+
+                // 3. BRANCHING LOOP
+                for (let j = i; j < this.arrState.length; j++) {
+                    this.drawStage(i, j); // Update pointers (i and scanner j)
+                    this.setPhase('BRANCH', `Testing candidate at index [${j}]: ${this.arrState[j].val}`);
+                    this.log(`Scanner [j] checking index ${j} (${this.arrState[j].val})`);
+                    await this.wait(1);
+
+                    // 4. MUTATE
+                    if (i !== j) {
+                        this.setPhase('MUTATE', `Fixing ${this.arrState[j].val} into Slot [${i}]`);
+                        this.log(`Swapping ${this.arrState[i].val} <-> ${this.arrState[j].val}`);
+                    } else {
+                        this.setPhase('MUTATE', `Kept ${this.arrState[j].val} in Slot [${i}] (Self-Swap)`);
+                    }
+                    await this.animateSwap(i, j);
+                    await this.wait(0.5);
+                    
+                    // 5. RECURSE
+                    this.setPhase('RECURSE', `Moving to next depth: ${i+1}`);
+                    await this.wait(0.5);
+                    
+                    await this.permute(i + 1);
+
+                    // 6. BACKTRACK
+                    this.drawStage(i, j); // Restore pointers for backtrack visualization
+                    this.setPhase('BACKTRACK', `Undoing swap: ${this.arrState[i].val} <-> ${this.arrState[j].val}`);
+                    this.log(`Backtracking: Revert ${this.arrState[i].val} <-> ${this.arrState[j].val}`);
+                    await this.wait(1);
+                    await this.animateSwap(i, j);
+                }
+                
+                this.popStack(i);
+            }
+        }
+
+        const viz = new PermutationEngine();
+    </script>
+</body>
+</html>
