@@ -189,9 +189,9 @@
                     <p>The goal is to take a list of unique numbers (an array of distinct integers) and produce every possible ordering (permutation) of those numbers. If the input has n numbers, you must find all n! (n-factorial) unique arrangements.</p>
                     <p>1 Recursive Backtracking (Optimal Solution A): A "divide and conquer" strategy where you fix the first number, then recursively permute the remaining numbers. This involves swapping elements to place them in the "fixed" position, recursing, and then swapping them back (backtracking) to restore the array to its previous state.</p>
                 </div>
-                
+        
                 <p><strong>THE HOW</strong></p>
-                
+        
                 <p><strong>Step 1: Initialize the State</strong><br>
                 Create a main list to store the final results and define a helper function accepting index i. Index i represents the specific position or "chair" you are currently filling. The function will try placing different available numbers into this slot, moving deeper into the array for each choice.</p>
         
@@ -209,9 +209,6 @@
         
                 <p><strong>Step 6: Backtrack (State Restoration)</strong><br>
                 Immediately after the recursive call returns, swap the values at i and j back to their original positions. This "undo" action restores the array to its previous state, ensuring the next iteration of the loop starts with a clean slate to test the next candidate.</p>
-            </div>
-        </details>
-
             </div>
         </details>
 
