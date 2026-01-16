@@ -161,44 +161,20 @@
                     </div>
                     <p>A sequence of characters that reads the exact same forwards and backwards.</p>
                     <p><strong>THE HOW:</strong></p>
-                    <p><strong>Step 1: Initialization (Defining the State Space)</strong><br>
-                    We establish two separate variables (pointers):
-                    <br>• Left Index (i): Initialized to 0 (the start of the string).
-                    <br>• Right Index (j): Initialized to len(s) - 1 (the very last character of the string).</p>
+                    <p><strong>Step 1: Initialization</strong><br>
+                    Create two pointers to track position. Set the Left index to the start of the string (0) and the Right index to the very last character.</p>
                     <p><strong>Step 2: The Convergence Loop</strong><br>
-                    We begin a loop that continues only as long as the Left Index is numerically smaller than the Right Index.</p>
-                    <p><strong>Step 3: Left-Side Sanitization (The Inner Scan)</strong><br>
-                    At the start of every major loop iteration, we must ensure the Left Index points to meaningful data.</p>
-                    <ul>
-                        <li>The Check: Is the character at s[i] non-alphanumeric? (Is it punctuation or whitespace?)</li>
-                        <li>The Action: If it is non-alphanumeric, it is irrelevant. We increment the Left Index (i) by 1 to skip it.</li>
-                        <li>The Invariant: We repeat this action strictly while i remains less than j. This bounds check prevents the Left Index from running off the end of the string or passing the Right Index entirely.</li>
-                    </ul>
-                    <p><strong>Step 4: Right-Side Sanitization (The Inner Scan)</strong><br>
-                    Once the Left Index is settled on a valid character (or has met the Right Index), we perform the mirror operation for the Right Index.</p>
-                    <ul>
-                        <li>The Check: Is the character at s[j] non-alphanumeric?</li>
-                        <li>The Action: If it is non-alphanumeric, we decrement the Right Index (j) by 1 to skip it.</li>
-                        <li>The Invariant: We repeat this action strictly while i is still less than j.</li>
-                    </ul>
-                    <p><strong>Step 5: Normalization and Comparison (The Validity Test)</strong><br>
-                    At this point, both i and j are pointing to valid, alphanumeric characters. We must now determine if they are equivalent.</p>
-                    <ul>
-                        <li>Normalization: We convert both characters to the same case (usually lowercase) to ignore capitalization differences.</li>
-                        <li>Comparison: We compare the normalized value at s[i] with the normalized value at s[j].</li>
-                        <li>Short-Circuit Logic: If the values are not equal, the definition of a palindrome is broken. We verify the string is invalid immediately and return False. We do not process the rest of the string.</li>
-                    </ul>
-                    <p><strong>Step 6: Convergence (Advancing the State)</strong><br>
-                    If the characters at Step 5 were equal, the string is still potentially a palindrome. We must now narrow our search window to check the next pair of characters.</p>
-                    <ul>
-                        <li>Action: We increment the Left Index (i + 1) and decrement the Right Index (j - 1). This moves both pointers inward toward the center of the string.</li>
-                    </ul>
-                    <p><strong>Step 7: Termination (The Default Success)</strong><br>
-                    The outer loop continues until the indices meet or cross (i.e., when i is no longer less than j).</p>
-                    <ul>
-                        <li>Logic: If the code reaches this point, it means the indices successfully traversed the entire string without ever triggering the "Short-Circuit" in Step 5.</li>
-                        <li>Result: We return True. The string has been verified as a palindrome.</li>
-                    </ul>
+                    Begin a loop that continues running only as long as the Left index remains positioned strictly before the Right index.</p>
+                    <p><strong>Step 3: Left-Side Sanitization</strong><br>
+                    Advance the Left pointer forward to skip any non-alphanumeric characters (like symbols or spaces), stopping immediately if it meets the Right pointer.</p>
+                    <p><strong>Step 4: Right-Side Sanitization</strong><br>
+                    Move the Right pointer backward to skip any non-alphanumeric characters, stopping immediately if it meets the Left pointer.</p>
+                    <p><strong>Step 5: Normalization and Comparison</strong><br>
+                    Convert the found characters to the same case and compare them. If they are different, the pattern is broken; return False immediately.</p>
+                    <p><strong>Step 6: Convergence</strong><br>
+                    If the characters match, narrow the search window by moving the Left pointer one step forward and the Right pointer one step backward.</p>
+                    <p><strong>Step 7: Termination</strong><br>
+                    If the pointers meet or cross without ever triggering a mismatch, the string is verified as a palindrome. Return True.</p>
                 </div>
 
             </div>
