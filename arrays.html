@@ -272,6 +272,12 @@ Analogy: Reading a Map
                         <li><strong>Suffix:</strong> The tail end of the list.</li>
                         <li><strong>Inversion Point:</strong> The first number (scanning right-to-left) smaller than its right neighbor.</li>
                     </ul>
+                    <ol>
+                        <li><strong>Locate the Inversion Point:</strong> Scan the list from right to left. Stop at the first number smaller than the one to its right. (If no such number exists, the list is at its maximum; reverse it to reset to the minimum).</li>
+                        <li><strong>Identify the Successor:</strong> Within the Suffix, find the smallest number that is strictly larger than the Inversion Point.</li>
+                        <li><strong>Swap:</strong> Exchange the Inversion Point with the Successor.</li>
+                        <li><strong>Minimize the Suffix:</strong> Reverse the Suffix. Since the tail was descending, reversing it creates an ascending sequence. This ensures the new permutation is the smallest possible increment over the previous one.</li>
+                    </ol>
                     <p><em>Use Case:</em> Cryptographic auditing (Brute-force key generation).</p>
                 </div>
 
