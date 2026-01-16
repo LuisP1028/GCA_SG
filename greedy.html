@@ -240,86 +240,71 @@
             </div>
         </details>
 
-        <details class="section">
-            <summary>2. Invariants & Optimality</summary>
-            <div class="section-content">
-                
-                <div class="subsection">
-                    <div class="subsection-title">
-                        3 SUM PROBLEM
-                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/3_sum.html'; v.classList.add('active');">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
-                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <p>You are given a list of numbers and a target total. You must determine if any three numbers from that list add up to the target.</p>
-                    <p><strong>The Strategy:</strong><br>
-                    "Lock" one number first. Now, the problem changes: you only need to find two numbers that add up to the remaining amount needed. You repeat this "lock one, find two" process for every number in the list.</p>
-                    <p><strong>Phase 1: Preparation (Sorting)</strong><br>
-                    The algorithm begins by sorting A in non-decreasing order.
-                    <br>• Sorting establishes the monotonic property required for the two-pointer technique.</p>
-                    <p><strong>Phase 2: Reduction (Iteration)</strong><br>
-                    We iterate through each element a in the array. We treat the current a as the fixed candidate for the first number in the triple.</p>
-                    <p><strong>Phase 3: The 2-Sum Subroutine (Two-Pointer Search)</strong><br>
-                    For every fixed a, we execute a search for b and c using two indices (pointers), let's call them low and high.
-                    <br>• Initialization: Set low = 0 (start of array) and high = n - 1 (end of array).
-                    <br>◦ Note: Because repetition is allowed, low starts at 0, not at the index of a.</p>
-                    <p><strong>The Loop (Convergence Logic)</strong><br>
-                    While low ≤ high:</p>
-                    <p>1. Calculate Sum<br>
-                    current_sum = A[low] + A[high]<br>
-                    2. Check Match<br>
-                    If current_sum = 𝑡−𝑎<br>
-                    → Solution found. Return True.<br>
-                    3. Branch 1 (Underflow)<br>
-                    If current_sum < 𝑡−𝑎<br>
-                    → Sum is too small.<br>
-                    Since the array is sorted, increase the sum by selecting a larger value for the lower pointer.<br>
-                    4. Branch 2 (Overflow)<br>
-                    If current_sum > 𝑡−𝑎<br>
-                    → Sum is too large.<br>
-                    Since the array is sorted, decrease the sum by selecting a smaller value for the upper pointer.</p>
-                    <p><strong>Phase 4: Termination</strong><br>
-                    If the outer loop finishes checking all a values without the inner 2-Sum subroutine returningTrue, then no such triple exists.</p>
-                </div>
+        <div class="subsection">
+            <div class="subsection-title">
+                3 SUM PROBLEM
+                <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/3_sum.html'; v.classList.add('active');">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                    </svg>
+                </button>
+            </div>
+            <p>You are given a list of numbers and a target total. You must determine if any three numbers from that list add up to the target.</p>
+            
+            <p><strong>The Strategy</strong><br>
+            "Lock" one element to reduce the problem complexity. For each element, solve the 2-Sum subproblem: find two numbers summing to the remaining difference using the two-pointer technique.</p>
+        
+            <p><strong>Phase 1: Preparation (Sorting)</strong><br>
+            Sort the array in non-decreasing order. This imposes a monotonic structure, allowing the two-pointer algorithm to efficiently traverse values based on the magnitude of the current sum.</p>
+        
+            <p><strong>Phase 2: Reduction (Iteration)</strong><br>
+            Iterate through the array, selecting the current element a as the fixed candidate. This determines the required sub-target, target - a, for the subsequent two-pointer search.</p>
+        
+            <p><strong>Phase 3: The 2-Sum Subroutine</strong><br>
+            Initialize two pointers: low at index 0 and high at n-1. Because element repetition is permitted, the search range encompasses the entire array for every fixed candidate.</p>
+        
+            <p><strong>The Loop (Convergence Logic)</strong><br>
+            While low ≤ high, calculate total = a + A[low] + A[high]. If total equals the target, return True. If total is too low, increment the low pointer; if too high, decrement the high pointer.</p>
+        
+            <p><strong>Phase 4: Termination</strong><br>
+            If the outer iteration completes the traversal without the subroutine identifying a valid triplet, the solution space is exhausted. Return False to indicate no solution exists.</p>
+        </div>
 
-                <div class="subsection">
-                    <div class="subsection-title">
-                        FINDING MAJORITY ELEMENT
-                        <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/majority_element.html'; v.classList.add('active');">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
-                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <p>A Majority Element is rigorously defined as an element that appears in strictly more than half of the positions</p>
-                    <p><strong>The Logic of "Mutual Destruction"</strong><br>
-                    The Boyer-Moore Voting Algorithm functions as a war of attrition.</p>
-                    <ul>
-                        <li>Every time the algorithm finds two different elements (a mismatch), it performs Elimination.</li>
-                        <li>It effectively says: "I will remove one Instance of the Candidate and one Instance of a Non-Candidate."</li>
-                    </ul>
-                    <p>If the Majority Element makes up more than 50% of the army, and every single enemy (Non-Candidate) manages to kill one Majority soldier, the Majority will still have soldiers left standing at the end.</p>
-                    <p><strong>Step 1: Establish State Variables</strong><br>
-                    We allocate memory for two variables only:<br>
-                    1. candidate: Stores the specific string currently suspected to be the majority.<br>
-                    2. candidate_count: An integer acting as a counter for the candidate.</p>
-                    <p><strong>Step 2: Begin Linear Scan (The Loop)</strong><br>
-                    We begin iterating through the input_stream. For every element it (iterator) in the sequence, we perform a logic check. It verifies whether the input stream contains a subsequent element to process.</p>
-                    <p><strong>Step 3: The Zero-Count Check (Reset Mechanism)</strong><br>
-                    Logic: If candidate_count is 0, it implies that all previous elements have effectively cancelled each other out (or we are at the start).</p>
-                    <p><strong>Step 4: The Comparison</strong><br>
-                    If the count is positive, compare the current element (it) with the candidate:</p>
-                    <ul>
-                        <li>Scenario A (Match): If candidate == it, reinforce the current hypothesis by incrementing the count by 1.</li>
-                        <li>Scenario B (Mismatch): If candidate != it, pair the distinct elements to cancel them out by decrementing the count by 1. (A zero count will trigger a reset in the next step).</li>
-                    </ul>
-                    <p><strong>Step 5: The Result</strong><br>
-                    When the list is finished, the string left in your candidate variable is the answer, thanks to the logic of mutual destruction.</p>
-                </div>
+        <div class="subsection">
+            <div class="subsection-title">
+                FINDING MAJORITY ELEMENT
+                <button class="eye-btn" onclick="const v = document.querySelector('.retro-viewport'); v.querySelector('iframe').src = 'Greedy/majority_element.html'; v.classList.add('active');">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                    </svg>
+                </button>
+            </div>
+            <p>A Majority Element is rigorously defined as an element that appears in strictly more than half of the positions</p>
+            <p><strong>The Logic of "Mutual Destruction"</strong><br>
+            The Boyer-Moore Voting Algorithm functions as a war of attrition.</p>
+            <ul>
+                <li>Every time the algorithm finds two different elements (a mismatch), it performs Elimination.</li>
+                <li>It effectively says: "I will remove one Instance of the Candidate and one Instance of a Non-Candidate."</li>
+            </ul>
+            <p>If the Majority Element makes up more than 50% of the army, and every single enemy (Non-Candidate) manages to kill one Majority soldier, the Majority will still have soldiers left standing at the end.</p>
+            
+            <p><strong>Step 1: Establish State Variables</strong><br>
+            Create two variables: candidate to track the potential majority element, and count to track its current strength.</p>
+        
+            <p><strong>Step 2: Begin Linear Scan</strong><br>
+            Iterate through the list one item at a time, moving from start to finish.</p>
+        
+            <p><strong>Step 3: The Zero-Count Check</strong><br>
+            If count is zero, previous battles neutralized each other. Set the current element as the new candidate and set count to 1.</p>
+        
+            <p><strong>Step 4: The Comparison</strong><br>
+            If the current element matches the candidate, increase count. If they differ, decrease count to simulate mutual destruction.</p>
+        
+            <p><strong>Step 5: The Result</strong><br>
+            After the loop finishes, the value remaining in candidate is the majority element, having survived all eliminations.</p>
+        </div>
                 
                 <div class="subsection">
                     <div class="subsection-title">
