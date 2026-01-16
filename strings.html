@@ -242,41 +242,26 @@
                         <li>Segmented Inversion: When a boundary is found, the specific segment (word) defined by the previous and current pointers is inverted again.</li>
                     </ol>
                 </div>
+                <div>
                     <p><strong>THE HOW:</strong></p>
                     <p><strong>Phase 1: The Global Transposition</strong></p>
                     <p><strong>Step 1:</strong><br>
-                    We receive s, a mutable bytearray. <strong>Step 2:</strong> We apply a reverse() operation to the entire array.</p>
-                    <ul>
-                        <li>Logic: This places the last word in the first word's memory block and the first word in the last word's memory block.</li>
-                        <li>Current State: The words are in the correct relative positions (Macro-Order), but the characters inside every word are backward (Micro-Order)
-                            <ul>
-                                <li>Example: "ram is costly" becomes "yltsoc si mar".</li>
-                            </ul>
-                        </li>
-                    </ul>
+                    Receive the input as a mutable bytearray s.</p>
+                    <p><strong>Step 2:</strong><br>
+                    Reverse the entire bytearray. This moves words to their correct relative positions, but the characters within each word remain backward (e.g., "ram is costly" becomes "yltsoc si mar").</p>
                     <p><strong>Phase 2: The Iterative Correction</strong></p>
                     <p><strong>Step 3:</strong><br>
-                    We initialize a pointer, start, at index 0. We enter a loop to scan the bytearray.</p>
+                    Initialize a start pointer at index 0 and begin a loop to scan through the array.</p>
                     <p><strong>Step 4:</strong><br>
-                    Within the loop, we search for the next whitespace delimiter (b' ') starting from our current start position. We assign this index to end.</p>
-                    <p><strong>Step 5: Conditional Branch (The Word Exists):</strong><br>
-                    If a space is found (meaning end is not -1):</p>
-                    <ul>
-                        <li>We have identified a word located between start and end - 1.</li>
-                        <li>We call reverse_range on this specific segment.</li>
-                        <li>Action: This flips the characters of just that word. "yltsoc" becomes "costly".</li>
-                        <li>Update: We advance the start pointer to end + 1 (skipping the space) to prepare for the next word.</li>
-                    </ul>
-                    <p><strong>Step 6: The loop ends:</strong><br>
-                    If no space is found (meaning end is -1), we have reached the final segment of the array. We break the loop.</p>
+                    Inside the loop, search for the next space character (b' ') beginning from the current start position. Assign this index to end.</p>
+                    <p><strong>Step 5:</strong><br>
+                    If a space is found, reverse the segment between start and end to correct the word (e.g., "yltsoc" to "costly"). Then, move start to end + 1 to prepare for the next word.</p>
+                    <p><strong>Step 6:</strong><br>
+                    If no space is found, it means the end of the array has been reached. Break the loop to handle the final word separately.</p>
                     <p><strong>FINALLY:</strong></p>
-                    <p><strong>Step 7:</strong> The loop logic relies on finding a space after a word. The very last word in the sentence usually does not have a trailing space. Therefore, the loop breaks before processing the last word.</p>
-                    <ul>
-                        <li>Action: We invoke reverse_range one final time.</li>
-                        <li>Range: From the current start pointer to the very end of the array (len(s) - 1).</li>
-                        <li>Result: The final word, "mar", is reversed to "ram".</li>
-                    </ul>
-                </div>
+                    <p><strong>Step 7:</strong><br>
+                    Since the last word lacks a trailing space, it wasn't processed in the loop. Reverse the remaining segment from start to the end of the array to fix this final word.</p>
+                    </div>
 
             </div>
         </details>

@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ditherpunk Double-Reverse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aligned Ditherpunk Visualizer</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
@@ -12,8 +12,15 @@
             --fg: #00FF41; /* Terminal Green */
             --fg-dim: #004411;
             --font-main: 'VT323', monospace;
-            --tape-height: 12vh;
-            --slot-size: 5vw;
+            
+            /* Responsive Calculations */
+            /* Slots: Min 30px, Preferred 6vw, Max 80px */
+            --slot-size: clamp(30px, 6vw, 80px); 
+            
+            /* Font sizes */
+            --fs-base: clamp(1rem, 2vw, 1.25rem);
+            --fs-large: clamp(1.5rem, 4vw, 2.5rem);
+            
             --anim-speed: 600ms;
         }
 
@@ -22,120 +29,90 @@
             margin: 0;
             padding: 0;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             background-color: var(--bg);
             color: var(--fg);
             font-family: var(--font-main);
-            height: 100vh;
+            height: 100dvh;
             width: 100vw;
             overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
-        /* --- CRT & Dither Effects --- */
-        
-        /* Scanlines */
+        /* --- CRT Overlay --- */
         .crt-overlay {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            inset: 0;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
                         linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
+            background-size: 100% 3px, 3px 100%;
             pointer-events: none;
             z-index: 999;
             box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
         }
 
-        /* Text Glow */
         .glow-text {
             text-shadow: 0 0 4px var(--fg), 0 0 10px var(--fg);
         }
 
-        /* Dither Patterns */
-        .dither-active {
-            /* Inverted */
-            background-color: var(--fg);
-            color: var(--bg);
-        }
-
-        .dither-swapping {
-            /* Striped Noise */
-            background: repeating-linear-gradient(
-                45deg,
-                var(--fg),
-                var(--fg) 4px,
-                var(--bg) 4px,
-                var(--bg) 8px
-            );
-            color: var(--bg);
-            text-shadow: 1px 1px 0 var(--fg); /* Outline for legibility */
-        }
-
-        .dither-finalized {
-            /* Checkerboard */
-            background-image: 
-                linear-gradient(45deg, var(--fg-dim) 25%, transparent 25%), 
-                linear-gradient(-45deg, var(--fg-dim) 25%, transparent 25%), 
-                linear-gradient(45deg, transparent 75%, var(--fg-dim) 75%), 
-                linear-gradient(-45deg, transparent 75%, var(--fg-dim) 75%);
-            background-size: 4px 4px;
-            background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
-            color: var(--fg);
-            border-color: var(--fg);
-        }
-
         /* --- Layout Zones --- */
 
-        /* Zone B: Pointers (Top 20%) */
+        /* Zone B: Pointers & Eye (Top) */
         #zone-b {
-            height: 20vh;
+            height: 25dvh;
+            min-height: 80px;
             width: 100%;
             position: relative;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
+            z-index: 50;
+            /* No flex centering here; absolute positioning is used for children */
         }
 
-        /* Zone A: Memory Tape (Center 40%) */
+        /* Zone A: Memory Tape (Middle) */
         #zone-a {
-            height: 40vh;
+            height: 20dvh;
+            min-height: calc(var(--slot-size) + 20px);
             width: 100%;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: center; /* Vertically center the tape */
+            justify-content: center; /* Horizontally center the tape */
             position: relative;
+            z-index: 40;
         }
 
-        /* Zone C: Logic (Bottom 40%) */
+        /* Zone C: Logic/Console (Bottom/Fill) */
         #zone-c {
-            height: 40vh;
+            flex-grow: 1;
             width: 100%;
             border-top: 2px solid var(--fg);
-            padding: 20px;
+            padding: clamp(10px, 2vw, 20px);
             display: flex;
             flex-direction: column;
             gap: 10px;
+            overflow: hidden;
         }
 
-        /* --- Components --- */
+        /* --- Tape Components --- */
 
         .tape-container {
             position: relative;
             display: flex;
-            gap: 10px;
-            padding: 0 5vw;
+            justify-content: center;
+            gap: clamp(2px, 0.5vw, 10px);
+            padding: 0 2vw;
+            /* Ensure the tape doesn't overflow horizontally on very small screens */
+            max-width: 100%; 
         }
 
         .slot {
             width: var(--slot-size);
             height: var(--slot-size);
-            min-width: 40px;
-            min-height: 40px;
+            flex-shrink: 0;
             border: 2px solid var(--fg-dim);
-            position: relative; /* Anchor for absolute tile */
+            position: relative;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -143,18 +120,18 @@
 
         .slot.space-slot {
             border: 2px dashed var(--fg);
+            opacity: 0.5;
         }
 
-        /* The actual character moving around */
         .tile {
             width: 100%;
             height: 100%;
             position: absolute;
-            top: 0; left: 0;
+            inset: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 2rem;
+            font-size: var(--fs-large);
             border: 2px solid var(--fg);
             background-color: var(--bg);
             transition: transform var(--anim-speed) cubic-bezier(0.68, -0.55, 0.265, 1.55),
@@ -162,54 +139,81 @@
             z-index: 10;
         }
 
-        .tile.dimmed {
-            opacity: 0.2;
+        .tile.dimmed { opacity: 0.2; }
+
+        .dither-active {
+            background-color: var(--fg);
+            color: var(--bg);
         }
 
-        /* Pointers */
+        .dither-swapping {
+            background: repeating-linear-gradient(
+                45deg, var(--fg), var(--fg) 4px, var(--bg) 4px, var(--bg) 8px
+            );
+            color: var(--bg);
+            text-shadow: 1px 1px 0 var(--fg);
+        }
+
+        .dither-finalized {
+            background-image: 
+                linear-gradient(45deg, var(--fg-dim) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--fg-dim) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--fg-dim) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--fg-dim) 75%);
+            background-size: 4px 4px;
+            color: var(--fg);
+        }
+
+        /* --- Pointer Components (In Zone B) --- */
+
         .pointer-track {
             position: absolute;
-            bottom: 10px;
-            left: 0;
-            height: 50px;
-            /* width handled by JS to match tape */
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
         }
         
         .pointer {
             position: absolute;
-            font-size: 2rem;
+            font-size: var(--fs-large);
             text-align: center;
-            width: var(--slot-size);
-            min-width: 40px;
+            min-width: 40px; /* Ensure enough width for text */
             transition: left 0.4s ease-out;
-            bottom: 0;
+            bottom: 0; /* Align to bottom of Zone B (touching top of Zone A) */
             display: flex;
             flex-direction: column;
             align-items: center;
+            z-index: 55;
         }
 
         .pointer span {
-            font-size: 1rem;
+            font-size: var(--fs-base);
+            background: var(--bg);
+            padding: 0 4px;
             margin-top: -5px;
         }
 
         #scanner-icon {
-            font-size: 3rem;
+            font-size: calc(var(--fs-large) * 1.5);
             color: var(--fg);
             position: absolute;
-            top: -50px; 
-            transition: left 0.3s linear;
+            /* Vertically center in Zone B */
+            top: 50%;
+            transform: translateY(-50%) translateX(-50%); /* Center based on its own width */
+            transition: left 0.15s linear; /* Fast, linear movement for scanning */
             display: none;
             text-shadow: 0 0 10px var(--fg);
+            z-index: 60;
         }
 
-        /* SVG Overlay for Arcs */
+        /* SVG Overlay */
         #arc-layer {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             pointer-events: none;
             z-index: 20;
+            overflow: visible;
         }
         
         path.swap-line {
@@ -220,51 +224,53 @@
             animation: dash 0.5s linear infinite;
         }
 
-        @keyframes dash {
-            to { stroke-dashoffset: -20; }
-        }
+        @keyframes dash { to { stroke-dashoffset: -20; } }
 
         /* Console */
         .phase-indicator {
-            font-size: 2.5rem;
+            font-size: var(--fs-large);
             text-transform: uppercase;
             border-bottom: 1px solid var(--fg-dim);
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            flex-shrink: 0;
         }
 
         .console-log {
             flex-grow: 1;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
-            font-size: 1.2rem;
+            font-size: var(--fs-base);
             scrollbar-width: thin;
             scrollbar-color: var(--fg) var(--bg);
+            padding-bottom: 20px;
         }
 
         .log-entry {
             margin-bottom: 5px;
             opacity: 0;
             animation: fadeIn 0.3s forwards;
+            word-wrap: break-word;
         }
         .log-entry::before { content: "> "; color: var(--fg-dim); }
 
         @keyframes fadeIn { to { opacity: 1; } }
 
-        /* Controls */
+        /* UI Controls */
         #replay-btn {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--bg);
+            top: clamp(10px, 2vh, 20px);
+            right: clamp(10px, 2vw, 20px);
+            background: rgba(0,0,0,0.8);
             border: 2px solid var(--fg);
             color: var(--fg);
-            padding: 10px 20px;
+            padding: 8px 16px;
             font-family: var(--font-main);
-            font-size: 1.2rem;
+            font-size: var(--fs-base);
             cursor: pointer;
             z-index: 1000;
             text-transform: uppercase;
+            backdrop-filter: blur(2px);
         }
         #replay-btn:hover {
             background: var(--fg);
@@ -277,9 +283,9 @@
 
     <div class="crt-overlay"></div>
 
-    <button id="replay-btn" onclick="init()">Replay System</button>
+    <button id="replay-btn" onclick="triggerInit()">Replay System</button>
 
-    <!-- ZONE B: POINTERS -->
+    <!-- ZONE B: Pointers & Scanner -->
     <div id="zone-b">
         <div id="scanner-icon">👁</div>
         <div class="pointer-track" id="pointer-track">
@@ -287,7 +293,7 @@
         </div>
     </div>
 
-    <!-- ZONE A: MEMORY TAPE -->
+    <!-- ZONE A: Memory Tape -->
     <div id="zone-a">
         <svg id="arc-layer"></svg>
         <div class="tape-container" id="tape">
@@ -295,7 +301,7 @@
         </div>
     </div>
 
-    <!-- ZONE C: LOGIC -->
+    <!-- ZONE C: Logic -->
     <div id="zone-c">
         <div class="phase-indicator" id="phase-display">SYSTEM IDLE</div>
         <div class="console-log" id="console"></div>
@@ -308,9 +314,12 @@
         
         // --- State ---
         let state = {
-            chars: [], // objects: { char, id, index }
-            running: false
+            chars: [], 
+            running: false,
+            abort: false
         };
+
+        let resizeTimeout;
 
         // --- Elements ---
         const tapeEl = document.getElementById('tape');
@@ -319,39 +328,47 @@
         const consoleEl = document.getElementById('console');
         const pointerTrack = document.getElementById('pointer-track');
         const scannerIcon = document.getElementById('scanner-icon');
+        const zoneB = document.getElementById('zone-b');
 
         // --- Initialization ---
+        async function triggerInit() {
+            if (state.running) {
+                state.abort = true;
+                await delay(200); 
+            }
+            init();
+        }
+
         function init() {
-            if(state.running) return; // Prevent double click
+            state.running = false;
+            state.abort = false;
             
-            // Reset DOM
+            // Cleanup
             tapeEl.innerHTML = '';
             pointerTrack.innerHTML = '';
             consoleEl.innerHTML = '';
             arcLayer.innerHTML = '';
             scannerIcon.style.display = 'none';
+            document.body.style.filter = "none";
 
             // Create Data
             state.chars = INITIAL_TEXT.map((c, i) => ({
                 char: c,
                 id: i,
-                index: i // Logical index
+                index: i
             }));
 
             // Build Tape
             state.chars.forEach((item, i) => {
-                // Slot (Background placeholder)
                 const slot = document.createElement('div');
                 slot.className = `slot ${item.char === ' ' ? 'space-slot' : ''}`;
                 slot.id = `slot-${i}`;
                 
-                // Tile (Moving element)
                 const tile = document.createElement('div');
                 tile.className = 'tile glow-text';
                 tile.textContent = item.char;
                 tile.id = `tile-${item.id}`;
                 
-                // Append Tile to Slot initially (will move via transform)
                 slot.appendChild(tile);
                 tapeEl.appendChild(slot);
             });
@@ -359,83 +376,114 @@
             log("System Initialized.");
             log("Memory Load: ['r','a','m',' ','i','s',' ','c','o','s','t','l','y']");
 
-            runAlgorithm();
+            // Wait for paint
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    runAlgorithm();
+                });
+            });
         }
 
-        // --- Core Animation Logic ---
-
-        // Helper to get visual X position of a slot relative to container
-        function getSlotX(index) {
+        // --- Alignment Logic ---
+        
+        /**
+         * Gets the center X coordinate of a specific slot relative to the viewport.
+         */
+        function getSlotCenterX(index) {
             const slot = document.getElementById(`slot-${index}`);
-            return slot.offsetLeft;
+            if(!slot) return 0;
+            const rect = slot.getBoundingClientRect();
+            return rect.left + (rect.width / 2);
         }
 
-        // Move a tile visual to a specific slot index
+        /**
+         * Aligns a DOM element (pointer/scanner) to the center of a target slot.
+         * The element must be a direct child of 'zone-b' or 'pointer-track'.
+         */
+        function alignElementToSlot(element, slotIndex) {
+            if (!element) return;
+            
+            const targetX = getSlotCenterX(slotIndex);
+            
+            // Get the container's left edge to calculate relative position
+            // Since element is absolute inside zone-b/pointer-track, we need relative X
+            const containerRect = pointerTrack.getBoundingClientRect();
+            
+            // We want the element's center to match targetX
+            // element.left = targetX - container.left - (element.width / 2)
+            
+            // Note: For the scanner, we use transform: translate(-50%), so we just set left to the center point.
+            // For pointers, we calculate width offset manually to be safe.
+            
+            if (element.id === 'scanner-icon') {
+                // Scanner uses transform translate(-50%), so just set left to relative center
+                const relativeX = targetX - containerRect.left;
+                element.style.left = `${relativeX}px`;
+            } else {
+                // Pointers don't use translate X (to allow transition on left property)
+                const elWidth = element.offsetWidth;
+                const relativeX = targetX - containerRect.left - (elWidth / 2);
+                element.style.left = `${relativeX}px`;
+            }
+        }
+
+        // --- Visual Logic ---
+
         function moveTileVisual(tileId, targetIndex) {
             const tile = document.getElementById(`tile-${tileId}`);
-            const parentSlot = tile.parentElement; // The slot it visually lives in (physically)
-            const parentIndex = parseInt(parentSlot.id.split('-')[1]);
+            if (!tile) return;
             
-            const currentX = 0; // It's absolute 0,0 relative to parent
-            const targetX = getSlotX(targetIndex) - getSlotX(parentIndex);
+            const currentSlot = tile.parentElement;
+            const targetSlot = document.getElementById(`slot-${targetIndex}`);
             
-            tile.style.transform = `translateX(${targetX}px)`;
+            const currentRect = currentSlot.getBoundingClientRect();
+            const targetRect = targetSlot.getBoundingClientRect();
+            
+            const deltaX = targetRect.left - currentRect.left;
+            tile.style.transform = `translateX(${deltaX}px)`;
         }
 
-        // Logical Swap + Visual Swap
         async function swap(idx1, idx2, mode = 'arc') {
-            // 1. Identify objects
+            if(state.abort) return;
+
             const item1 = state.chars.find(c => c.index === idx1);
             const item2 = state.chars.find(c => c.index === idx2);
-            
             const tile1 = document.getElementById(`tile-${item1.id}`);
             const tile2 = document.getElementById(`tile-${item2.id}`);
 
-            // 2. Visual State: Swapping
             tile1.classList.add('dither-swapping');
             tile2.classList.add('dither-swapping');
 
-            // 3. Draw Connector (only for global phase)
             let line = null;
-            if (mode === 'arc') {
-                line = drawArc(idx1, idx2);
-            }
+            if (mode === 'arc') line = drawArc(idx1, idx2);
 
-            // 4. Animate Move
             moveTileVisual(item1.id, idx2);
             moveTileVisual(item2.id, idx1);
 
-            await delay(700); // Wait for transition
+            await delay(600);
+            if(state.abort) return;
 
-            // 5. Cleanup Visuals
             tile1.classList.remove('dither-swapping');
             tile2.classList.remove('dither-swapping');
             if (line) line.remove();
 
-            // 6. Logical Update (Crucial: Reparenting)
-            // We need to physically swap the DOM elements to the new slots 
-            // to reset transforms so future calculations work correctly.
+            // Physical DOM swap
             const slot1 = document.getElementById(`slot-${idx1}`);
             const slot2 = document.getElementById(`slot-${idx2}`);
 
-            // Reset transforms
             tile1.style.transition = 'none';
             tile2.style.transition = 'none';
             tile1.style.transform = 'translate(0,0)';
             tile2.style.transform = 'translate(0,0)';
             
-            // Swap parents
             slot1.appendChild(tile2);
             slot2.appendChild(tile1);
 
-            // Force reflow
-            tile1.offsetHeight; 
+            void tile1.offsetWidth; // Force Reflow
 
-            // Restore transition
             tile1.style.transition = '';
             tile2.style.transition = '';
 
-            // Update State Array
             item1.index = idx2;
             item2.index = idx1;
         }
@@ -443,18 +491,18 @@
         function drawArc(idx1, idx2) {
             const rect1 = document.getElementById(`slot-${idx1}`).getBoundingClientRect();
             const rect2 = document.getElementById(`slot-${idx2}`).getBoundingClientRect();
-            const containerRect = document.getElementById('zone-a').getBoundingClientRect();
+            const svgRect = arcLayer.getBoundingClientRect();
 
-            // Centers relative to SVG container
-            const x1 = rect1.left + rect1.width/2 - containerRect.left;
-            const y1 = rect1.top - containerRect.top;
-            const x2 = rect2.left + rect2.width/2 - containerRect.left;
-            const y2 = rect2.top - containerRect.top;
+            const x1 = (rect1.left + rect1.width/2) - svgRect.left;
+            const y1 = (rect1.top) - svgRect.top;
+            const x2 = (rect2.left + rect2.width/2) - svgRect.left;
+            const y2 = (rect2.top) - svgRect.top;
 
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            // Bezier control point
             const cx = (x1 + x2) / 2;
-            const cy = y1 - 100; // Arc height
+            const dist = Math.abs(x1 - x2);
+            const arcHeight = Math.min(150, dist / 2 + 20); 
+            const cy = y1 - arcHeight;
 
             const d = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
             path.setAttribute("d", d);
@@ -462,8 +510,6 @@
             arcLayer.appendChild(path);
             return path;
         }
-
-        // --- Pointer Logic ---
 
         function createPointer(label, type) {
             const p = document.createElement('div');
@@ -474,107 +520,85 @@
             return p;
         }
 
-        function setPointerPos(el, index) {
-            if(index >= state.chars.length) return; // Edge case safety
-            const slot = document.getElementById(`slot-${index}`);
-            // Calculate position relative to track
-            // We need the slot's offset relative to the tape, plus tape's offset
-            const tapeRect = tapeEl.getBoundingClientRect();
-            const slotRect = slot.getBoundingClientRect();
-            const trackRect = pointerTrack.getBoundingClientRect();
-
-            // Center of slot relative to screen
-            const center = slotRect.left + slotRect.width/2;
-            // Relative to track
-            const left = center - trackRect.left - (slotRect.width/2); // Centers pointer
-
-            el.style.left = `${left}px`;
-        }
-
-        // --- Algorithm Execution ---
+        // --- Main Algorithm ---
 
         async function runAlgorithm() {
             state.running = true;
 
-            // --- PHASE 1: GLOBAL TRANSPOSITION ---
-            phaseDisplay.innerText = "PHASE 1: GLOBAL TRANSPOSITION";
-            log("Starting full array reversal...");
+            // Phase 1: Global Reversal
+            phaseDisplay.innerText = "PHASE 1: GLOBAL REVERSAL";
+            log("Algorithm: Two-pointer swap from ends.");
 
             let i = 0;
             let j = state.chars.length - 1;
 
-            const ptrStart = createPointer('START', 'up');
-            const ptrEnd = createPointer('END', 'up');
+            const ptrStart = createPointer('L', 'up');
+            const ptrEnd = createPointer('R', 'up');
+
+            // Force initial position calculation
+            alignElementToSlot(ptrStart, i);
+            alignElementToSlot(ptrEnd, j);
+            await delay(400);
 
             while (i < j) {
-                setPointerPos(ptrStart, i);
-                setPointerPos(ptrEnd, j);
-                
-                log(`Swapping index [${i}] <-> [${j}]`);
+                if(state.abort) return;
+
+                log(`Swapping [${i}] <-> [${j}]`);
                 await swap(i, j, 'arc');
                 
                 i++;
                 j--;
+
+                alignElementToSlot(ptrStart, i);
+                alignElementToSlot(ptrEnd, j);
                 await delay(300);
             }
 
             ptrStart.remove();
             ptrEnd.remove();
 
-            log("Global reversal complete. Result: 'yltsoc si mar'");
+            log("Global reversal complete.");
             
-            // Invert color effect for phase transition
+            // Screen Flash
             document.body.style.filter = "invert(1)";
             await delay(100);
             document.body.style.filter = "none";
             
-            // --- PHASE 2: WORD CORRECTION ---
-            phaseDisplay.innerText = "PHASE 2: ITERATIVE CORRECTION";
-            log("Scanning for words...");
+            // Phase 2: Word Correction
+            phaseDisplay.innerText = "PHASE 2: WORD CORRECTION";
+            log("Reversing individual words.");
 
             let start = 0;
-            
-            // Initialize Scanner Icon
             scannerIcon.style.display = 'block';
             
             while (start < state.chars.length) {
-                // 1. Move Start Pointer
-                const pStart = createPointer('Start', 'up');
-                setPointerPos(pStart, start);
+                if(state.abort) return;
 
-                // 2. Scan for End
+                const pStart = createPointer('Start', 'up');
+                alignElementToSlot(pStart, start);
+
                 let end = start;
                 
-                // Animation: Scanner moves
+                // Scanner Animation Loop
                 while (end < state.chars.length) {
+                    if(state.abort) return;
                     const charObj = state.chars.find(c => c.index === end);
                     
-                    // Move visual scanner
-                    const slot = document.getElementById(`slot-${end}`);
-                    const slotRect = slot.getBoundingClientRect();
-                    const trackRect = document.getElementById('zone-b').getBoundingClientRect();
-                    scannerIcon.style.left = `${(slotRect.left + slotRect.width/2) - trackRect.left - 20}px`;
-                    scannerIcon.style.top = `30px`; // Align in Zone B
-
-                    await delay(200);
+                    // Move scanner to current slot
+                    alignElementToSlot(scannerIcon, end);
+                    
+                    await delay(150);
 
                     if (charObj.char === ' ') break;
                     end++;
                 }
 
-                // Edge Case Visual
-                if (end === state.chars.length) {
-                    log("Edge Case: End of Tape encountered.");
-                }
-
-                // 3. Drop End Pointer
                 const pEnd = createPointer('End', 'up');
-                // Point to the last character of the word, not the space
-                setPointerPos(pEnd, end - 1);
+                alignElementToSlot(pEnd, end - 1);
 
-                log(`Word found: Index ${start} to ${end - 1}`);
+                log(`Word found: ${start} to ${end - 1}`);
 
-                // 4. Highlight Range & Dim Others
+                // Highlight Word
                 const wordIndices = [];
                 for(let k=start; k<end; k++) wordIndices.push(k);
 
@@ -589,19 +613,25 @@
                     }
                 });
 
-                await delay(500);
+                await delay(400);
 
-                // 5. Reverse Word (Local Swap)
+                // Reverse Word
                 let low = start;
                 let high = end - 1;
 
                 while (low < high) {
-                    await swap(low, high, 'slide'); // Use 'slide' (no arc)
+                    if(state.abort) return;
+                    
+                    // Keep pointers aligned during swap steps
+                    alignElementToSlot(pStart, low);
+                    alignElementToSlot(pEnd, high);
+                    
+                    await swap(low, high, 'slide');
                     low++;
                     high--;
                 }
 
-                // 6. Finalize Word
+                // Finalize Word
                 wordIndices.forEach(idx => {
                     const c = state.chars.find(obj => obj.index === idx);
                     const tile = document.getElementById(`tile-${c.id}`);
@@ -609,28 +639,20 @@
                     tile.classList.add('dither-finalized');
                 });
                 
-                log("Word corrected.");
-
-                // Cleanup Pointers
                 pStart.remove();
                 pEnd.remove();
-
-                // Move Start
                 start = end + 1;
                 
-                // Restore Opacity
                 document.querySelectorAll('.tile').forEach(t => t.classList.remove('dimmed'));
-                
-                await delay(500);
+                await delay(300);
             }
 
             scannerIcon.style.display = 'none';
             phaseDisplay.innerText = "SEQUENCE COMPLETE";
-            log("Final Output: 'costly is ram'");
+            log("Result: 'costly is ram'");
             state.running = false;
         }
 
-        // --- Console Helper ---
         function log(msg) {
             const p = document.createElement('div');
             p.className = 'log-entry';
@@ -639,9 +661,15 @@
             consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
-        // Start immediately
-        window.onload = init;
-        window.onresize = () => { if(!state.running) init(); }; // Simple responsive fix: reset if resized while idle
+        // --- Event Listeners ---
+        window.onload = triggerInit;
+
+        window.onresize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                triggerInit();
+            }, 300);
+        };
 
     </script>
 </body>
