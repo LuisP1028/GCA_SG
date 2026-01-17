@@ -221,9 +221,11 @@
             </span>
             <p><strong>Flow:</strong> Expand Right, Shrink Left.</p>
             <ol>
-                <li><strong>Expand:</strong> Move right. Decrement counts in hash map. If count hits 0, decrement <code>remaining_to_cover</code>.</li>
-                <li><strong>Valid State:</strong> When <code>remaining_to_cover == 0</code>, the window is valid.</li>
-                <li><strong>Shrink:</strong> Move left to minimize. If a required keyword leaves, increment its count; if count > 0, increment <code>remaining_to_cover</code> (window becomes invalid, resume expansion).</li>
+                <li><strong>Initialization:</strong> Create a frequency map of the characters in the target string (what you are looking for). Initialize <code>left</code> and <code>right</code> pointers at the start of the source string. Set a counter, <code>remaining_to_cover</code>, to the number of unique characters needed.</li>
+                <li><strong>Expand Right:</strong> Move the <code>right</code> pointer forward to add a character to the window. If this character exists in your target map, decrement its count. If the count hits exactly 0, it means you have enough of this specific character; decrement <code>remaining_to_cover</code>.</li>
+                <li><strong>Identify Valid Window:</strong> Check the <code>remaining_to_cover</code> counter. If it equals 0, the current window from <code>left</code> to <code>right</code> contains all required characters. The window is now valid. Proceed to the shrinking phase to see if you can make this window smaller.</li>
+                <li><strong>Shrink Left:</strong> While valid, update the minimum size. Move <code>left</code> forward to eject a character. If it is a target character, increment its count because we have removed a required item from the window, so we must increase the tally of that character needed.</li>
+                <li><strong>Break Validity:</strong> If a target character's count rises above 0 after shrinking, the window is no longer valid because it is missing a required character. Increment <code>remaining_to_cover</code>. Stop shrinking and resume expanding to find that missing character again.</li>
             </ol>
         </div>
 
