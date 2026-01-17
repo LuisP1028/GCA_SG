@@ -240,7 +240,14 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">Maximal Consecutive Integers</span>
+                    <span class="subsection-title">Maximal Consecutive Integers 
+                        <button class="eye-btn" onclick="const v=document.querySelector('.retro-viewport'); v.querySelector('iframe').src='Hash/maximal_consecutives.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find the longest consecutive range in a set. </p>
                     <p>If you need the list [1, 2, 3, 4], simply save the start number of the longest chain found. You can then reconstruct the list at the end.</p>
                     <p><strong>Efficient Solution:</strong></p>
