@@ -284,10 +284,18 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Resource Availability Checks</span>
+                    <span class="subsection-title">
+                        Resource Availability Checks
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Hash/resource_avail_check.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <ol>
-                        <li><strong>Map the Requirements:</strong> First, analyze the "Target Needs" list. Create a frequency map (a key-value pair) that counts exactly how many of each specific item are required to fulfill the request.</li>
-                        <li><strong>Stream the Inventory:</strong> Begin processing the available inventory one item at a time. Using a data stream is efficient because it avoids loading the entire massive stock list into memory at once.</li>
+                        <li><strong>Map the Requirements:</strong> First, analyze the list. Create a frequency map (a key-value pair) that counts exactly how many of each specific item are required to fulfill the request.</li>
+                        <li><strong>Stream the Inventory:</strong> Begin processing the available inventory one item at a time. </li>
                         <li><strong>Match and Decrement:</strong> For every item found in the inventory stream, check if it exists in your needs map. If there is a match, decrease the required count for that specific item by one.</li>
                         <li><strong>Remove Completed Needs:</strong> Monitor the counts in your map. As soon as a specific item's count reaches zero, it means that requirement is fully met. Remove that entry from the map entirely.</li>
                         <li><strong>Early Exit Optimization:</strong> After removing an entry, check if the map is empty. If it is, stop scanning immediately. All needs are met, so you return "True" without wasting time checking the remaining stock.</li>
