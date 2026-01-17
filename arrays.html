@@ -323,8 +323,7 @@ Analogy: Reading a Map
                     <p><strong>Vocabulary:</strong></p>
                     <p><strong>State:</strong> The list A is a mutable object. Its state changes every time the loop runs.</p>
                     <p><strong>Local Optimality:</strong> The algorithm doesn't "look ahead." It looks only at the current pair (i and i+1). It assumes that fixing the current pair won't break the previous pair in a way that matters.</p>
-                    <p><strong>Infrastructure Example (Smart Grid Load Scheduling):</strong> 
-                    <p>In smart energy grids, "wiggle" logic applies to task scheduling for demand response. By interleaving high-wattage industrial processes with low-wattage background tasks (High-Low-High), controllers prevent aggregate power spikes that trip breakers. This alternating current-draw profile flattens the demand curve, ensuring grid stability without requiring massive battery reserves to handle simultaneous peak loads.</p>
+                    
                 </div>
 
             </div>
@@ -345,8 +344,8 @@ Analogy: Reading a Map
                     <p>Optimizing two sequential, non-overlapping events (e.g., Stock Trading).</p>
                     
                     
-                        <li><strong>Forward Pass:</strong> Scan left-to-right to calculate the best possible result for the first event ending by each specific day.</li>
-                        <li><strong>Backward Pass:</strong> Scan right-to-left to calculate the best result for the second event starting from each specific day.</li>
+                        <li><strong>Forward Pass:</strong> Scan left-to-right to calculate the best possible result for the first event ending by each specific split point possible.</li>
+                        <li><strong>Backward Pass:</strong> Scan right-to-left to calculate the best result for the second event starting from each specific split point possible, to the right endpoint of the array.</li>
                         <li><strong>Combine:</strong> Sum the two values at every index. By comparing every possible split, you identify the exact moment where the total of the past maximum and future maximum is highest.</li>
                     
                 
@@ -394,7 +393,8 @@ Analogy: Reading a Map
                 <div class="subsection">
                     <span class="subsection-title">Enumerate Primes (Sieve)</span>
                     <p>Instead of asking "Is X prime?" for every number (Brute Force), we assume all numbers are prime and progressively eliminate non-primes.</p>
-                    <p>We start with 2, keep it, and cross out all multiples of 2. Then we find the next non-crossed number (3), keep it, and cross out its multiples. Repeat until finished.</p>
+                    <p>Start assuming all numbers are prime. Iterate from 2. If a number is unmarked, it has no smaller factors—it is prime. Keep it. Then, strike out all its multiples. These are composites "built" by that prime and cannot be fundamental. By systematically eliminating every constructed product, only the indivisible building blocks remain.</p>
+                </div>
                     
                     <h3>WHY THIS IS FASTER THAN BRUTE FORCING</h3>
                     <p><strong>The Operation: Division vs. Jumping</strong></p>
@@ -410,13 +410,8 @@ Analogy: Reading a Map
                     <p>Computers find division (and modulus) relatively "expensive" (slow). You are doing this heavy math for every single number from 1 to <strong>N</strong>.</p>
                 
                     <p><strong>Method B: Eratosthenes Sieve</strong></p>
-                    <p>When we find that <strong>2</strong> is prime, we do not do any division. We just jump through the array indices: index <strong>4</strong>, index <strong>6</strong>, index <strong>8</strong>.</p>
-                    <ul>
-                        <li>We are just setting a value to False.</li>
-                        <li>We find the next index by simple addition: current_index + <strong>2</strong>.</li>
-                    </ul>
-                
-                    <p><strong>Verdict:</strong> Adding and marking is much faster for a CPU than dividing and checking remainders.</p>
+                    <p>When we confirm <strong>2</strong> is prime, we avoid division entirely. Instead, we stride through the array indices (4, 6, 8...) using simple addition. At each step, we "mark" the index by setting a boolean flag in memory to <strong>False</strong>. This explicitly records the number as composite.</p>
+                    <p><strong>Verdict:</strong> Simple addition and memory assignment are computationally cheaper for CPUs than modulo arithmetic.</p>
                 </div>
 
             </div>
