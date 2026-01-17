@@ -261,13 +261,25 @@
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Min Distance Between Duplicates</span>
+                    <span class="subsection-title">
+                        Min Distance Between Duplicates
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Hash/min_distance.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>Find the smallest position gap between any two identical elements.</p>
-                    <p><strong>Logic:</strong> Use a hash table to store the <strong>most recent position</strong> of each element. As you iterate:</p>
+                    <p><strong>Logic:</strong></p>
                     <ul>
-                        <li>If element exists in map: <code>gap = current_i - stored_i</code>.</li>
-                        <li>Update global minimum if gap is smaller.</li>
-                        <li>Update map with <code>current_i</code>.</li>
+                        <li><strong>1. Setup Variables:</strong> Initialize an empty hash map (dictionary) to store numbers and their indices. Create a variable named min_dist and set it to the largest possible number (infinity) to track the best result.</li>
+                        <li><strong>2. Start Iteration:</strong> Begin a loop that goes through the array one element at a time. Keep track of both the current number (value) and its specific location (index) in the list.</li>
+                        <li><strong>3. Check for History:</strong> At each step, check if the current number already exists as a key in your hash map. If it exists, it means you have seen this number before, identifying a duplicate pair.</li>
+                        <li><strong>4. Calculate the Gap:</strong> If the number is in the map, subtract the index stored in the map (the previous location) from the current index. This calculation gives you the distance between the two duplicates.</li>
+                        <li><strong>5. Update Minimum:</strong> Compare this newly calculated gap against your global min_dist. If the new gap is smaller than the one currently stored, update min_dist to this new, lower value.</li>
+                        <li><strong>6. Record Position:</strong> Update the hash map by saving the current number as the key and the current index as the value. This ensures that future comparisons are always made against the most recent occurrence of the number.</li>
+                        <li><strong>7. Final Output:</strong> After the loop finishes, check min_dist. If it is still infinity, no duplicates were found (return -1). Otherwise, return min_dist as the smallest gap.</li>
                     </ul>
                 </div>
 

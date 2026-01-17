@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DITHERPUNK RESPONSIVE: MIN DISTANCE</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --fg: #00FF41;
+            --dim: #003b0f;
+            --font-stack: 'Courier New', Courier, monospace;
+            
+            /* Responsive Sizing Variables */
+            --node-size: clamp(2.5rem, 8vw, 5rem);
+            --gap-size: clamp(0.5rem, 1vw, 1.5rem);
+            --border-thick: clamp(2px, 0.4vw, 4px);
+            --font-base: clamp(0.8rem, 1.5vw, 1.1rem);
+            --font-lg: clamp(1.2rem, 3vw, 2.5rem);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-stack);
+            font-size: var(--font-base);
+            height: 100dvh; /* Dynamic viewport height for mobile */
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- VISUAL FX LAYERS --- */
+        #noise-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.12;
+            z-index: 999;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        /* --- MAIN LAYOUT STRUCTURE --- */
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            max-width: 1600px; /* Prevent stretching on ultrawide */
+            margin: 0 auto;
+        }
+
+        /* ZONE A: VISUALIZATION AREA (Top) */
+        #zone-a {
+            flex: 4; /* Takes 40-50% of screen */
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: var(--border-thick) solid var(--fg);
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .array-scroll-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto; /* Allow scroll on very small screens */
+            padding: 2rem 0;
+        }
+
+        .array-container {
+            display: flex;
+            gap: var(--gap-size);
+            position: relative;
+            z-index: 10;
+            padding: 0 1rem;
+        }
+
+        /* NODES */
+        .node-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .node {
+            width: var(--node-size);
+            height: var(--node-size);
+            border: var(--border-thick) solid var(--fg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: calc(var(--node-size) * 0.5); /* Text scales with box */
+            font-weight: bold;
+            background: var(--bg);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .node.active {
+            background: var(--fg);
+            color: var(--bg);
+            box-shadow: 0 0 15px var(--fg);
+        }
+
+        .index-label {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        /* SVG OVERLAY */
+        #arch-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            overflow: visible;
+        }
+
+        path.arch-line {
+            fill: none;
+            stroke: var(--fg);
+            stroke-width: clamp(2px, 0.4vw, 5px);
+            stroke-dasharray: 10;
+            animation: dash 1s linear infinite;
+        }
+
+        @keyframes dash { to { stroke-dashoffset: -20; } }
+
+        /* ZONE LOWER: SPLIT VIEW */
+        .zone-lower {
+            flex: 6; /* Takes remaining space */
+            display: flex;
+            flex-direction: column; /* Mobile Default: Stacked */
+            min-height: 0; /* Important for scroll in flex items */
+        }
+
+        /* Desktop Breakpoint */
+        @media (min-width: 768px) {
+            .zone-lower {
+                flex-direction: row; /* Side-by-side */
+            }
+            #zone-b, #zone-c {
+                flex: 1;
+                width: 50%;
+            }
+            #zone-b {
+                border-right: var(--border-thick) solid var(--fg);
+                border-bottom: none;
+            }
+        }
+
+        /* ZONE B: MEMORY (Hash Map) */
+        #zone-b {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            border-bottom: var(--border-thick) solid var(--fg);
+            background: rgba(0, 59, 15, 0.1);
+        }
+
+        h2 {
+            margin: 0 0 1rem 0;
+            border-bottom: 2px solid var(--fg);
+            padding-bottom: 0.5rem;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 2;
+        }
+
+        .map-table {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            border: 2px solid var(--fg);
+            font-size: var(--font-base);
+        }
+
+        .map-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-bottom: 1px solid var(--fg);
+            padding: 0.5rem;
+        }
+
+        .map-header {
+            background: var(--fg);
+            color: var(--bg);
+            font-weight: bold;
+        }
+
+        .map-row.highlight {
+            animation: flashRow 0.5s ease forwards;
+        }
+
+        @keyframes flashRow {
+            0% { background: var(--fg); color: var(--bg); }
+            100% { background: var(--dim); color: var(--fg); }
+        }
+
+        /* ZONE C: CONTROLS */
+        #zone-c {
+            flex: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto;
+        }
+
+        .stat-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .stat-box {
+            border: 2px solid var(--fg);
+            padding: 1rem;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: var(--font-lg);
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .log-box {
+            font-size: var(--font-base);
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
+            word-break: break-word;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            background: var(--bg);
+            color: var(--fg);
+            border: var(--border-thick) solid var(--fg);
+            padding: 1rem;
+            font-family: var(--font-stack);
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.1s;
+            /* Prevent text selection on rapid clicks */
+            user-select: none; 
+            touch-action: manipulation;
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* SCROLLBAR STYLING */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--fg);
+        }
+        ::-webkit-scrollbar-corner {
+            background: var(--bg);
+        }
+
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <!-- Visual Noise Layers -->
+    <canvas id="noise-canvas"></canvas>
+    <div class="scanline"></div>
+
+    <div class="container">
+        <!-- Zone A: Array Visualization -->
+        <div id="zone-a">
+            <!-- SVG lives relative to the zone, but we calc coordinates based on the inner container -->
+            <div class="array-scroll-wrapper">
+                <div class="array-container" id="array-container">
+                    <svg id="arch-svg"></svg>
+                    <!-- Nodes generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="zone-lower">
+            <!-- Zone B: Hash Map -->
+            <div id="zone-b">
+                <h2>// MEMORY_BANK</h2>
+                <div class="map-table" id="map-table">
+                    <div class="map-row map-header">
+                        <div>KEY</div>
+                        <div>IDX</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zone C: Controls -->
+            <div id="zone-c">
+                <div class="stat-group">
+                    <div class="stat-box">
+                        <div class="stat-label">MIN_DIST</div>
+                        <div class="stat-value" id="min-dist-display">∞</div>
+                    </div>
+                    
+                    <div class="stat-box">
+                        <div class="stat-label">LOG</div>
+                        <div class="log-box" id="log-display">WAITING...<span class="blink">_</span></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="btn-start" onclick="startVisualization()">RUN</button>
+                    <button id="btn-reset" onclick="resetVisualization()">RESET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIGURATION ---
+    const DATA = [5, 2, 8, 5, 1, 8, 8];
+    const DELAY_MS = 1000;
+
+    // --- STATE ---
+    let map = new Map();
+    let minDist = Infinity;
+    let isRunning = false;
+
+    // --- DOM ELEMENTS ---
+    const arrayContainer = document.getElementById('array-container');
+    const mapTable = document.getElementById('map-table');
+    const displayMinDist = document.getElementById('min-dist-display');
+    const displayLog = document.getElementById('log-display');
+    const svgLayer = document.getElementById('arch-svg');
+    const btnStart = document.getElementById('btn-start');
+
+    // --- NOISE GENERATOR (Optimized) ---
+    const canvas = document.getElementById('noise-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    
+    // Handle Window Resize Events
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            resizeCanvas();
+            // If we resize during a run, we clear the arch line to prevent misalignment
+            svgLayer.innerHTML = ''; 
+        }, 100);
+    });
+    resizeCanvas();
+
+    function drawNoise() {
+        const w = canvas.width;
+        const h = canvas.height;
+        // Optimization: Draw smaller noise patch and tile it, or draw randomly sparsely
+        // For 'Ditherpunk', a sparse full redraw works
+        ctx.clearRect(0,0,w,h);
+        
+        // Only fill 5% of pixels to save CPU
+        const count = Math.floor((w * h) * 0.0005); 
+        
+        ctx.fillStyle = '#00FF41';
+        for (let i = 0; i < count; i++) {
+            const x = Math.random() * w;
+            const y = Math.random() * h;
+            const size = Math.random() * 2;
+            ctx.fillRect(x, y, size, size);
+        }
+        requestAnimationFrame(drawNoise);
+    }
+    drawNoise();
+
+    // --- INITIALIZATION ---
+    function init() {
+        arrayContainer.innerHTML = '<svg id="arch-svg"></svg>'; // Reset but keep SVG container inside
+        // Re-reference SVG layer after innerHTML wipe
+        const newSvg = document.getElementById('arch-svg');
+        
+        // Reset Map Table
+        while(mapTable.children.length > 1) {
+            mapTable.removeChild(mapTable.lastChild);
+        }
+        displayMinDist.innerText = '∞';
+        displayMinDist.style.color = 'var(--fg)';
+        displayLog.innerHTML = 'SYSTEM READY<span class="blink">_</span>';
+        
+        // Render Array Nodes
+        DATA.forEach((num, idx) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'node-wrapper';
+            
+            const node = document.createElement('div');
+            node.className = 'node';
+            node.id = `node-${idx}`;
+            node.innerText = num;
+            
+            const label = document.createElement('div');
+            label.className = 'index-label';
+            label.innerText = idx;
+
+            wrapper.appendChild(node);
+            wrapper.appendChild(label);
+            arrayContainer.appendChild(wrapper);
+        });
+    }
+
+    // --- HELPER FUNCTIONS ---
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    function log(msg) {
+        displayLog.innerHTML = `> ${msg}<span class="blink">_</span>`;
+    }
+
+    function createArch(idx1, idx2) {
+        const svg = document.getElementById('arch-svg');
+        const n1 = document.getElementById(`node-${idx1}`);
+        const n2 = document.getElementById(`node-${idx2}`);
+        
+        // Get coords relative to the container that holds the SVG
+        const containerRect = arrayContainer.getBoundingClientRect();
+        const r1 = n1.getBoundingClientRect();
+        const r2 = n2.getBoundingClientRect();
+
+        // Calculate center points relative to container
+        const x1 = (r1.left - containerRect.left) + (r1.width / 2);
+        const y1 = (r1.top - containerRect.top) + (r1.height / 2); // Start from center of node
+        const x2 = (r2.left - containerRect.left) + (r2.width / 2);
+        const y2 = (r2.top - containerRect.top) + (r2.height / 2);
+
+        // Arc height varies by screen width to look good on mobile vs desktop
+        const dist = Math.abs(x2 - x1);
+        const height = Math.min(dist, 100) * 1.5; 
+
+        // Draw path (Quadratic Bezier)
+        // M: Start, Q: Control Point (mid X, high Y), End Point
+        // We lift y1/y2 to top of box for cleaner look
+        const yTop = y1 - (r1.height/2);
+        
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const d = `M ${x1} ${yTop} Q ${(x1+x2)/2} ${yTop - height} ${x2} ${yTop}`;
+        
+        path.setAttribute("d", d);
+        path.setAttribute("class", "arch-line");
+        svg.appendChild(path);
+    }
+
+    function updateMapVisual(key, val) {
+        let row = document.getElementById(`map-row-${key}`);
+        if (row) {
+            const valCell = row.children[1];
+            valCell.innerText = val;
+            row.classList.remove('highlight');
+            void row.offsetWidth; // trigger reflow
+            row.classList.add('highlight');
+        } else {
+            row = document.createElement('div');
+            row.className = 'map-row highlight';
+            row.id = `map-row-${key}`;
+            
+            const k = document.createElement('div'); k.innerText = key;
+            const v = document.createElement('div'); v.innerText = val;
+            
+            row.appendChild(k);
+            row.appendChild(v);
+            mapTable.appendChild(row);
+            
+            // Scroll to bottom of map
+            const zoneB = document.getElementById('zone-b');
+            zoneB.scrollTop = zoneB.scrollHeight;
+        }
+    }
+
+    // --- MAIN ALGORITHM LOOP ---
+    async function startVisualization() {
+        if (isRunning) return;
+        resetVisualization();
+        isRunning = true;
+        btnStart.disabled = true;
+        btnStart.innerText = "RUNNING...";
+
+        map = new Map();
+        minDist = Infinity;
+
+        try {
+            for (let i = 0; i < DATA.length; i++) {
+                if (!isRunning) break;
+
+                const currentNum = DATA[i];
+                const currentNode = document.getElementById(`node-${i}`);
+                const svg = document.getElementById('arch-svg');
+
+                // Clear previous arch
+                svg.innerHTML = '';
+
+                // Step 1: Scan
+                currentNode.classList.add('active');
+                // Auto-scroll logic for mobile: keep active node in view
+                currentNode.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"});
+                
+                log(`SCANNING INDEX [${i}]`);
+                await sleep(DELAY_MS);
+
+                // Step 2: Check Map
+                if (map.has(currentNum)) {
+                    const prevIndex = map.get(currentNum);
+                    log(`MATCH: ${currentNum} @ [${prevIndex}]`);
+                    
+                    // Draw Line
+                    createArch(prevIndex, i);
+                    
+                    // Highlight Map Row
+                    const row = document.getElementById(`map-row-${currentNum}`);
+                    if(row) {
+                        row.classList.remove('highlight');
+                        void row.offsetWidth;
+                        row.classList.add('highlight');
+                    }
+
+                    await sleep(DELAY_MS);
+
+                    // Step 3: Math
+                    const gap = i - prevIndex;
+                    log(`GAP: ${i} - ${prevIndex} = ${gap}`);
+                    await sleep(DELAY_MS);
+
+                    // Step 4: Compare
+                    if (gap < minDist) {
+                        minDist = gap;
+                        displayMinDist.innerText = minDist;
+                        log(`NEW MINIMUM: ${minDist}`);
+                        
+                        // Flash Success
+                        displayMinDist.style.color = '#fff';
+                        displayMinDist.style.textShadow = '0 0 10px #fff';
+                        setTimeout(() => {
+                            displayMinDist.style.color = 'var(--fg)';
+                            displayMinDist.style.textShadow = 'none';
+                        }, 500);
+                    } else {
+                        log(`GAP ${gap} >= MIN ${minDist}. SKIP.`);
+                    }
+                } else {
+                    log(`NO HISTORY FOR ${currentNum}`);
+                }
+                
+                await sleep(DELAY_MS * 0.8);
+
+                // Step 5: Update
+                map.set(currentNum, i);
+                updateMapVisual(currentNum, i);
+                
+                await sleep(DELAY_MS * 0.5);
+                currentNode.classList.remove('active');
+            }
+
+            // Final
+            const result = minDist === Infinity ? -1 : minDist;
+            log(`DONE. RESULT: ${result}`);
+            if(minDist === Infinity) displayMinDist.innerText = "-1";
+
+        } catch (e) {
+            console.error(e);
+        }
+        
+        isRunning = false;
+        btnStart.disabled = false;
+        btnStart.innerText = "RUN";
+    }
+
+    function resetVisualization() {
+        isRunning = false;
+        init();
+        btnStart.disabled = false;
+        btnStart.innerText = "RUN";
+    }
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>
