@@ -238,13 +238,13 @@
                 
                     <p><strong>Standardize:</strong> Convert all inputs into objects that track the numeric value and the "closed/open" status.</p>
                 
-                    <p><strong>Sort (The Critical Step):</strong> Arrange the intervals chronologically.</p>
+                    <p><strong>Sort:</strong> Arrange the intervals chronologically.</p>
                     <ul>
                         <li><strong>Primary Sort:</strong> Sort all intervals by their Left Endpoint value (ascending).</li>
                         <li><strong>Secondary Sort:</strong> If start times are equal, put <em>Closed</em> left endpoints before <em>Open</em> right endpoints. This ensures we catch overlaps immediately.</li>
                     </ul>
                 
-                    <p><strong>Sweep and Merge:</strong> Once sorted, we perform a single pass (a "sweep") through the list. We maintain one <em>Active Interval</em> and compare it against the <em>Next Interval</em>.</p>
+                    <p><strong>Sweep and Merge:</strong> Once sorted, we perform a sweep through the list. We maintain one <em>Active Interval</em> and compare it against the <em>Next Interval</em>.</p>
                 
                     <p><strong>The Decision Logic:</strong> For every Next Interval in the list, we check its relationship to the Active Interval:</p>
                     <ul>
@@ -312,7 +312,7 @@
                     <p>The goal is to find the maximum number of events that overlap at any single moment (peak concurrency).</p>
                     <p><strong>The How:</strong></p>
                     <ul>
-                        <li><strong>Identify Key Moments:</strong> For each event (which has a start and end time), mark two crucial points in time: its start and its end. Think of these as "events begin" and "events end" markers.</li>
+                        <li><strong>Identify Key Moments:</strong> For each event, mark two crucial points in time: its start and its end.</li>
                         <li><strong>Create a Timeline of Markers:</strong> Collect all these start and end markers from all events.</li>
                         <li><strong>Order the Markers:</strong> Sort these markers chronologically.</li>
                         <li><strong>Handle Simultaneous Events [Tie Breaker]:</strong>  If one event starts exactly when another ends, handle the "Start" first. This pushes your counter up before it goes down, ensuring you count both events as active at that specific moment so you don't miss the peak overlap.</li>

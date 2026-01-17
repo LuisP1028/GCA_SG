@@ -166,6 +166,18 @@
                             </svg>
                         </button>
                     </div>
+                    <div class="subsection-content">
+                        <p>Standard binary search returns the moment it finds k. This version keeps going left to ensure it found the first k, not just any k.</p>
+                        <p><strong>Initialize:</strong> Set bounds to cover the entire array. Set result = −𝟏 (indicating failure).</p>
+                        <p><strong>Loop:</strong> While the window remains valid (left ≤ right): • Calculate the middle index: mid = (left + right) // 𝟐</p>
+                        <p><strong>Decision Logic:</strong></p>
+                        <ul>
+                            <li><strong>Case A (𝐀[𝐦𝐢𝐝] > 𝐤):</strong> The first occurrence must lie to the left. Discard the right half → right = mid − 𝟏</li>
+                            <li><strong>Case B (𝐀[𝐦𝐢𝐝] < 𝐤):</strong> The first occurrence must lie to the right. Discard the left half → left = mid + 𝟏</li>
+                            <li><strong>Case C (𝐀[𝐦𝐢𝐝] = 𝐤):</strong> (The key difference from standard binary search) • We have found an occurrence of 𝐤 • Update result = mid (this is the best candidate found so far) • <strong>CRITICAL:</strong> Do not stop here. Aggressively prune the right side: right = mid − 𝟏 (We continue searching leftward to find any earlier occurrence). Store mid in result. By forcing the search left, any future match is guaranteed to be earlier, so we simply overwrite the old value.</li>
+                        </ul>
+                    </div>
+                </div>
                     <p>Standard binary search returns the moment it finds k. This version keeps going left to ensure it found the first k, not just any k.</p>
                     <ul>
                         <li>Initialize: Set bounds to cover the entire array. Set result = −𝟏 (indicating failure).</li>
@@ -342,7 +354,7 @@
                             </svg>
                         </button>
                     </div>
-                    <p><strong>THE HOW: MANHATTAN WALKING</strong></p>
+                    <p><strong>THE HOW:</strong></p>
                     <p>To find the k-th ranked largest element, don't sort the whole list. Pick a pivot, partition so smaller elements go left, larger go right. The pivot lands in its final position. If it's at index k-1, we're done. Otherwise, discard the unwanted half and repeat.</p>
 
                     <p><strong>SIMPLIFIED HOW:</strong></p>

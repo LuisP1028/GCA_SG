@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>INTERVAL_MERGE_PROTOCOL // DITHER_PUNK</title>
     <style>
         :root {
@@ -10,11 +10,14 @@
             --term-green: #00FF00;
             --term-dim: #003300;
             --font-stack: 'Courier New', 'VT323', 'Fira Code', monospace;
+            --spacing-unit: clamp(0.5rem, 1vw, 1rem);
+            --border-width: clamp(1px, 0.1vw, 3px);
         }
 
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body, html {
@@ -26,6 +29,7 @@
             color: var(--term-green);
             font-family: var(--font-stack);
             overflow: hidden;
+            font-size: 16px; /* Base for rem */
         }
 
         /* --- CRT FX LAYER --- */
@@ -34,7 +38,7 @@
             top: 0;
             left: 0;
             width: 100vw;
-            height: 100vh;
+            height: 100dvh;
             pointer-events: none;
             z-index: 999;
             background: 
@@ -65,109 +69,122 @@
         }
 
         @keyframes flicker {
-            0% { opacity: 0.027906; }
-            5% { opacity: 0.034869; }
-            10% { opacity: 0.023069; }
-            15% { opacity: 0.037498; }
-            20% { opacity: 0.018199; }
-            25% { opacity: 0.039886; }
-            30% { opacity: 0.032646; }
-            35% { opacity: 0.025685; }
-            40% { opacity: 0.032302; }
-            45% { opacity: 0.039515; }
-            50% { opacity: 0.026402; }
-            55% { opacity: 0.038373; }
-            60% { opacity: 0.019777; }
-            65% { opacity: 0.030638; }
-            70% { opacity: 0.038177; }
-            75% { opacity: 0.030752; }
-            80% { opacity: 0.018981; }
-            85% { opacity: 0.035859; }
-            90% { opacity: 0.028906; }
-            95% { opacity: 0.020088; }
-            100% { opacity: 0.032761; }
+            0% { opacity: 0.027; }
+            20% { opacity: 0.018; }
+            40% { opacity: 0.032; }
+            60% { opacity: 0.019; }
+            80% { opacity: 0.018; }
+            100% { opacity: 0.032; }
         }
 
         /* --- LAYOUT --- */
         #ui-container {
             display: grid;
-            grid-template-rows: 1fr 150px; /* Main canvas area | Controls */
-            height: 100vh;
+            grid-template-rows: 1fr auto; /* Canvas takes remaining space, Controls take content space */
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
             width: 100vw;
             position: relative;
             z-index: 10;
+        }
+
+        #canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
         }
 
         canvas {
             display: block;
             width: 100%;
             height: 100%;
-            image-rendering: pixelated; /* Crucial for dither look */
-        }
-
-        #controls {
-            border-top: 2px solid var(--term-green);
-            background: var(--void);
-            padding: 1rem;
-            display: grid;
-            grid-template-columns: 300px 1fr 300px;
-            gap: 1rem;
-            align-items: center;
+            /* image-rendering: pixelated; Handled via JS scaling now */
         }
 
         /* --- CONTROLS --- */
+        #controls {
+            border-top: var(--border-width) solid var(--term-green);
+            background: var(--void);
+            padding: var(--spacing-unit);
+            
+            /* Responsive Flexbox Layout */
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-unit);
+            justify-content: space-between;
+            align-items: stretch;
+            
+            max-height: 40dvh; /* Prevent controls from eating entire screen on landscape mobile */
+            overflow-y: auto;
+        }
+
         .panel {
             border: 1px solid var(--term-green);
             padding: 0.5rem;
-            height: 100%;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
             box-shadow: 0 0 5px var(--term-green);
+            
+            /* Flex Sizing */
+            flex: 1 1 250px; /* Grow, Shrink, Basis */
+            min-height: 120px;
+        }
+
+        /* Specifically for the log to grow if space allows */
+        .panel:first-child {
+            flex: 2 1 300px; 
         }
 
         h2 {
             margin: 0 0 0.5rem 0;
-            font-size: 1rem;
+            font-size: clamp(0.8rem, 2vw, 1rem);
             text-transform: uppercase;
             border-bottom: 1px dashed var(--term-green);
             padding-bottom: 0.2rem;
             text-shadow: 0 0 5px var(--term-green);
+            white-space: nowrap;
         }
 
         #log-output {
-            font-size: 0.8rem;
-            line-height: 1.2;
+            font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+            line-height: 1.3;
             overflow-y: auto;
             flex-grow: 1;
             white-space: pre-wrap;
+            height: 100%;
         }
 
-        #log-output::-webkit-scrollbar {
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
             width: 5px;
+            height: 5px;
             background: var(--void);
         }
-        #log-output::-webkit-scrollbar-thumb {
+        ::-webkit-scrollbar-thumb {
             background: var(--term-green);
         }
 
         .btn-group {
             display: flex;
-            gap: 1rem;
+            flex-direction: row; /* Always row even on mobile */
+            gap: 0.5rem;
             align-items: center;
             justify-content: center;
+            flex: 1 1 200px;
         }
 
         button {
             background: var(--void);
             color: var(--term-green);
             border: 2px solid var(--term-green);
-            padding: 10px 20px;
+            padding: 0.8em 1em;
             font-family: var(--font-stack);
-            font-size: 1rem;
+            font-size: clamp(0.8rem, 2vw, 1rem);
             text-transform: uppercase;
             cursor: pointer;
             transition: all 0.1s;
+            flex: 1; /* Distribute space evenly */
+            white-space: nowrap;
         }
 
         button:hover {
@@ -179,37 +196,67 @@
             transform: translate(2px, 2px);
         }
 
+        label {
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
         input[type=range] {
             -webkit-appearance: none;
             width: 100%;
             background: transparent;
+            margin: 0.5rem 0;
+        }
+        input[type=range]:focus {
+            outline: none;
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 15px;
-            width: 15px;
+            height: 1rem;
+            width: 1rem;
             background: var(--term-green);
             cursor: pointer;
-            margin-top: -5px; 
+            margin-top: -0.4rem; 
             border-radius: 0;
+            box-shadow: 0 0 5px var(--term-green);
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 4px;
+            height: 2px;
             cursor: pointer;
             background: var(--term-dim);
             border: 1px solid var(--term-green);
         }
 
-        /* --- RESPONSIVENESS --- */
-        @media (max-width: 800px) {
-            #controls {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto auto;
-                height: auto;
-            }
+        .status-line {
+            margin-top: auto;
+            font-size: 0.75em; 
+            opacity: 0.8;
+            padding-top: 5px;
+        }
+
+        /* --- MEDIA QUERIES for Edge Cases --- */
+        @media (max-height: 500px) and (orientation: landscape) {
+            /* Landscape Mobile Optimizations */
             #ui-container {
-                grid-template-rows: 1fr auto;
+                grid-template-rows: 1fr;
+                grid-template-columns: 1fr 250px;
+            }
+            #controls {
+                flex-direction: column;
+                max-height: 100dvh;
+                border-top: none;
+                border-left: var(--border-width) solid var(--term-green);
+                overflow-y: auto;
+                flex-wrap: nowrap;
+            }
+            .panel {
+                min-height: 100px;
+                flex-shrink: 0;
+            }
+            .btn-group {
+                flex-direction: column;
             }
         }
     </style>
@@ -227,14 +274,14 @@
             <!-- LOG -->
             <div class="panel">
                 <h2>System Log</h2>
-                <div id="log-output">> INITIALIZING...</div>
+                <div id="log-output">> INITIALIZING PROTOCOL...</div>
             </div>
 
             <!-- PLAYBACK -->
             <div class="btn-group">
                 <button id="btn-reset">Reset</button>
-                <button id="btn-step">Step >|</button>
-                <button id="btn-play">Play/Pause</button>
+                <button id="btn-step">Step</button>
+                <button id="btn-play">Play</button>
             </div>
 
             <!-- SETTINGS -->
@@ -242,7 +289,7 @@
                 <h2>Parameters</h2>
                 <label>Speed: <span id="speed-val">1x</span></label>
                 <input type="range" id="speed-slider" min="1" max="10" value="3">
-                <div style="margin-top:10px; font-size: 0.8em; opacity: 0.8;">
+                <div class="status-line">
                     STATUS: <span id="status-indicator">IDLE</span>
                 </div>
             </div>
@@ -252,11 +299,7 @@
     <script>
         /**
          * 1-BIT DITHERPUNK INTERVAL MERGER
-         * --------------------------------
-         * Architecture:
-         * 1. State Manager: Handles the intervals and the algorithmic phase.
-         * 2. Render Engine: Draws the state to canvas using procedural patterns.
-         * 3. Loop: Animation frame loop with speed control.
+         * RESPONSIVE EDITION
          */
 
         // --- UTILS ---
@@ -269,20 +312,22 @@
         const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
         
         // --- DITHER PATTERN GENERATOR ---
-        // Creates a 1-bit checkerboard pattern for "Inactive/Candidate" textures
-        function createCheckerPattern(ctx) {
+        function createCheckerPattern(ctx, scale) {
+            // Scale the pattern size so it doesn't become microscopic on 4k
+            const size = Math.max(2, Math.floor(2 * scale)); 
+            const doubleSize = size * 2;
+            
             const pCanvas = document.createElement('canvas');
-            pCanvas.width = 4;
-            pCanvas.height = 4;
+            pCanvas.width = doubleSize;
+            pCanvas.height = doubleSize;
             const pCtx = pCanvas.getContext('2d');
             
             pCtx.fillStyle = '#000000'; // Void
-            pCtx.fillRect(0, 0, 4, 4);
+            pCtx.fillRect(0, 0, doubleSize, doubleSize);
             pCtx.fillStyle = '#00FF00'; // Term Green
             
-            // 2px checkerboard
-            pCtx.fillRect(0, 0, 2, 2);
-            pCtx.fillRect(2, 2, 2, 2);
+            pCtx.fillRect(0, 0, size, size);
+            pCtx.fillRect(size, size, size, size);
             
             return ctx.createPattern(pCanvas, 'repeat');
         }
@@ -294,23 +339,18 @@
                 this.id = Math.random().toString(36).substr(2, 9);
                 this.start = start;
                 this.end = end;
-                this.typeStart = typeStart; // '(' or '['
-                this.typeEnd = typeEnd;     // ')' or ']'
+                this.typeStart = typeStart;
+                this.typeEnd = typeEnd;
                 
-                // Visual Physics State
-                this.zone = 'QUEUE'; // QUEUE, WORKBENCH_ACTIVE, WORKBENCH_CANDIDATE, ARCHIVE
+                this.zone = 'QUEUE'; 
                 this.visualStart = start;
                 this.visualEnd = end;
                 
-                // Position interpolation
                 this.x = 0;
                 this.y = 0;
-                this.targetX = 0;
-                this.targetY = 0;
                 this.width = 0;
-                this.targetWidth = 0;
                 
-                this.isMerged = false; // Flag for deletion animation
+                this.isMerged = false;
                 this.opacity = 1;
             }
 
@@ -319,20 +359,16 @@
             }
         }
 
-        // --- CORE LOGIC ---
+        // --- CORE LOGIC (State Machine) ---
 
         class LogicEngine {
             constructor() {
-                this.intervals = []; // Queue
-                this.active = null;  // The consolidated interval
-                this.candidate = null; // The one being compared
-                this.archived = []; // Finished
-                
-                this.phase = 'INIT'; // INIT, SORT, FEED, COMPARE, RESOLVE
-                this.historyLog = [];
-                
-                this.animSpeed = 0.05; // Lerp factor
-                this.globalSpeedMult = 1;
+                this.intervals = [];
+                this.active = null;
+                this.candidate = null;
+                this.archived = [];
+                this.phase = 'INIT';
+                this.globalSpeedMult = 3; // Sync with slider default
             }
 
             reset() {
@@ -345,7 +381,6 @@
             }
 
             generateData() {
-                // Generate 6-8 random intervals
                 const count = 6;
                 for(let i=0; i<count; i++) {
                     let s = randomInt(1, 15);
@@ -357,35 +392,28 @@
                 log(`GENERATED ${count} INTERVALS.`);
             }
 
-            // The main algorithmic step function
             step() {
                 switch(this.phase) {
                     case 'INIT':
                         this.phase = 'SORT';
-                        log("PHASE: SORTING QUEUE...");
+                        log("PHASE: SORTING...");
                         break;
 
                     case 'SORT':
-                        // Sort by Start, then by Closed-first
                         this.intervals.sort((a, b) => {
                             if (a.start !== b.start) return a.start - b.start;
-                            // Tie breaker: [ comes before (
                             const valA = a.typeStart === '[' ? 0 : 1;
                             const valB = b.typeStart === '[' ? 0 : 1;
-                            if (valA !== valB) {
-                                log(`TIE-BREAKER: ${a.getLabel()} before ${b.getLabel()}`);
-                            }
                             return valA - valB;
                         });
                         this.phase = 'FEED';
                         break;
 
                     case 'FEED':
-                        // Move intervals to workbench
                         if (!this.active) {
                             if (this.intervals.length === 0) {
                                 this.phase = 'DONE';
-                                log("PROCESS COMPLETE. ALL MERGED.");
+                                log("PROCESS COMPLETE.");
                                 return;
                             }
                             this.active = this.intervals.shift();
@@ -399,35 +427,21 @@
                             log(`CANDIDATE: ${this.candidate.getLabel()}`);
                             this.phase = 'COMPARE';
                         } else if (!this.candidate && this.intervals.length === 0) {
-                            // No more candidates, archive active
                             this.active.zone = 'ARCHIVE';
                             this.archived.push(this.active);
                             this.active = null;
                             this.phase = 'DONE';
-                            log("FINAL INTERVAL ARCHIVED.");
+                            log("FINAL ARCHIVED.");
                         }
                         break;
 
                     case 'COMPARE':
-                        // Logic frame
-                        log(`COMPARING ${this.active.getLabel()} vs ${this.candidate.getLabel()}`);
                         this.phase = 'RESOLVE';
                         break;
 
                     case 'RESOLVE':
                         const act = this.active;
                         const cand = this.candidate;
-
-                        // Logic: Does Candidate start before Active ends?
-                        // Strict inequality if Open/Closed logic matches, but simpler numeric logic:
-                        // Convert to "comparable" values? 
-                        // Let's stick to prompt logic: 
-                        // Scenario A: GAP (Disjoint) -> cand.start > act.end
-                        // Scenario B: MERGE -> cand.start <= act.end
-                        
-                        // Precise Open/Closed Intersection Logic:
-                        // Overlap if: cand.start < act.end 
-                        // OR (cand.start == act.end AND both are Closed)
                         
                         let isOverlap = false;
                         if (cand.start < act.end) {
@@ -439,10 +453,7 @@
                         }
 
                         if (isOverlap) {
-                            log(">> OVERLAP DETECTED. MERGING.");
-                            
-                            // Calculate new end
-                            // We need to compare ends.
+                            log(">> OVERLAP. MERGING.");
                             let newEnd = act.end;
                             let newTypeEnd = act.typeEnd;
 
@@ -450,43 +461,30 @@
                                 newEnd = cand.end;
                                 newTypeEnd = cand.typeEnd;
                             } else if (cand.end === act.end) {
-                                // If equal, prioritize Closed ']'
                                 if (cand.typeEnd === ']' || act.typeEnd === ']') {
                                     newTypeEnd = ']';
                                 }
                             }
-
-                            // Update Active
                             act.end = newEnd;
                             act.typeEnd = newTypeEnd;
-                            act.visualEnd = newEnd; // Trigger visual expansion
-                            
-                            // Dissolve Candidate
+                            act.visualEnd = newEnd;
                             cand.isMerged = true; 
-                            // Visually move candidate into active
                             cand.zone = 'WORKBENCH_ACTIVE'; 
-                            
                             this.candidate = null;
-                            // Go back to feed to get next candidate
                             this.phase = 'FEED';
-
                         } else {
-                            log(">> GAP DETECTED. ARCHIVING ACTIVE.");
-                            // Move Active to Archive
+                            log(">> GAP. ARCHIVING.");
                             act.zone = 'ARCHIVE';
                             this.archived.push(act);
-                            
-                            // Candidate becomes new Active
                             this.active = cand;
                             this.active.zone = 'WORKBENCH_ACTIVE';
                             this.candidate = null;
-                            
                             this.phase = 'FEED';
                         }
                         break;
                     
                     case 'DONE':
-                        log("SYSTEM IDLE.");
+                        // Idle
                         break;
                 }
             }
@@ -494,39 +492,57 @@
 
         // --- VISUALIZATION ENGINE ---
 
+        const canvasWrapper = document.getElementById('canvas-wrapper');
         const canvas = document.getElementById('mainCanvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Opt for speed
         const logic = new LogicEngine();
 
-        // Config
         let isPlaying = false;
         let lastTime = 0;
         let stepTimer = 0;
-        const STEP_INTERVAL_BASE = 1000; // ms
-
-        // Pattern Cache
+        const STEP_INTERVAL_BASE = 1000;
         let ditherPattern = null;
+        let uiScale = 1; // Scaling factor for high DPI and responsiveness
 
+        // Responsive Resizing Logic
         function resize() {
-            canvas.width = canvas.parentElement.offsetWidth;
-            canvas.height = canvas.parentElement.offsetHeight;
-            ditherPattern = createCheckerPattern(ctx);
-        }
-        window.addEventListener('resize', resize);
-        resize();
+            // Get wrapper dimensions
+            const w = canvasWrapper.offsetWidth;
+            const h = canvasWrapper.offsetHeight;
 
+            // Handle High DPI
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            
+            // Normalize coordinate system so we don't have to think in dpr
+            // BUT we want crisp lines, so we control scaling manually in draw calls 
+            // instead of ctx.scale() to keep 1px lines sharp.
+            
+            // Calculate a UI scale factor based on width to keep things visible on 4k vs Mobile
+            // Base width 1000px = scale 1. Clamp min scale so it's readable on mobile.
+            uiScale = (Math.max(w, 400) / 1000) * dpr;
+
+            // Re-create pattern with new scale
+            ditherPattern = createCheckerPattern(ctx, uiScale);
+        }
+
+        // Debounced resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resize, 100);
+        });
+        resize();
         logic.reset();
 
-        // Render Helpers
+        // --- DRAWING FUNCTIONS ---
+
         function drawGrid(w, h) {
             ctx.strokeStyle = '#003300';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1 * uiScale;
             
-            // Zones
-            // Top: Queue (0 - 33%)
-            // Mid: Workbench (33% - 66%)
-            // Bot: Archive (66% - 100%)
-            
+            // Horizontal Zone Lines
             ctx.beginPath();
             ctx.moveTo(0, h*0.33);
             ctx.lineTo(w, h*0.33);
@@ -536,19 +552,22 @@
 
             // Labels
             ctx.fillStyle = '#00FF00';
-            ctx.font = '12px "Courier New"';
-            ctx.fillText("ZONE_01: INPUT_QUEUE", 10, 20);
-            ctx.fillText("ZONE_02: WORKBENCH", 10, h*0.33 + 20);
-            ctx.fillText("ZONE_03: ARCHIVE", 10, h*0.66 + 20);
+            const fontSize = Math.floor(14 * uiScale);
+            ctx.font = `${fontSize}px "Courier New"`;
+            
+            const pad = 10 * uiScale;
+            ctx.fillText("ZONE_01: INPUT", pad, pad + fontSize);
+            ctx.fillText("ZONE_02: PROCESSING", pad, (h*0.33) + pad + fontSize);
+            ctx.fillText("ZONE_03: STORAGE", pad, (h*0.66) + pad + fontSize);
         }
 
         function drawNumberLine(w, h, min, max) {
-            const zoneY = h * 0.5; // Center of Workbench
-            const pad = 50;
+            const zoneY = h * 0.5; 
+            const pad = 40 * uiScale;
             const lineW = w - (pad*2);
             
             ctx.strokeStyle = '#00FF00';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * uiScale;
             
             // Main Line
             ctx.beginPath();
@@ -557,104 +576,102 @@
             ctx.stroke();
 
             // Ticks
-            const range = max - min + 2; // Add padding to range
+            const range = max - min + 2; 
             const stepPx = lineW / range;
 
-            ctx.font = '10px monospace';
+            const fontSize = Math.floor(12 * uiScale);
+            ctx.font = `${fontSize}px monospace`;
             ctx.textAlign = 'center';
+
+            const tickH = 6 * uiScale;
+            const textOffset = 20 * uiScale;
 
             for(let i=min-1; i<=max+1; i++) {
                 const x = pad + ((i - (min-1)) * stepPx);
                 
                 // Tick
                 ctx.beginPath();
-                ctx.moveTo(x, zoneY - 5);
-                ctx.lineTo(x, zoneY + 5);
+                ctx.moveTo(x, zoneY - tickH);
+                ctx.lineTo(x, zoneY + tickH);
                 ctx.stroke();
 
-                // Number
-                ctx.fillText(i, x, zoneY + 20);
+                // Number (skip some on very small screens if crowded)
+                if (stepPx > fontSize * 1.5 || i % 2 === 0) {
+                    ctx.fillText(i, x, zoneY + textOffset);
+                }
             }
 
             return { startX: pad, stepPx: stepPx, valMin: min-1 };
         }
 
         function drawInterval(interval, map, zoneY) {
-            // map contains scaling info
-            
-            // Calculate Target Screen Position based on Data State
+            // Target Position
             let tX = map.startX + (interval.start - map.valMin) * map.stepPx;
             let tW = (interval.end - interval.start) * map.stepPx;
             
-            // Calculate Target Y based on Zone
+            // Target Y
             let tY = 0;
             const h = canvas.height;
 
             if (interval.zone === 'QUEUE') {
-                tY = h * 0.15;
-                // Stack in queue loosely
-                // In a real generic sort we'd calculate index, but here we just float them
-                // Let's randomize X slightly for "Heap" look in queue or keep generic
-                if(interval.x === 0) interval.x = tX; // init
+                // Spread nicely in top area
+                tY = h * 0.16;
+                // Add a little pseudo-random stagger based on ID
+                const stagger = (parseInt(interval.id, 36) % 100) / 100; 
+                tY += stagger * (h * 0.1); 
+                
+                if(interval.x === 0) interval.x = tX; 
             } else if (interval.zone === 'WORKBENCH_ACTIVE') {
-                tY = h * 0.5 - 15; // Slightly above line
+                tY = h * 0.5 - (15 * uiScale); 
             } else if (interval.zone === 'WORKBENCH_CANDIDATE') {
-                tY = h * 0.5 + 15; // Slightly below line
+                tY = h * 0.5 + (15 * uiScale); 
             } else if (interval.zone === 'ARCHIVE') {
-                tY = h * 0.8;
-                // Stack archives? For now just place on line
+                tY = h * 0.83;
             }
 
-            // Lerp Physics
-            const speed = 0.1 * logic.globalSpeedMult;
-            interval.x += (tX - interval.x) * speed;
-            interval.y += (tY - interval.y) * speed;
+            // Physics Lerp
+            const lerpSpeed = 0.1 * logic.globalSpeedMult;
+            interval.x += (tX - interval.x) * lerpSpeed;
+            interval.y += (tY - interval.y) * lerpSpeed;
             
-            // Width Lerp (for expansion animation)
             if (interval.width === 0) interval.width = tW;
-            interval.width += (tW - interval.width) * speed;
+            interval.width += (tW - interval.width) * lerpSpeed;
 
-            // Merging Fade out
+            // Fade Logic
             if (interval.isMerged) {
                 interval.opacity -= 0.05 * logic.globalSpeedMult;
                 if (interval.opacity < 0) interval.opacity = 0;
             }
+            if (interval.opacity <= 0.01) return;
 
-            if (interval.opacity <= 0.01) return; // Skip drawing
-
-            // Drawing
-            const barHeight = 10;
+            // Draw
+            const barHeight = 12 * uiScale;
             
             ctx.save();
             ctx.globalAlpha = interval.opacity;
 
-            // Fill Style
+            // Fill
             if (interval.zone === 'WORKBENCH_CANDIDATE') {
                 ctx.fillStyle = ditherPattern || '#003300';
             } else {
                 ctx.fillStyle = '#00FF00';
             }
 
-            // Draw Connecting Line/Bar
-            // To make it look "Pixelated", we draw a rect
+            // Bar
             ctx.fillRect(interval.x, interval.y - (barHeight/2), interval.width, barHeight);
 
-            // Draw Endpoints
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#00FF00';
+            // Endpoints
+            const size = 6 * uiScale;
+            ctx.lineWidth = 2 * uiScale;
             
-            const size = 6;
-
-            // Start Point
             drawEndpoint(interval.x, interval.y, interval.typeStart, size, interval.zone === 'WORKBENCH_CANDIDATE');
-            
-            // End Point
             drawEndpoint(interval.x + interval.width, interval.y, interval.typeEnd, size, interval.zone === 'WORKBENCH_CANDIDATE');
 
-            // Text Label
+            // Label
             ctx.fillStyle = '#00FF00';
-            ctx.font = '10px monospace';
-            ctx.fillText(interval.getLabel(), interval.x, interval.y - 12);
+            ctx.font = `${Math.floor(10 * uiScale)}px monospace`;
+            ctx.textAlign = 'left';
+            ctx.fillText(interval.getLabel(), interval.x, interval.y - (barHeight));
 
             ctx.restore();
         }
@@ -670,21 +687,19 @@
                 ctx.fill();
                 ctx.stroke();
             } else {
-                // Open: Hollow Square (filled with black to hide line behind)
-                ctx.fillStyle = '#000000';
+                // Open: Hollow Square
+                ctx.fillStyle = '#000000'; // Void center
                 ctx.rect(x - size, y - size, size*2, size*2);
                 ctx.fill();
                 ctx.stroke();
-                // Inner dot to distinguish? Or just hollow. Prompt says "Hollow Square".
             }
         }
 
-        // Main Loop
+        // --- ANIMATION LOOP ---
         function animate(timestamp) {
             const dt = timestamp - lastTime;
             lastTime = timestamp;
 
-            // Logic Stepper
             if (isPlaying && logic.phase !== 'DONE') {
                 stepTimer += dt;
                 const stepThreshold = STEP_INTERVAL_BASE / logic.globalSpeedMult;
@@ -701,8 +716,7 @@
 
             drawGrid(canvas.width, canvas.height);
 
-            // Determine Range for Number Line
-            // Get min/max of all intervals to scale line dynamically
+            // Dynamic Range Calculation
             let all = [...logic.intervals, ...logic.archived];
             if (logic.active) all.push(logic.active);
             if (logic.candidate) all.push(logic.candidate);
@@ -717,22 +731,21 @@
             
             const map = drawNumberLine(canvas.width, canvas.height, minVal, maxVal);
 
-            // Draw Intervals
-            // We draw archived first, then queue, then workbench
+            // Draw Order: Archive -> Queue -> Active/Candidate
             logic.archived.forEach(i => drawInterval(i, map));
-            logic.intervals.forEach(i => drawInterval(i, map)); // Queue
+            logic.intervals.forEach(i => drawInterval(i, map));
             
-            // Draw Merged/Active last to be on top
             if (logic.active) drawInterval(logic.active, map);
             if (logic.candidate) drawInterval(logic.candidate, map);
 
-            // Update UI Status
-            document.getElementById('status-indicator').innerText = logic.phase;
+            // Update Status Text
+            const statusEl = document.getElementById('status-indicator');
+            if (statusEl.innerText !== logic.phase) statusEl.innerText = logic.phase;
 
             requestAnimationFrame(animate);
         }
 
-        // --- CONTROLS BINDING ---
+        // --- EVENTS ---
         const btnStep = document.getElementById('btn-step');
         const btnPlay = document.getElementById('btn-play');
         const btnReset = document.getElementById('btn-reset');
@@ -741,17 +754,18 @@
 
         btnStep.addEventListener('click', () => {
             isPlaying = false;
+            btnPlay.innerText = "PLAY";
             logic.step();
         });
 
         btnPlay.addEventListener('click', () => {
             isPlaying = !isPlaying;
-            btnPlay.innerText = isPlaying ? "PAUSE ||" : "PLAY >";
+            btnPlay.innerText = isPlaying ? "PAUSE" : "PLAY";
         });
 
         btnReset.addEventListener('click', () => {
             isPlaying = false;
-            btnPlay.innerText = "PLAY >";
+            btnPlay.innerText = "PLAY";
             logic.reset();
             log("SYSTEM RESET.");
         });
@@ -762,7 +776,7 @@
             speedVal.innerText = val + "x";
         });
 
-        // Start
+        // Init
         requestAnimationFrame(animate);
 
     </script>
