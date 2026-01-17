@@ -315,10 +315,24 @@
                 <div class="subsection">
                     <span class="subsection-title">LCA (Least Common Ancestor)</span>
                     <p>The "Close Ancestor" Optimization. Instead of tracing all the way to the root, we use <strong>Interleaved Traversal</strong>.</p>
-                    <p><strong>Logic:</strong>
-                    1. Node A takes one step up. Mark parent as "Visited" (Hash Set).
-                    2. Node B takes one step up. Check: "Has A been here?"
-                    3. Repeat. The moment one node steps onto a visited node, that is the LCA.</p>
+                    
+                    <p><strong>Step 1: Initialization</strong><br>
+                    Start with pointers at Node A and Node B. Initialize an empty Hash Set. This set acts as a shared memory log to record every node visited. We will use this to detect the exact moment the two paths intersect.</p>
+                
+                    <p><strong>Step 2: The Loop</strong><br>
+                    Begin a loop that continues until the LCA is found. In each iteration, we alternate processing one step for Node A and then one step for Node B, rather than racing one node all the way to the top immediately.</p>
+                
+                    <p><strong>Step 3: Process Node A</strong><br>
+                    Check if pointer A is valid (i.e., not Null/None, ensuring we aren't above the root). If valid and the node is already in the Set, paths have crossed; return it as the LCA. If not, add it to the Set and move to the parent.</p>
+                
+                    <p><strong>Step 4: Process Node B</strong><br>
+                    Similarly, check if pointer B is valid (not Null). If the current node is in the Hash Set (placed there by A), B has stepped onto A’s path; return this node as the LCA. If no, add it to the Set and move B to its parent.</p>
+                
+                    <p><strong>Step 5: Handling Roots</strong><br>
+                    If a pointer moves past the root, it becomes Null (invalid). That pointer stops moving. The other pointer continues its ascent step-by-step until it lands on a node previously marked by the stopped path.</p>
+                
+                    <p><strong>Step 6: Termination</strong><br>
+                    The moment a valid pointer identifies a node already in the Hash Set, the algorithm ends. This guarantees the "lowest" ancestor is found immediately without traversing the rest of the tree above the intersection.</p>
                 </div>
 
                 <div class="subsection">
