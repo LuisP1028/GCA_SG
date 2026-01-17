@@ -313,8 +313,17 @@
             <div class="section-content">
                 
                 <div class="subsection">
-                    <span class="subsection-title">LCA (Least Common Ancestor)</span>
+                    <span class="subsection-title">
+                        LCA (Least Common Ancestor)
+                        <button class="eye-btn" onclick="const v=document.querySelector('.retro-viewport'); v.querySelector('iframe').src='Hash/LCA.html'; v.classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </span>
                     <p>The "Close Ancestor" Optimization. Instead of tracing all the way to the root, we use <strong>Interleaved Traversal</strong>.</p>
+                </div>
                     
                     <p><strong>Step 1: Initialization</strong><br>
                     Start with pointers at Node A and Node B. Initialize an empty Hash Set. This set acts as a shared memory log to record every node visited. We will use this to detect the exact moment the two paths intersect.</p>
