@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Greedy Interval Scheduling // Ditherpunk</title>
     <style>
         :root {
@@ -10,6 +10,10 @@
             --phos-color: #33ff33;
             --phos-dim: #1a801a;
             --font-stack: 'Courier New', Courier, monospace;
+            
+            /* Responsive spacing */
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
         }
 
         body, html {
@@ -37,22 +41,24 @@
             background: 
                 linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
                 linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
-            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+            background-size: 100% 4px, 6px 100%;
+            box-shadow: inset 0 0 5vmax rgba(0,0,0,0.9);
         }
 
         .crt-glow {
-            text-shadow: 0 0 4px var(--phos-color);
+            text-shadow: 0 0 0.3rem var(--phos-color);
         }
 
         /* Main Layout */
         #visualization-container {
-            flex-grow: 1;
+            flex-grow: 1; /* Takes all available space */
             position: relative;
-            width: 90%;
-            margin: 20px auto;
+            width: 95%; /* Responsive width */
+            max-width: 1600px; /* Cap width on ultrawide */
+            margin: var(--spacing-md) auto;
             border: 2px solid var(--phos-color);
             box-sizing: border-box;
+            min-height: 200px; /* Prevent collapse on tiny screens */
         }
 
         canvas {
@@ -63,48 +69,66 @@
 
         /* Control Panel / Terminal */
         #terminal {
-            height: 150px;
-            width: 90%;
-            margin: 0 auto 20px auto;
+            /* Responsive Height */
+            height: auto;
+            min-height: 150px;
+            max-height: 35vh; /* Don't take more than 35% of screen height */
+            
+            width: 95%;
+            max-width: 1600px;
+            margin: 0 auto var(--spacing-md) auto;
+            
             border: 1px solid var(--phos-dim);
-            padding: 10px;
+            padding: var(--spacing-sm);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            font-size: 14px;
+            
             background: #050505;
+            box-sizing: border-box;
+            font-size: clamp(0.8rem, 2vw, 1rem); 
         }
 
         #log-window {
             flex-grow: 1;
             overflow-y: auto;
-            margin-bottom: 10px;
+            margin-bottom: var(--spacing-sm);
             border-bottom: 1px dashed var(--phos-dim);
             padding-bottom: 5px;
             font-family: var(--font-stack);
             white-space: pre-wrap;
+            /* Scrollbar styling for webkit */
+            scrollbar-width: thin;
+            scrollbar-color: var(--phos-dim) var(--bg-color);
         }
 
-        .log-entry { margin-bottom: 4px; }
+        #log-window::-webkit-scrollbar { width: 8px; }
+        #log-window::-webkit-scrollbar-thumb { background: var(--phos-dim); }
+
+        .log-entry { margin-bottom: 0.25rem; line-height: 1.2; }
         .log-entry::before { content: ">> "; color: var(--phos-dim); }
 
         #controls {
             display: flex;
-            gap: 20px;
+            flex-wrap: wrap; /* Allow wrapping on mobile */
+            gap: var(--spacing-md);
             align-items: center;
+            padding-top: var(--spacing-sm);
         }
 
         button {
+            flex: 1 1 auto; /* Grow to fill space on mobile */
             background: transparent;
             border: 2px solid var(--phos-color);
             color: var(--phos-color);
             font-family: var(--font-stack);
-            font-size: 16px;
-            padding: 5px 15px;
+            font-size: clamp(0.8rem, 1.5vw, 1.2rem);
+            padding: 0.5rem 1rem;
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 0 0 5px var(--phos-color);
             transition: all 0.1s;
+            white-space: nowrap;
         }
 
         button:hover {
@@ -119,8 +143,16 @@
         .status-pill {
             margin-left: auto;
             border: 1px solid var(--phos-color);
-            padding: 2px 8px;
-            font-size: 12px;
+            padding: 0.25rem 0.75rem;
+            font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+            white-space: nowrap;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            #controls { gap: 10px; }
+            .status-pill { width: 100%; text-align: center; margin-top: 5px; }
+            #terminal { min-height: 200px; }
         }
     </style>
 </head>
@@ -143,19 +175,12 @@
 
 <script>
 /**
- * DITHERPUNK INTERVAL SCHEDULING VISUALIZATION
- * 
- * Logic:
- * 1. Generate Intervals
- * 2. Sort by Right Endpoint (Ascending)
- * 3. Iterate: Find first uncovered task -> Drop Laser at End -> Mark overlaps
+ * DITHERPUNK INTERVAL SCHEDULING VISUALIZATION - RESPONSIVE
  */
 
 // --- CONFIGURATION ---
 const COLOR_BG = '#000000';
 const COLOR_FG = '#33ff33';
-const TASK_HEIGHT_RATIO = 0.8; // Percentage of height for tasks
-const TIMELINE_PADDING = 50;
 
 // --- STATE MANAGEMENT ---
 const STATE = {
@@ -169,18 +194,18 @@ const STATE = {
 
 let appState = STATE.IDLE;
 let intervals = [];
-let visits = []; // X-coordinates of visits
-let scanIndex = 0; // Current index in loop
-let activeInterval = null; // The one dictating the visit
+let visits = []; 
+let scanIndex = 0; 
+let activeInterval = null; 
 let lastVisitX = -1;
-let animationSpeed = 1; // 1 = Slow, 5 = Fast
+let animationSpeed = 1; 
 let lastFrameTime = 0;
 let logicTimer = 0;
 
 // Canvas & Context
+const container = document.getElementById('visualization-container');
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
-// Disable smoothing for crisp pixel look
 ctx.imageSmoothingEnabled = false;
 
 // DOM Elements
@@ -189,26 +214,36 @@ const btnRun = document.getElementById('btn-run');
 const btnSpeed = document.getElementById('btn-speed');
 const visitDisplay = document.getElementById('visit-counter');
 
-// --- PATTERN GENERATION (Dithering) ---
+// Layout Metrics (Calculated on Resize)
+let layout = {
+    width: 0,
+    height: 0,
+    paddingX: 0,
+    paddingY: 0,
+    chartW: 0,
+    chartH: 0,
+    fontSize: 10,
+    dpr: 1
+};
 
+// --- PATTERN GENERATION (Dithering) ---
+// Note: Patterns need to be recreated if DPR changes significantly, 
+// but strictly speaking for this style, low-res patterns scaled up look fine/better.
 function createPattern(type) {
     const patCanvas = document.createElement('canvas');
     const patCtx = patCanvas.getContext('2d');
     
     if (type === 'noise') {
-        // Sparse Noise (Pending State)
         patCanvas.width = 4;
         patCanvas.height = 4;
         patCtx.fillStyle = COLOR_BG;
         patCtx.fillRect(0,0,4,4);
         patCtx.fillStyle = COLOR_FG;
-        // Random sparse pixels
         patCtx.fillRect(0, 0, 1, 1);
         patCtx.fillRect(2, 2, 1, 1);
         patCtx.fillRect(3, 1, 1, 1);
     } 
     else if (type === 'hatch') {
-        // Diagonal Hatch (Covered State)
         patCanvas.width = 8;
         patCanvas.height = 8;
         patCtx.fillStyle = COLOR_BG;
@@ -221,17 +256,15 @@ function createPattern(type) {
         patCtx.stroke();
     }
     else if (type === 'solid') {
-        // Solid (Active Anchor)
         patCanvas.width = 2;
         patCanvas.height = 2;
         patCtx.fillStyle = COLOR_FG;
         patCtx.fillRect(0,0,2,2);
     }
     else if (type === 'grid') {
-        // Background Grid
         patCanvas.width = 20;
         patCanvas.height = 20;
-        patCtx.fillStyle = '#0a2a0a'; // Very dim green
+        patCtx.fillStyle = '#0a2a0a'; 
         patCtx.fillRect(0,0,20,1);
         patCtx.fillRect(0,0,1,20);
     }
@@ -253,9 +286,7 @@ class Interval {
         this.id = id;
         this.start = start; // 0-100 scale
         this.end = end;     // 0-100 scale
-        this.status = 'PENDING'; // PENDING, ACTIVE, COVERED
-        
-        // Visualization coords (normalized 0-1)
+        this.status = 'PENDING';
         this.yPos = 0; 
         this.targetY = 0;
     }
@@ -268,7 +299,8 @@ function log(msg) {
     div.className = 'log-entry';
     div.innerText = msg;
     logWindow.appendChild(div);
-    logWindow.scrollTop = logWindow.scrollHeight;
+    // Smooth scroll
+    logWindow.scrollTo({ top: logWindow.scrollHeight, behavior: 'smooth' });
 }
 
 function generateData() {
@@ -277,37 +309,32 @@ function generateData() {
     lastVisitX = -1;
     visitDisplay.innerText = "VISITS: 0";
     
-    const count = 12; // Number of tasks
+    // Calculate density based on screen height
+    // On small screens, fewer tasks so it's not a blur
+    const count = window.innerHeight < 600 ? 8 : 14;
+
     for(let i=0; i<count; i++) {
-        // Generate random start/end
         let s = Math.random() * 80;
         let length = 5 + Math.random() * 15;
         let e = Math.min(s + length, 100);
-        
         let interval = new Interval(i, s, e);
-        // Initially spread vertically based on creation order
         interval.yPos = i / count;
         interval.targetY = interval.yPos;
         intervals.push(interval);
     }
-    log("Generated " + count + " random intervals.");
+    log(`Generated ${count} tasks.`);
 }
 
 function startSort() {
     appState = STATE.SORTING;
-    log("SORTING DATA: By Right Endpoint (Ascending)...");
-    
-    // Logic: Sort the array
+    log("SORTING: Right Endpoint (Asc)...");
     intervals.sort((a, b) => a.end - b.end);
-    
-    // Assign new target Y positions based on sorted order
     intervals.forEach((inv, index) => {
         inv.targetY = index / intervals.length;
     });
 }
 
 function checkNext() {
-    // Find next pending
     let found = false;
     for(let i=0; i<intervals.length; i++) {
         if(intervals[i].status === 'PENDING') {
@@ -315,7 +342,8 @@ function checkNext() {
             activeInterval.status = 'ACTIVE';
             scanIndex = i;
             appState = STATE.DROPPING_LASER;
-            log(`ANALYZING: Interval ${activeInterval.id} ends earliest.`);
+            // Shortened log for mobile readability
+            log(`SCAN: ID ${activeInterval.id} ends soonest.`);
             found = true;
             break;
         }
@@ -323,33 +351,26 @@ function checkNext() {
     
     if(!found) {
         appState = STATE.FINISHED;
-        log("OPTIMAL SOLUTION FOUND. All tasks covered.");
+        log("OPTIMAL SOLUTION FOUND.");
         btnRun.innerText = "[ RESTART ]";
     }
 }
 
 function performVisit() {
-    // The greedy choice: Visit at the end of the active interval
     let visitTime = activeInterval.end;
     visits.push(visitTime);
     lastVisitX = visitTime;
     
     visitDisplay.innerText = `VISITS: ${visits.length}`;
-    log(`GREEDY CHOICE: Visit added at time ${visitTime.toFixed(1)}`);
+    log(`GREEDY: Visit at time ${visitTime.toFixed(1)}`);
     
     appState = STATE.CHECKING_OVERLAP;
 }
 
 function checkOverlaps() {
     let newlyCovered = 0;
-    
-    // Check all pending intervals to see if they contain the visit time
     intervals.forEach(inv => {
         if(inv.status === 'PENDING' || inv.status === 'ACTIVE') {
-            // Logic: Does the visit time fall after start (and naturally before end)?
-            // Since we sorted by end, and picked the earliest end, visitTime <= inv.end is guaranteed for the active one.
-            // But we specifically need to check if inv.start <= visitTime.
-            
             if(inv.start <= lastVisitX) {
                 inv.status = 'COVERED';
                 newlyCovered++;
@@ -357,157 +378,128 @@ function checkOverlaps() {
         }
     });
     
-    log(`RESULT: Covered ${newlyCovered} overlapping tasks.`);
+    log(`RESULT: Covered ${newlyCovered} tasks.`);
     activeInterval = null;
-    appState = STATE.SCANNING; // Go back to find next
+    appState = STATE.SCANNING;
 }
 
 // --- RENDER LOOP ---
 
 function draw() {
-    const w = canvas.width;
-    const h = canvas.height;
+    // Use Pre-calculated layout metrics
+    const w = layout.width;
+    const h = layout.height;
     
     // 1. Clear & Background
     ctx.fillStyle = COLOR_BG;
     ctx.fillRect(0, 0, w, h);
-    
-    // Draw Grid Pattern
     ctx.fillStyle = patterns.bg;
     ctx.fillRect(0,0,w,h);
 
     // 2. Draw Axis
-    const chartBottom = h - 30;
-    const chartTop = 20;
-    const chartHeight = chartBottom - chartTop;
-    const chartWidth = w - (TIMELINE_PADDING * 2);
-    const startX = TIMELINE_PADDING;
+    // Use responsive padding
+    const startX = layout.paddingX;
+    const endX = w - layout.paddingX;
+    const axisY = h - layout.paddingY;
     
     ctx.strokeStyle = COLOR_FG;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.max(2, w * 0.002); // Dynamic thickness
     ctx.beginPath();
-    ctx.moveTo(startX, chartBottom);
-    ctx.lineTo(startX + chartWidth, chartBottom); // X Axis
+    ctx.moveTo(startX, axisY);
+    ctx.lineTo(endX, axisY); 
     ctx.stroke();
 
-    // 3. Draw Visits (Vertical Lines)
-    ctx.strokeStyle = '#ff3333'; // Red-ish for visits? Or kept to Mono Green? 
-    // Let's stick to Ditherpunk logic: High contrast or Blinking.
-    // We will use a Dashed Green line.
-    ctx.setLineDash([5, 5]);
-    ctx.lineWidth = 2;
+    // 3. Draw Visits
+    const dashSize = Math.max(3, w * 0.005);
+    ctx.setLineDash([dashSize, dashSize]);
+    ctx.lineWidth = Math.max(1, w * 0.001);
     ctx.strokeStyle = COLOR_FG;
 
+    const pinSize = Math.max(4, w * 0.006);
+
     visits.forEach(vx => {
-        let xPos = startX + (vx / 100) * chartWidth;
+        let xPos = startX + (vx / 100) * layout.chartW;
         ctx.beginPath();
-        ctx.moveTo(xPos, chartTop);
-        ctx.lineTo(xPos, chartBottom);
+        ctx.moveTo(xPos, layout.paddingY);
+        ctx.lineTo(xPos, axisY);
         ctx.stroke();
         
-        // Draw Pin Head
         ctx.fillStyle = COLOR_FG;
-        ctx.fillRect(xPos - 3, chartTop - 3, 6, 6);
+        ctx.fillRect(xPos - (pinSize/2), layout.paddingY - (pinSize/2), pinSize, pinSize);
     });
     
     ctx.setLineDash([]); // Reset
 
     // 4. Draw Intervals
-    const barHeight = (chartHeight / intervals.length) * 0.6;
+    const barHeight = (layout.chartH / intervals.length) * 0.6;
     
     intervals.forEach(inv => {
-        // Logic for Y-Interpolation (Animation)
+        // Animation Interpolation
         let diff = inv.targetY - inv.yPos;
-        if(Math.abs(diff) > 0.001) {
-            inv.yPos += diff * 0.1; // Ease in
-        } else {
-            inv.yPos = inv.targetY;
-        }
+        if(Math.abs(diff) > 0.001) inv.yPos += diff * 0.1; 
+        else inv.yPos = inv.targetY;
 
-        let x = startX + (inv.start / 100) * chartWidth;
-        let width = ((inv.end - inv.start) / 100) * chartWidth;
-        let y = chartTop + (inv.yPos * chartHeight);
+        let x = startX + (inv.start / 100) * layout.chartW;
+        let width = ((inv.end - inv.start) / 100) * layout.chartW;
+        let y = layout.paddingY + (inv.yPos * layout.chartH);
         
-        // Select Pattern based on state
         if (inv.status === 'COVERED') {
             ctx.fillStyle = patterns.hatch;
-            ctx.strokeStyle = '#1a801a'; // Dim border
+            ctx.strokeStyle = '#1a801a';
         } else if (inv.status === 'ACTIVE') {
-            // Blink effect
-            if (Date.now() % 500 < 250) {
-                ctx.fillStyle = patterns.solid; 
-            } else {
-                ctx.fillStyle = patterns.noise;
-            }
+            ctx.fillStyle = (Date.now() % 500 < 250) ? patterns.solid : patterns.noise;
             ctx.strokeStyle = COLOR_FG;
         } else {
-            // PENDING
             ctx.fillStyle = patterns.noise;
             ctx.strokeStyle = COLOR_FG;
         }
 
-        // Draw Bar
         ctx.fillRect(x, y, width, barHeight);
         ctx.strokeRect(x, y, width, barHeight);
 
-        // Label ID (Tiny)
-        if(w > 600) {
+        // Label (Only if enough space)
+        if(layout.width > 400) {
             ctx.fillStyle = COLOR_FG;
-            ctx.font = "10px monospace";
-            ctx.fillText(inv.id, x - 15, y + barHeight/2 + 3);
+            ctx.font = `${layout.fontSize}px monospace`;
+            ctx.fillText(inv.id, x - (layout.fontSize * 1.5), y + barHeight/2 + (layout.fontSize * 0.3));
         }
     });
 
-    // 5. State Specific Visuals
-    
-    // Draw Current Laser Beam (Before it becomes permanent)
+    // 5. Laser Beam
     if(appState === STATE.DROPPING_LASER || appState === STATE.CHECKING_OVERLAP) {
         if(activeInterval) {
-            let laserX = startX + (activeInterval.end / 100) * chartWidth;
+            let laserX = startX + (activeInterval.end / 100) * layout.chartW;
             ctx.strokeStyle = COLOR_FG;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(laserX, chartTop);
-            ctx.lineTo(laserX, chartBottom);
+            ctx.moveTo(laserX, layout.paddingY);
+            ctx.lineTo(laserX, axisY);
             ctx.stroke();
             
-            // Draw "Scanner" text
-            ctx.fillText("SCANNING DEADLINE...", laserX + 5, chartBottom - 5);
+            // Text placement adjustment
+            ctx.font = `${layout.fontSize}px monospace`;
+            ctx.fillText("SCANNING", laserX + 5, axisY - 5);
         }
     }
-
 }
-
-// --- MAIN LOOP ---
 
 function update(dt) {
     logicTimer += dt;
-    const threshold = 1000 / animationSpeed; // Logic step delay
+    const threshold = 1000 / animationSpeed;
 
     if (logicTimer > threshold) {
         logicTimer = 0;
-        
         switch (appState) {
             case STATE.SORTING:
-                // Check if animation is roughly done
                 let isSettled = intervals.every(i => Math.abs(i.targetY - i.yPos) < 0.01);
                 if(isSettled) {
                     appState = STATE.SCANNING;
                     log("Sort complete.");
                 }
                 break;
-                
-            case STATE.SCANNING:
-                checkNext();
-                break;
-                
-            case STATE.DROPPING_LASER:
-                performVisit();
-                break;
-                
-            case STATE.CHECKING_OVERLAP:
-                checkOverlaps();
-                break;
+            case STATE.SCANNING: checkNext(); break;
+            case STATE.DROPPING_LASER: performVisit(); break;
+            case STATE.CHECKING_OVERLAP: checkOverlaps(); break;
         }
     }
 }
@@ -515,21 +507,50 @@ function update(dt) {
 function loop(timestamp) {
     let dt = timestamp - lastFrameTime;
     lastFrameTime = timestamp;
-    
     update(dt);
     draw();
-    
     requestAnimationFrame(loop);
 }
 
-// --- INTERACTION ---
+// --- INTERACTION & RESIZING ---
 
 function resize() {
-    canvas.width = document.getElementById('visualization-container').clientWidth;
-    canvas.height = document.getElementById('visualization-container').clientHeight;
+    // 1. Get container dimensions
+    const rect = container.getBoundingClientRect();
+    
+    // 2. Handle High DPI (Retina)
+    const dpr = window.devicePixelRatio || 1;
+    
+    // 3. Set actual canvas size (resolution)
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    // 4. Scale context
+    ctx.scale(dpr, dpr);
+    
+    // 5. Update Layout calculations (Logical pixels)
+    layout.dpr = dpr;
+    layout.width = rect.width;
+    layout.height = rect.height;
+    
+    // Dynamic Padding based on percentage, clamped
+    layout.paddingX = Math.max(30, rect.width * 0.05); 
+    layout.paddingY = Math.max(20, rect.height * 0.05);
+    
+    layout.chartW = layout.width - (layout.paddingX * 2);
+    // Reserve space for axis at bottom
+    layout.chartH = layout.height - (layout.paddingY * 2) - 20; 
+    
+    // Dynamic Font Size
+    layout.fontSize = Math.max(10, Math.min(14, rect.width * 0.015));
 }
 
-window.addEventListener('resize', resize);
+// Debounce resize to prevent flicker on mobile scroll/orientation change
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(resize, 100);
+});
 
 btnRun.addEventListener('click', () => {
     if(appState === STATE.FINISHED || appState === STATE.IDLE) {
@@ -537,7 +558,6 @@ btnRun.addEventListener('click', () => {
         startSort();
         btnRun.innerText = "[ RESTART ]";
     } else {
-        // Reset mid-run
         generateData();
         startSort();
     }

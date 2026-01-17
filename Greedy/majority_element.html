@@ -2,13 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BOYER-MOORE: BATTLE OF ATTRITION</title>
     <style>
         :root {
             --bg-color: #050505;
             --fg-color: #00FF41;
             --dim-color: #003b0f;
+            
+            /* Responsive Typography */
+            --font-xs: clamp(0.7rem, 1.5vw, 0.9rem);
+            --font-sm: clamp(0.8rem, 2vw, 1rem);
+            --font-md: clamp(1rem, 3vw, 1.5rem);
+            --font-lg: clamp(1.2rem, 4vw, 2rem);
+            
+            --spacing: clamp(10px, 2vw, 20px);
         }
 
         body, html {
@@ -20,9 +28,11 @@
             overflow: hidden;
             font-family: 'Courier New', Courier, monospace;
             color: var(--fg-color);
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        /* UI Overlay */
+        /* UI Overlay - Using Grid for layout structure */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -31,28 +41,40 @@
             height: 100%;
             pointer-events: none;
             z-index: 10;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            padding: 0;
         }
 
         .header {
-            padding: 20px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            background: linear-gradient(180deg, var(--bg-color) 0%, transparent 100%);
+            padding: var(--spacing);
+            background: linear-gradient(180deg, rgba(5,5,5,0.95) 0%, rgba(5,5,5,0) 100%);
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: var(--spacing);
+        }
+
+        .title-block h1 {
+            margin: 0;
+            font-size: var(--font-lg);
+            line-height: 1;
+        }
+        .title-block small {
+            font-size: var(--font-xs);
+            opacity: 0.7;
+            display: block;
+            margin-top: 5px;
         }
 
         .controls {
             pointer-events: auto;
             background: rgba(0, 0, 0, 0.8);
             border: 1px solid var(--fg-color);
-            padding: 10px;
+            padding: calc(var(--spacing) / 2);
             display: flex;
-            gap: 15px;
+            gap: 1rem;
             align-items: center;
         }
 
@@ -62,27 +84,53 @@
             border: none;
             font-family: inherit;
             font-weight: bold;
-            padding: 5px 10px;
+            font-size: var(--font-sm);
+            padding: 0.5em 1em;
             cursor: pointer;
             text-transform: uppercase;
+            white-space: nowrap;
         }
 
         button:hover {
             background: #fff;
         }
 
+        button:active {
+            transform: translateY(2px);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: var(--font-sm);
+        }
+
         input[type="range"] {
             -webkit-appearance: none;
             background: var(--dim-color);
-            height: 5px;
+            height: 4px;
             width: 100px;
+            max-width: 20vw;
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 15px;
-            height: 15px;
+            width: 12px;
+            height: 12px;
             background: var(--fg-color);
             cursor: pointer;
+        }
+
+        .footer {
+            padding: var(--spacing);
+            text-align: right;
+            opacity: 0.8;
+            background: linear-gradient(0deg, rgba(5,5,5,0.95) 0%, rgba(5,5,5,0) 100%);
+        }
+
+        #status-readout {
+            font-size: var(--font-sm);
+            text-shadow: 0 0 5px var(--dim-color);
         }
 
         /* CRT Overlay Effects */
@@ -95,7 +143,7 @@
             pointer-events: none;
             z-index: 20;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
+            background-size: 100% 4px, 6px 100%;
             opacity: 0.6;
         }
         
@@ -118,6 +166,21 @@
 
         canvas {
             display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .controls {
+                width: 100%;
+                justify-content: space-between;
+                box-sizing: border-box;
+            }
         }
     </style>
 </head>
@@ -125,17 +188,21 @@
 
     <div id="ui-layer">
         <div class="header">
-            <div>
-                <h1 style="margin:0; font-size: 24px;">BOYER-MOORE</h1>
-                <small style="opacity: 0.7;">VOTING_ALGORITHM // VISUALIZER_v1.0</small>
+            <div class="title-block">
+                <h1>BOYER-MOORE</h1>
+                <small>VOTING_ALGORITHM // VISUALIZER_v1.1</small>
             </div>
             <div class="controls">
-                <label>SPEED</label>
-                <input type="range" id="speedSlider" min="1" max="10" value="3">
-                <button id="resetBtn">RESET SYSTEM</button>
+                <div class="slider-container">
+                    <label>SPEED</label>
+                    <input type="range" id="speedSlider" min="1" max="10" value="3">
+                </div>
+                <button id="resetBtn">RESET</button>
             </div>
         </div>
-        <div style="padding: 20px; text-align: right; opacity: 0.5;">
+        <!-- Spacer -->
+        <div></div> 
+        <div class="footer">
             <div id="status-readout">SYSTEM_READY</div>
         </div>
     </div>
@@ -147,11 +214,11 @@
 <script>
 /**
  * 1-BIT DITHERPUNK VISUALIZATION ENGINE
- * Target: Window-Agnostic, High-Contrast, Retro-Terminal Aesthetic
+ * V.1.1 Responsive Update
  */
 
 const canvas = document.getElementById('mainCanvas');
-const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency
+const ctx = canvas.getContext('2d', { alpha: false });
 const speedSlider = document.getElementById('speedSlider');
 const resetBtn = document.getElementById('resetBtn');
 const statusReadout = document.getElementById('status-readout');
@@ -161,7 +228,6 @@ const COLORS = {
     BG: '#050505',
     FG: '#00FF41',
     DIM: '#005515',
-    ALERT: '#00FF41' // Monochromatic, so "Red" concepts are just intense flicker or patterns
 };
 
 const SHAPES = {
@@ -172,7 +238,7 @@ const SHAPES = {
 
 // Data Generation
 const STREAM_LENGTH = 16;
-const MAJORITY_SHAPE = SHAPES.SQUARE; // The "Candidate" to find
+const MAJORITY_SHAPE = SHAPES.SQUARE;
 
 // Animation States
 const STATE = {
@@ -190,48 +256,86 @@ const STATE = {
 // Global Simulation State
 let sim = {
     stream: [],
-    candidate: null, // { type: SHAPE }
+    candidate: null,
     count: 0,
     processedCount: 0,
-    
-    // Animation specific
-    activeItem: null, // The item currently moving from stream
+    activeItem: null,
     particles: [],
     graveyard: [],
     phase: STATE.SPAWN,
     timer: 0,
     speedMult: 1,
     message: "SYSTEM INITIALIZED",
-    history: [] // For the stack visual
+    history: []
 };
 
-// --- RESIZE HANDLING ---
-let W, H;
-let ZONES = {};
+// --- RESPONSIVE METRICS ---
+// Instead of hardcoded pixels, we calculate metrics based on window size
+let metrics = {
+    w: 0, // Canvas logical width
+    h: 0, // Canvas logical height
+    u: 0, // Base Unit (1% of min dimension)
+    shapeSize: 0,
+    fontSize: 0,
+    stroke: 0,
+    zones: {}
+};
 
 function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    // 1. Handle High DPI (Retina) Displays
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = window.innerWidth;
+    const cssHeight = window.innerHeight;
     
-    // Define layout zones based on percentages
-    ZONES = {
-        STREAM: { y: 0, h: H * 0.2 },
-        ARENA: { y: H * 0.2, h: H * 0.6 },
-        GRAVEYARD: { y: H * 0.8, h: H * 0.2 },
-        // Sub-zones
-        PODIUM: { x: W * 0.2, y: H * 0.6 },
-        INTERACTION: { x: W * 0.5, y: H * 0.5 },
-        STACK: { x: W * 0.8, y: H * 0.6 }
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+    
+    // Scale context to match
+    ctx.scale(dpr, dpr);
+
+    // 2. Update Logical Metrics
+    metrics.w = cssWidth;
+    metrics.h = cssHeight;
+    // Define a "Unit" based on the smaller dimension to fit mobile or desktop
+    metrics.u = Math.min(cssWidth, cssHeight) / 100;
+
+    // 3. Set derived sizes
+    metrics.shapeSize = metrics.u * 5; // Shapes are 5% of screen min-dim
+    metrics.fontSize = Math.max(12, metrics.u * 2); 
+    metrics.stroke = Math.max(1, metrics.u * 0.25);
+
+    // 4. Define Layout Zones
+    metrics.zones = {
+        STREAM: { y: 0, h: cssHeight * 0.2 },
+        ARENA: { y: cssHeight * 0.2, h: cssHeight * 0.6 },
+        GRAVEYARD: { y: cssHeight * 0.8, h: cssHeight * 0.2 },
+        
+        // Coordinates for key actors
+        PODIUM: { x: cssWidth * 0.25, y: cssHeight * 0.55 },
+        INTERACTION: { x: cssWidth * 0.5, y: cssHeight * 0.4 },
+        STACK: { x: cssWidth * 0.75, y: cssHeight * 0.55 }
     };
+
+    // If active, update position of waiting stream items to match new width
+    if (sim.stream.length > 0) {
+        sim.stream.forEach((item, i) => {
+            if (item.state === 'waiting') {
+                // Keep them offscreen or in relative position
+                item.x = metrics.w + (i * (metrics.w * 0.08));
+                item.y = metrics.zones.STREAM.h / 2;
+            }
+        });
+    }
 }
+
 window.addEventListener('resize', resize);
+// Initial trigger
 resize();
 
 // --- UTILITIES ---
 
 function generateStream() {
     let arr = [];
-    // Ensure majority
     for (let i = 0; i < STREAM_LENGTH; i++) {
         if (i % 2 === 0 || Math.random() > 0.6) {
             arr.push(MAJORITY_SHAPE);
@@ -242,7 +346,6 @@ function generateStream() {
     return arr;
 }
 
-// Dither Pattern Generator (2x2 Checkerboard)
 function createPattern(color1, color2) {
     const pCanvas = document.createElement('canvas');
     pCanvas.width = 4;
@@ -256,25 +359,33 @@ function createPattern(color1, color2) {
     return ctx.createPattern(pCanvas, 'repeat');
 }
 
-const PATTERN_DIM = createPattern(COLORS.BG, COLORS.DIM);
-const PATTERN_SOLID = COLORS.FG;
+let PATTERN_DIM, PATTERN_SOLID;
 
 // --- DRAWING FUNCTIONS ---
 
 function drawShape(type, x, y, size, isFilled = true, color = COLORS.FG) {
+    // Regenerate patterns if context was reset (rare but possible on some browsers on resize)
+    if(!PATTERN_DIM) {
+        PATTERN_DIM = createPattern(COLORS.BG, COLORS.DIM);
+        PATTERN_SOLID = COLORS.FG;
+    }
+
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = metrics.stroke;
     ctx.fillStyle = isFilled ? PATTERN_SOLID : PATTERN_DIM;
     
     ctx.beginPath();
+    const half = size / 2;
     if (type === SHAPES.SQUARE) {
-        ctx.rect(x - size/2, y - size/2, size, size);
+        ctx.rect(x - half, y - half, size, size);
     } else if (type === SHAPES.CIRCLE) {
-        ctx.arc(x, y, size/2, 0, Math.PI * 2);
+        ctx.arc(x, y, half, 0, Math.PI * 2);
     } else if (type === SHAPES.TRIANGLE) {
-        ctx.moveTo(x, y - size/2);
-        ctx.lineTo(x + size/2, y + size/2);
-        ctx.lineTo(x - size/2, y + size/2);
+        // Equilateral calculation for visual balance
+        const h = size * (Math.sqrt(3)/2);
+        ctx.moveTo(x, y - h/2);
+        ctx.lineTo(x + half, y + h/2);
+        ctx.lineTo(x - half, y + h/2);
         ctx.closePath();
     }
     
@@ -285,28 +396,28 @@ function drawShape(type, x, y, size, isFilled = true, color = COLORS.FG) {
 function drawBlock(x, y, w, h, filled) {
     ctx.fillStyle = filled ? COLORS.FG : COLORS.BG;
     ctx.strokeStyle = COLORS.FG;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = metrics.stroke;
     ctx.fillRect(x, y, w, h);
     ctx.strokeRect(x, y, w, h);
     
-    // Internal crosshatch for texture
     if(filled) {
+        const border = metrics.stroke * 2;
         ctx.fillStyle = COLORS.BG;
-        ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
-        ctx.fillStyle = PATTERN_DIM; // dither inside
-        ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+        ctx.fillRect(x + border, y + border, w - (border*2), h - (border*2));
+        ctx.fillStyle = PATTERN_DIM; 
+        ctx.fillRect(x + border*1.5, y + border*1.5, w - (border*3), h - (border*3));
     }
 }
 
 function spawnExplosion(x, y) {
-    for(let i=0; i<20; i++) {
+    for(let i=0; i<15; i++) {
         sim.particles.push({
             x: x, 
             y: y,
-            vx: (Math.random() - 0.5) * 10,
-            vy: (Math.random() - 0.5) * 10,
+            vx: (Math.random() - 0.5) * metrics.u * 1.5,
+            vy: (Math.random() - 0.5) * metrics.u * 1.5,
             life: 1.0,
-            size: Math.random() * 4 + 2
+            size: Math.random() * (metrics.u * 0.8) + (metrics.u * 0.2)
         });
     }
 }
@@ -314,11 +425,15 @@ function spawnExplosion(x, y) {
 // --- LOGIC & ANIMATION ---
 
 function initSim() {
+    // Regenerate patterns just in case
+    PATTERN_DIM = createPattern(COLORS.BG, COLORS.DIM);
+    PATTERN_SOLID = COLORS.FG;
+
     sim.stream = generateStream().map((type, i) => ({
         id: i,
         type: type,
-        x: W + (i * (W*0.08)), // Initial positions off screen
-        y: ZONES.STREAM.h / 2,
+        x: metrics.w + (i * (metrics.w * 0.08)), 
+        y: metrics.zones.STREAM.h / 2,
         state: 'waiting'
     }));
     
@@ -326,7 +441,7 @@ function initSim() {
     sim.count = 0;
     sim.processedCount = 0;
     sim.activeItem = null;
-    sim.history = []; // stack of items
+    sim.history = [];
     sim.graveyard = [];
     sim.particles = [];
     sim.phase = STATE.SPAWN;
@@ -336,12 +451,13 @@ function initSim() {
 }
 
 function update() {
-    const speed = parseFloat(speedSlider.value) * 0.01;
-    sim.speedMult = parseFloat(speedSlider.value);
+    const speed = parseFloat(speedSlider.value);
+    sim.speedMult = speed;
     sim.timer += 1 * sim.speedMult;
 
-    // --- STATE MACHINE ---
-    
+    // Dynamic threshold for "arrival" checks based on screen size
+    const snapDist = metrics.u * 0.5; 
+
     switch (sim.phase) {
         case STATE.SPAWN:
             if (sim.processedCount >= STREAM_LENGTH) {
@@ -349,58 +465,55 @@ function update() {
                 return;
             }
             
-            // Pick next item
             sim.activeItem = sim.stream[sim.processedCount];
             sim.activeItem.state = 'active';
-            sim.activeItem.targetX = ZONES.INTERACTION.x;
-            sim.activeItem.targetY = ZONES.INTERACTION.y;
+            sim.activeItem.targetX = metrics.zones.INTERACTION.x;
+            sim.activeItem.targetY = metrics.zones.INTERACTION.y;
             sim.phase = STATE.MOVE_TO_FOCUS;
-            sim.message = "FETCHING ELEMENT " + sim.processedCount;
+            sim.message = `FETCHING ELEMENT ${sim.processedCount}`;
             break;
 
         case STATE.MOVE_TO_FOCUS:
-            // Move item to center
             const dx = sim.activeItem.targetX - sim.activeItem.x;
             const dy = sim.activeItem.targetY - sim.activeItem.y;
             
+            // Percentage based movement
             sim.activeItem.x += dx * 0.1 * sim.speedMult;
             sim.activeItem.y += dy * 0.1 * sim.speedMult;
             
-            // Move entire stream left
+            // Move stream
             sim.stream.forEach(item => {
                 if (item.state === 'waiting') {
-                    item.x -= (W*0.08) * 0.05 * sim.speedMult;
+                    // Move relative to width
+                    item.x -= (metrics.w * 0.08) * 0.05 * sim.speedMult;
                 }
             });
 
-            if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+            if (Math.abs(dx) < snapDist && Math.abs(dy) < snapDist) {
                 sim.phase = STATE.CHECK_ZERO;
                 sim.timer = 0;
             }
             break;
 
         case STATE.CHECK_ZERO:
-            if (sim.timer < 20) break; // Pause
+            if (sim.timer < 20) break;
             
             if (sim.count === 0) {
-                sim.message = "COUNT IS ZERO -> NEW CANDIDATE";
-                // Move current active to podium
+                sim.message = "COUNT ZERO -> NEW CANDIDATE";
                 sim.candidate = { type: sim.activeItem.type };
-                sim.activeItem.targetX = ZONES.PODIUM.x;
-                sim.activeItem.targetY = ZONES.PODIUM.y - 40; // Hover above
+                sim.activeItem.targetX = metrics.zones.PODIUM.x;
+                sim.activeItem.targetY = metrics.zones.PODIUM.y - (metrics.shapeSize * 1.5);
                 
-                // Animate move to podium
                 const pdx = sim.activeItem.targetX - sim.activeItem.x;
                 const pdy = sim.activeItem.targetY - sim.activeItem.y;
                 sim.activeItem.x += pdx * 0.1 * sim.speedMult;
                 sim.activeItem.y += pdy * 0.1 * sim.speedMult;
 
-                if (Math.abs(pdx) < 2) {
-                    // It becomes the candidate visuals
+                if (Math.abs(pdx) < snapDist) {
                     sim.count = 1;
-                    sim.history.push({ type: sim.activeItem.type }); // Add to stack
+                    sim.history.push({ type: sim.activeItem.type });
                     sim.processedCount++;
-                    sim.activeItem = null; // Consumed
+                    sim.activeItem = null;
                     sim.phase = STATE.SPAWN;
                 }
             } else {
@@ -410,40 +523,39 @@ function update() {
 
         case STATE.MOVE_TO_COMPARE:
             sim.message = "COMPARING WITH CANDIDATE";
-            // Move active item next to Podium
-            const cx = ZONES.PODIUM.x + 80;
-            const cy = ZONES.PODIUM.y;
+            // Position next to Podium
+            const cx = metrics.zones.PODIUM.x + (metrics.shapeSize * 2);
+            const cy = metrics.zones.PODIUM.y;
             
             sim.activeItem.x += (cx - sim.activeItem.x) * 0.1 * sim.speedMult;
             sim.activeItem.y += (cy - sim.activeItem.y) * 0.1 * sim.speedMult;
             
-            if (Math.abs(cx - sim.activeItem.x) < 2) {
+            if (Math.abs(cx - sim.activeItem.x) < snapDist) {
                 sim.phase = STATE.COMPARE_ANIM;
                 sim.timer = 0;
             }
             break;
 
         case STATE.COMPARE_ANIM:
-            if (sim.timer < 30) break; // Wait for user to see
+            if (sim.timer < 30) break;
             
             if (sim.activeItem.type === sim.candidate.type) {
                 sim.phase = STATE.RESOLVE_MATCH;
-                sim.message = "MATCH DETECTED -> REINFORCE (+1)";
+                sim.message = "MATCH -> REINFORCE (+1)";
             } else {
                 sim.phase = STATE.RESOLVE_MISMATCH;
-                sim.message = "MISMATCH DETECTED -> ELIMINATE (-1)";
+                sim.message = "MISMATCH -> ELIMINATE (-1)";
             }
             break;
 
         case STATE.RESOLVE_MATCH:
-            // Move to stack
-            const sx = ZONES.STACK.x;
-            const sy = ZONES.STACK.y - (sim.history.length * 30);
+            const sx = metrics.zones.STACK.x;
+            const sy = metrics.zones.STACK.y - (sim.history.length * (metrics.shapeSize * 0.6));
             
             sim.activeItem.x += (sx - sim.activeItem.x) * 0.15 * sim.speedMult;
             sim.activeItem.y += (sy - sim.activeItem.y) * 0.15 * sim.speedMult;
             
-            if (Math.abs(sx - sim.activeItem.x) < 5 && Math.abs(sy - sim.activeItem.y) < 5) {
+            if (Math.abs(sx - sim.activeItem.x) < snapDist && Math.abs(sy - sim.activeItem.y) < snapDist) {
                 sim.count++;
                 sim.history.push({ type: sim.candidate.type });
                 sim.processedCount++;
@@ -453,25 +565,23 @@ function update() {
             break;
 
         case STATE.RESOLVE_MISMATCH:
-            // Visual warfare: Active item charges stack, Top of stack charges active item
-            const attackX = (ZONES.PODIUM.x + ZONES.STACK.x) / 2;
-            const attackY = ZONES.PODIUM.y - 50;
+            // Clash point
+            const attackX = (metrics.zones.PODIUM.x + metrics.zones.STACK.x) / 2;
+            const attackY = metrics.zones.PODIUM.y - (metrics.shapeSize * 1.5);
             
-            // 1. Move Active Item to clash point
             sim.activeItem.x += (attackX - sim.activeItem.x) * 0.2 * sim.speedMult;
             sim.activeItem.y += (attackY - sim.activeItem.y) * 0.2 * sim.speedMult;
             
-            // 2. Visually detach top stack item (we don't remove from array yet)
-            // Just simulate impact frame
-            if (Math.abs(attackX - sim.activeItem.x) < 10) {
-                // EXPLOSION
+            if (Math.abs(attackX - sim.activeItem.x) < (snapDist * 2)) {
                 spawnExplosion(attackX, attackY);
                 sim.count--;
                 const deadStackItem = sim.history.pop();
                 
-                // Add to graveyard
+                // Graveyard push
                 sim.graveyard.push({ ...sim.activeItem, x: attackX, y: attackY, r: Math.random() });
-                sim.graveyard.push({ ...deadStackItem, x: attackX+10, y: attackY, r: Math.random() });
+                if(deadStackItem) {
+                    sim.graveyard.push({ ...deadStackItem, x: attackX + metrics.u, y: attackY, r: Math.random() });
+                }
                 
                 sim.activeItem = null;
                 sim.processedCount++;
@@ -481,11 +591,10 @@ function update() {
             break;
 
         case STATE.GRAVEYARD_FALL:
-            // Items in graveyard fall to bottom
             sim.graveyard.forEach(g => {
-                if (g.y < ZONES.GRAVEYARD.y + Math.random()*50) {
-                    g.y += 5 * sim.speedMult;
-                    g.x += Math.sin(g.y * 0.1) * 2;
+                if (g.y < metrics.zones.GRAVEYARD.y + Math.random() * metrics.u * 10) {
+                    g.y += metrics.u * 0.5 * sim.speedMult;
+                    g.x += Math.sin(g.y * 0.1) * (metrics.u * 0.2);
                 }
             });
             if (sim.timer > 20) {
@@ -494,20 +603,19 @@ function update() {
             break;
 
         case STATE.FINISHED:
-            sim.message = "STREAM COMPLETE. SURVIVOR IDENTIFIED.";
+            sim.message = "STREAM COMPLETE. SURVIVOR FOUND.";
             break;
     }
 
-    // Particle Updates
+    // Particles
     for (let i = sim.particles.length - 1; i >= 0; i--) {
         let p = sim.particles[i];
-        p.x += p.vx * sim.speedMult * 0.5;
-        p.y += p.vy * sim.speedMult * 0.5;
+        p.x += p.vx * sim.speedMult;
+        p.y += p.vy * sim.speedMult;
         p.life -= 0.02 * sim.speedMult;
         if (p.life <= 0) sim.particles.splice(i, 1);
     }
 
-    // UI Updates
     statusReadout.innerText = `PHASE: ${getPhaseName(sim.phase)} // MSG: ${sim.message}`;
 }
 
@@ -516,102 +624,95 @@ function getPhaseName(p) {
 }
 
 function render() {
-    // 1. Clear & Background
-    ctx.fillStyle = COLORS.BG;
-    ctx.fillRect(0, 0, W, H);
+    if(!ctx || metrics.w === 0) return;
 
-    // 2. Draw Zones (Grid lines)
+    // Clear
+    ctx.fillStyle = COLORS.BG;
+    ctx.fillRect(0, 0, metrics.w, metrics.h);
+
+    // Draw Grid Zones
     ctx.strokeStyle = COLORS.DIM;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
+    ctx.lineWidth = metrics.stroke;
+    ctx.setLineDash([metrics.u, metrics.u]);
     
-    // Horizon lines
     ctx.beginPath();
-    ctx.moveTo(0, ZONES.ARENA.y);
-    ctx.lineTo(W, ZONES.ARENA.y);
-    ctx.moveTo(0, ZONES.GRAVEYARD.y);
-    ctx.lineTo(W, ZONES.GRAVEYARD.y);
+    ctx.moveTo(0, metrics.zones.ARENA.y);
+    ctx.lineTo(metrics.w, metrics.zones.ARENA.y);
+    ctx.moveTo(0, metrics.zones.GRAVEYARD.y);
+    ctx.lineTo(metrics.w, metrics.zones.GRAVEYARD.y);
     ctx.stroke();
     
-    ctx.setLineDash([]); // Reset
+    ctx.setLineDash([]);
 
-    // 3. Draw Labels
-    ctx.font = "16px 'Courier New'";
+    // Labels
+    ctx.font = `${metrics.fontSize}px 'Courier New'`;
     ctx.fillStyle = COLORS.DIM;
-    ctx.fillText("IN_STREAM", 20, ZONES.STREAM.h - 10);
-    ctx.fillText("ARENA_LOGIC", 20, ZONES.ARENA.y + 20);
-    ctx.fillText("DISCARD_PILE", 20, ZONES.GRAVEYARD.y + 20);
+    ctx.fillText("IN_STREAM", metrics.u * 2, metrics.zones.STREAM.h - metrics.u);
+    ctx.fillText("ARENA_LOGIC", metrics.u * 2, metrics.zones.ARENA.y + (metrics.u * 3));
+    ctx.fillText("DISCARD_PILE", metrics.u * 2, metrics.zones.GRAVEYARD.y + (metrics.u * 3));
 
-    // 4. Draw Stream
+    // Draw Stream
+    const size = metrics.shapeSize;
     sim.stream.forEach(item => {
-        if (item === sim.activeItem) return; // Draw separately
-        if (item.id < sim.processedCount) return; // Already processed
-        
-        drawShape(item.type, item.x, item.y, 40, true, COLORS.DIM);
+        if (item === sim.activeItem) return;
+        if (item.id < sim.processedCount) return;
+        drawShape(item.type, item.x, item.y, size, true, COLORS.DIM);
     });
 
-    // 5. Draw Candidate Podium
+    // Draw Podium Base
+    const pX = metrics.zones.PODIUM.x;
+    const pY = metrics.zones.PODIUM.y;
     ctx.fillStyle = PATTERN_DIM;
-    ctx.fillRect(ZONES.PODIUM.x - 50, ZONES.PODIUM.y + 30, 100, 10); // Base
+    ctx.fillRect(pX - size, pY + (size/2), size * 2, size * 0.2); 
     
-    // Label
     ctx.fillStyle = COLORS.FG;
     ctx.textAlign = "center";
-    ctx.fillText("CANDIDATE", ZONES.PODIUM.x, ZONES.PODIUM.y + 60);
+    ctx.fillText("CANDIDATE", pX, pY + size * 1.5);
 
     if (sim.candidate && sim.count > 0) {
-        // Draw the candidate hologram
         ctx.save();
         ctx.shadowColor = COLORS.FG;
-        ctx.shadowBlur = 10;
-        drawShape(sim.candidate.type, ZONES.PODIUM.x, ZONES.PODIUM.y - 10, 60, false, COLORS.FG);
+        ctx.shadowBlur = metrics.u * 2;
+        drawShape(sim.candidate.type, pX, pY - (size*0.2), size * 1.5, false, COLORS.FG);
         ctx.restore();
     } else {
         ctx.fillStyle = COLORS.DIM;
-        ctx.fillText("NULL", ZONES.PODIUM.x, ZONES.PODIUM.y - 10);
+        ctx.fillText("NULL", pX, pY);
     }
 
-    // 6. Draw Count Stack
-    const stackBaseX = ZONES.STACK.x;
-    const stackBaseY = ZONES.STACK.y + 30;
+    // Draw Stack
+    const stackBaseX = metrics.zones.STACK.x;
+    const stackBaseY = metrics.zones.STACK.y + size * 0.8;
     
     ctx.fillStyle = COLORS.FG;
-    ctx.fillText(`COUNT: ${sim.count}`, stackBaseX, stackBaseY + 30);
+    ctx.fillText(`COUNT: ${sim.count}`, stackBaseX, stackBaseY + size);
 
-    // Draw blocks
     sim.history.forEach((histItem, idx) => {
-        const by = stackBaseY - (idx * 30);
-        drawBlock(stackBaseX - 25, by - 25, 50, 25, true);
+        const blockH = size * 0.6;
+        const by = stackBaseY - (idx * blockH);
+        drawBlock(stackBaseX - size*0.6, by - blockH, size * 1.2, blockH, true);
     });
 
-    // 7. Draw Active Item
+    // Active Item
     if (sim.activeItem) {
-        drawShape(sim.activeItem.type, sim.activeItem.x, sim.activeItem.y, 40, true, COLORS.FG);
+        drawShape(sim.activeItem.type, sim.activeItem.x, sim.activeItem.y, size, true, COLORS.FG);
     }
 
-    // 8. Draw Particles
+    // Particles
     sim.particles.forEach(p => {
         ctx.fillStyle = COLORS.FG;
         ctx.fillRect(p.x, p.y, p.size, p.size);
     });
 
-    // 9. Draw Graveyard
+    // Graveyard
     sim.graveyard.forEach(g => {
         ctx.save();
         ctx.translate(g.x, g.y);
         ctx.rotate(g.r);
         ctx.globalAlpha = 0.3;
-        drawShape(g.type, 0, 0, 30, false, COLORS.DIM);
+        drawShape(g.type, 0, 0, size * 0.8, false, COLORS.DIM);
         ctx.restore();
     });
-
-    // 10. Glitch / Scanline aesthetic is handled by CSS, but we can add random noise
-    if (Math.random() > 0.95) {
-        ctx.fillStyle = "rgba(0, 255, 65, 0.1)";
-        const y = Math.random() * H;
-        const h = Math.random() * 20;
-        ctx.fillRect(0, y, W, h);
-    }
 }
 
 function loop() {

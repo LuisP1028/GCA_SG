@@ -3,38 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GREEDY_SORT_VISUALIZER // V.1.0</title>
+    <title>GREEDY_SORT_VISUALIZER // V.1.1</title>
     <style>
         :root {
             --bg: #000000;
             --fg: #00FF00;
             --dim: #005500;
+            --crt-line: rgba(18, 16, 16, 0);
+            --crt-scan: rgba(0, 0, 0, 0.25);
+            
+            /* Responsive spacing */
+            --spacing-sm: clamp(0.5rem, 1vw, 1rem);
+            --spacing-md: clamp(1rem, 2vw, 2rem);
+            
+            /* Typography */
+            --font-base: 'Courier New', Courier, monospace;
+            --text-sm: clamp(0.75rem, 1.5vw, 0.9rem);
+            --text-md: clamp(0.9rem, 2vw, 1.2rem);
+            --text-lg: clamp(1.2rem, 4vw, 2rem);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border_box;
         }
 
         body {
             background-color: var(--bg);
             color: var(--fg);
-            font-family: 'Courier New', Courier, monospace;
+            font-family: var(--font-base);
             margin: 0;
             padding: 0;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
+            width: 100vw;
             overflow: hidden;
             user-select: none;
+            
+            /* Modern Grid Layout */
+            display: grid;
+            grid-template-rows: auto 1fr minmax(100px, 20vh);
+            grid-template-areas: 
+                "header"
+                "main"
+                "footer";
         }
 
-        /* CRT Scanline Effect */
+        /* CRT Scanline Effect Overlay */
         body::after {
             content: "";
             position: absolute;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             background: linear-gradient(
-                rgba(18, 16, 16, 0) 50%, 
-                rgba(0, 0, 0, 0.25) 50%
+                var(--crt-line) 50%, 
+                var(--crt-scan) 50%
             ), linear-gradient(
                 90deg, 
                 rgba(255, 0, 0, 0.06), 
@@ -47,32 +70,38 @@
         }
 
         header {
+            grid-area: header;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem;
+            padding: var(--spacing-sm) var(--spacing-md);
             border-bottom: 2px solid var(--fg);
-            flex-shrink: 0;
+            z-index: 10;
         }
 
         h1 {
-            font-size: 1.2rem;
+            font-size: var(--text-lg);
             margin: 0;
             text-transform: uppercase;
             letter-spacing: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         button {
             background: var(--bg);
             color: var(--fg);
             border: 2px solid var(--fg);
-            padding: 0.5rem 1.5rem;
+            padding: 0.5em 1em;
             font-family: inherit;
             font-weight: bold;
+            font-size: var(--text-md);
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 4px 4px 0px var(--fg);
-            transition: transform 0.1s;
+            transition: transform 0.1s, box-shadow 0.1s;
+            white-space: nowrap;
         }
 
         button:active {
@@ -88,33 +117,37 @@
         }
 
         main {
-            flex-grow: 1;
+            grid-area: main;
             position: relative;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: var(--bg);
+            overflow: hidden;
         }
 
         canvas {
             display: block;
-            /* Canvas is sized via JS, but max bounds here */
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
         }
 
         footer {
-            height: 150px;
+            grid-area: footer;
             border-top: 2px solid var(--fg);
-            padding: 1rem;
-            font-size: 0.9rem;
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: var(--text-sm);
             overflow-y: auto;
-            flex-shrink: 0;
             background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
         }
 
         .log-entry {
             margin-bottom: 0.25rem;
+            word-wrap: break-word;
         }
         .log-highlight {
             font-weight: bold;
@@ -122,15 +155,27 @@
         }
 
         /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--fg); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--dim); }
         ::-webkit-scrollbar-thumb { background: var(--fg); }
+        
+        @media (max-width: 480px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            button {
+                width: 100%;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>Min_Wait_Time_Algo</h1>
+        <h1>Min_Wait_Algo</h1>
         <button id="runBtn">Run Simulation</button>
     </header>
 
@@ -145,28 +190,38 @@
 
 <script>
 /**
- * DITHERPUNK VISUALIZER
+ * DITHERPUNK VISUALIZER // V1.1 (Responsive)
  * Logic: Greedy Algorithm (Minimizing Total Waiting Time)
- * Style: 1-bit Green/Black, Atkinson Dithering simulation via Canvas Patterns
+ * Style: 1-bit Green/Black
  */
 
 // --- CONFIGURATION ---
 const COLORS = {
     bg: '#000000',
-    fg: '#00FF00'
+    fg: '#00FF00',
+    dim: '#005500'
 };
 const TASK_COUNT = 6;
-const ANIMATION_SPEED = 1.5; // Multiplier
+const ANIMATION_SPEED = 1.5;
 
 // --- STATE MANAGEMENT ---
 let canvas, ctx;
-let width, height;
+let width, height; // Logical dimensions (CSS pixels)
+let dpr; // Device Pixel Ratio
 let tasks = [];
 let ghosts = [];
 let isRunning = false;
-let animationId;
 let accumulator = 0;
-let ditherPattern; // CanvasPattern
+let ditherPattern;
+
+// Scalable Metrics
+let metrics = {
+    fontSize: 16,
+    padding: 20,
+    gap: 10,
+    baseline: 0,
+    lineWidth: 2
+};
 
 // --- DOM ELEMENTS ---
 const runBtn = document.getElementById('runBtn');
@@ -177,23 +232,20 @@ const container = document.getElementById('canvas-container');
 
 function init() {
     canvas = document.getElementById('simCanvas');
-    ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no transparency
+    ctx = canvas.getContext('2d', { alpha: false });
     
-    // Resize Observer to handle window-agnostic scaling
-    const resizeObserver = new ResizeObserver(() => resize());
+    // Resize Observer handles all screen changes
+    const resizeObserver = new ResizeObserver(() => handleResize());
     resizeObserver.observe(container);
     
-    // Generate Dither Pattern (Checkerboard for "Ghost" transparency look)
+    // Initial Setup
     createDitherPattern();
-    
-    // Initial resize
-    resize();
+    handleResize(); // Triggers initial setup
     
     runBtn.addEventListener('click', startSimulation);
 }
 
 function createDitherPattern() {
-    // Create a tiny offscreen canvas to generate a pattern
     const patCanvas = document.createElement('canvas');
     patCanvas.width = 4;
     patCanvas.height = 4;
@@ -202,31 +254,53 @@ function createDitherPattern() {
     pCtx.fillStyle = COLORS.bg;
     pCtx.fillRect(0,0,4,4);
     pCtx.fillStyle = COLORS.fg;
-    
-    // 50% Bayer-like check
     pCtx.fillRect(0,0,2,2);
     pCtx.fillRect(2,2,2,2);
     
     ditherPattern = ctx.createPattern(patCanvas, 'repeat');
 }
 
-function resize() {
+/**
+ * Handles seamless resizing by scaling coordinate systems
+ * preserving the relative positions of animations.
+ */
+function handleResize() {
+    const oldWidth = width;
+    const oldHeight = height;
+
+    // Get new CSS dimensions
     width = container.clientWidth;
     height = container.clientHeight;
-    
-    // Handle High DPI
-    const dpr = window.devicePixelRatio || 1;
+    dpr = window.devicePixelRatio || 1;
+
+    // Update canvas internal resolution
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
-    
-    // Reset view if idle
-    if (!isRunning && tasks.length === 0) {
-        log("RESIZED DISPLAY PORT. SYSTEM IDLE.");
-    }
-    
-    // Re-create pattern on resize/context reset
+
+    // Recalculate Metrics based on new size
+    const minDim = Math.min(width, height);
+    metrics.fontSize = Math.max(12, minDim * 0.025); // ~2.5% of min dimension
+    metrics.padding = width * 0.05; // 5% side padding
+    metrics.gap = Math.max(2, width * 0.015); // Dynamic gap
+    metrics.baseline = height * 0.4;
+    metrics.lineWidth = Math.max(1, minDim * 0.003);
+
+    // Re-create pattern on resize
     createDitherPattern();
+
+    // If objects exist, rescale their coordinates
+    if (oldWidth && oldHeight && (tasks.length > 0 || ghosts.length > 0)) {
+        const scaleX = width / oldWidth;
+        const scaleY = height / oldHeight;
+
+        tasks.forEach(t => t.rescale(scaleX, scaleY));
+        ghosts.forEach(g => g.rescale(scaleX, scaleY));
+    } else if (!isRunning && tasks.length === 0) {
+        // Initial idle state, re-log if significant change
+        // log("VIEWPORT UPDATED: " + width + "x" + height);
+    }
+
     drawFrame();
 }
 
@@ -245,33 +319,41 @@ class Task {
     constructor(val, index, total) {
         this.value = val;
         this.id = Math.random().toString(36).substr(2, 5);
-        this.color = COLORS.fg;
-        
-        // Layout Config
-        const padding = 20; // px
-        const maxBarHeight = height * 0.3; // Tasks take up top 30%
-        const availableWidth = width - (padding * 2);
-        const gap = 10;
-        
-        // Initial random geometry (Simulating unsorted chaos)
-        const blockWidth = (availableWidth / total) - gap;
-        
-        this.w = blockWidth;
-        // Height is proportional to value relative to max possible (approx 15)
-        this.h = (val / 15) * maxBarHeight + 20; 
-        
-        this.x = padding + index * (blockWidth + gap);
-        this.y = (height * 0.4) - this.h; // Baseline at 40% height
-        
-        this.targetX = this.x;
         this.isHighlight = false;
-        this.pulse = 0;
+        
+        // Initial Geometry calculation
+        this.calculateGeometry(index, total);
+        
+        this.x = this.targetX;
+        this.y = (height * 0.4) - this.h;
+    }
+
+    calculateGeometry(index, total) {
+        // Defines the ideal layout logic
+        const availableWidth = width - (metrics.padding * 2);
+        const blockWidth = (availableWidth / total) - metrics.gap;
+        const maxBarHeight = height * 0.3;
+
+        this.w = blockWidth;
+        // Height proportional to value (max value ~15)
+        this.h = (this.value / 15) * maxBarHeight + (height * 0.05); 
+        this.targetX = metrics.padding + index * (blockWidth + metrics.gap);
+    }
+
+    // Called during resize to map old pixel coords to new
+    rescale(sx, sy) {
+        this.x *= sx;
+        this.y *= sy;
+        this.w *= sx;
+        this.h *= sy;
+        this.targetX *= sx;
     }
 
     draw(ctx) {
+        ctx.lineWidth = metrics.lineWidth;
+        
         // Outline
         ctx.strokeStyle = COLORS.fg;
-        ctx.lineWidth = 2;
         ctx.strokeRect(this.x, this.y, this.w, this.h);
         
         // Fill
@@ -281,18 +363,19 @@ class Task {
             
             // Text Color Inverted
             ctx.fillStyle = COLORS.bg;
-            ctx.font = 'bold 16px Courier New';
+            ctx.font = `bold ${metrics.fontSize}px Courier New`;
             ctx.textAlign = 'center';
-            ctx.fillText(this.value, this.x + this.w/2, this.y + this.h/2 + 5);
+            // Adjust text Y based on font size
+            ctx.fillText(this.value, this.x + this.w/2, this.y + this.h/2 + (metrics.fontSize/3));
         } else {
             ctx.fillStyle = COLORS.bg;
             ctx.fillRect(this.x, this.y, this.w, this.h);
             
             // Text Color Normal
             ctx.fillStyle = COLORS.fg;
-            ctx.font = 'bold 16px Courier New';
+            ctx.font = `bold ${metrics.fontSize}px Courier New`;
             ctx.textAlign = 'center';
-            ctx.fillText(this.value, this.x + this.w/2, this.y + this.h/2 + 5);
+            ctx.fillText(this.value, this.x + this.w/2, this.y + this.h/2 + (metrics.fontSize/3));
         }
     }
 }
@@ -311,13 +394,13 @@ class Ghost {
     update() {
         if (this.arrived) return;
         
-        // Simple lerp
         const dx = this.targetX - this.x;
         const dy = this.targetY - this.y;
         
         this.x += dx * 0.1 * ANIMATION_SPEED;
         this.y += dy * 0.1 * ANIMATION_SPEED;
         
+        // Check arrival (using dynamic threshold based on width)
         if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
             this.x = this.targetX;
             this.y = this.targetY;
@@ -325,14 +408,23 @@ class Ghost {
         }
     }
 
+    rescale(sx, sy) {
+        this.x *= sx;
+        this.y *= sy;
+        this.w *= sx;
+        this.h *= sy;
+        this.targetX *= sx;
+        this.targetY *= sy;
+    }
+
     draw(ctx) {
         ctx.save();
-        // Use dither pattern for "transparency"
         ctx.fillStyle = ditherPattern;
         ctx.fillRect(this.x, this.y, this.w, this.h);
+        
         ctx.strokeStyle = COLORS.fg;
         ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
+        ctx.setLineDash([2, 4]); // Dashed line
         ctx.strokeRect(this.x, this.y, this.w, this.h);
         ctx.restore();
     }
@@ -356,102 +448,80 @@ async function startSimulation() {
         values.push(Math.floor(Math.random() * 10) + 2);
     }
     
+    // Create Initial Tasks
     values.forEach((v, i) => tasks.push(new Task(v, i, TASK_COUNT)));
     drawFrame();
-    await wait(1000);
+    await wait(800);
 
     // 2. SORT
     log("EXECUTING GREEDY SORT (ASCENDING)...", true);
-    log("GOAL: MINIMIZE IMPACT ON QUEUE");
     
-    // Bubble sort logic just to get indices, but we animate directly to final state for smoothness
-    const sortedValues = [...values].sort((a,b) => a - b);
-    
-    // Assign new Target positions
-    // We reconstruct the tasks array to match sorted order visually
-    let sortedTasks = [];
-    
-    // We need to map old objects to new positions. 
-    // Simple way: Create new task objects in correct order but animate them from old positions? 
-    // Easier: Just swap the X coordinates of the existing objects.
-    
-    // Let's modify the 'tasks' array to be sorted, but keep objects intact
+    // Logic: Sort array to find new order
     tasks.sort((a,b) => a.value - b.value);
     
-    // Recalculate X targets based on new sorted index
-    const padding = 20;
-    const gap = 10;
-    const availableWidth = width - (padding * 2);
-    const blockWidth = (availableWidth / TASK_COUNT) - gap;
+    // Re-calculate target slots based on sorted indices
+    // We re-run the layout logic, but only apply it to targetX
+    const availableWidth = width - (metrics.padding * 2);
+    const blockWidth = (availableWidth / TASK_COUNT) - metrics.gap;
 
     tasks.forEach((t, i) => {
-        t.targetX = padding + i * (blockWidth + gap);
+        t.targetX = metrics.padding + i * (blockWidth + metrics.gap);
     });
 
-    // Animation Loop for Sorting
     await animateMovement();
-    
-    log("SORT COMPLETE. O(N log N) COST APPLIED.");
+    log("SORT COMPLETE. O(N log N).");
     await wait(500);
 
     // 3. CALCULATION & PROJECTION
     log("INITIATING WAIT_TIME PROJECTION...", true);
     
-    // Determine baseline Y for ghost stack (just below the timeline)
-    const baselineY = (height * 0.4) + 20; 
+    // Start stacking ghosts below the timeline
+    // Baseline + some margin
+    const stackStartY = metrics.baseline + (height * 0.05); 
 
     for (let i = 0; i < tasks.length; i++) {
         let task = tasks[i];
-        
-        // Highlight Active
         task.isHighlight = true;
+        drawFrame();
         
         let remaining = tasks.length - 1 - i;
         
         if (remaining > 0) {
-            log(`Processing Task [${task.value}]. Impacts ${remaining} future tasks.`);
+            log(`Task [${task.value}]: Delays ${remaining} subsequent tasks.`);
             
-            // Spawn Ghosts
             let currentGhosts = [];
-            
-            // We need to stack them. We need to know how high the stack is at each future index.
-            // Let's calculate the Y position dynamically. 
-            // We can iterate future tasks.
             
             for (let j = 1; j <= remaining; j++) {
                 let targetTaskIndex = i + j;
                 let targetTask = tasks[targetTaskIndex];
                 
-                // Calculate Stack Height at this position
-                // To do this simply, we check how many ghosts are already at this targetX
-                let existingStackHeight = ghosts.filter(g => Math.abs(g.targetX - targetTask.targetX) < 5).length;
+                // Determine Stack Height dynamically
+                // Count how many ghosts target this specific task's X slot
+                let existingStackCount = ghosts.filter(g => Math.abs(g.targetX - targetTask.targetX) < (blockWidth/2)).length;
                 
-                // Determine Y target (Stacking downwards)
-                let targetY = baselineY + (existingStackHeight * (task.h + 5)); // 5px gap
+                let targetY = stackStartY + (existingStackCount * (task.h + (height * 0.01))); 
                 
                 let g = new Ghost(task, targetTask.targetX, targetY);
                 ghosts.push(g);
                 currentGhosts.push(g);
             }
             
-            // Wait for ghosts to arrive
             await animateGhosts(currentGhosts);
             
-            // Update Math
             let contribution = task.value * remaining;
             accumulator += contribution;
-            log(`> ADDED: ${task.value} x ${remaining} = ${contribution}`);
+            log(`> WAIT TIME INCREASE: +${contribution}`);
             
         } else {
-            log(`Task [${task.value}] is last. No impact.`);
+            log(`Task [${task.value}] is last. Zero impact.`);
         }
         
         task.isHighlight = false;
-        await wait(300);
+        await wait(250);
     }
 
     log("SIMULATION COMPLETE.", true);
-    log(`MINIMUM TOTAL WAITING TIME: ${accumulator}`);
+    log(`MIN TOTAL WAIT: ${accumulator}`);
     isRunning = false;
     runBtn.disabled = false;
     drawFrame();
@@ -465,13 +535,15 @@ function animateMovement() {
             let moving = false;
             tasks.forEach(t => {
                 let dx = t.targetX - t.x;
-                t.x += dx * 0.1 * ANIMATION_SPEED;
-                if(Math.abs(dx) > 0.5) moving = true;
+                // Proportional speed
+                t.x += dx * 0.15 * ANIMATION_SPEED;
+                
+                // Dynamic snap threshold
+                if(Math.abs(dx) > width * 0.001) moving = true;
                 else t.x = t.targetX;
             });
             
             drawFrame();
-            
             if(moving) requestAnimationFrame(loop);
             else resolve();
         }
@@ -489,7 +561,6 @@ function animateGhosts(activeGhosts) {
             });
             
             drawFrame();
-            
             if(moving) requestAnimationFrame(loop);
             else resolve();
         }
@@ -498,38 +569,40 @@ function animateGhosts(activeGhosts) {
 }
 
 function drawFrame() {
-    // Clear
+    if(!ctx) return;
+
+    // Clear Screen
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, width, height);
     
-    // Draw Accumulator (Background Text)
+    // Draw Accumulator (Background Watermark)
     ctx.save();
-    ctx.font = 'bold 20vw Courier New';
-    ctx.fillStyle = '#002200'; // Very dim green
+    // Font size relative to width (approx 20vw equivalent)
+    ctx.font = `bold ${width * 0.2}px Courier New`;
+    ctx.fillStyle = '#001a00'; 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(accumulator, width/2, height/2 + 100);
+    ctx.fillText(accumulator, width/2, height/2 + (height*0.1));
     ctx.restore();
 
     // Draw Timeline Line
     ctx.beginPath();
     ctx.strokeStyle = COLORS.dim;
-    ctx.lineWidth = 4;
-    ctx.moveTo(0, height * 0.4);
-    ctx.lineTo(width, height * 0.4);
+    ctx.lineWidth = Math.max(2, metrics.lineWidth * 2);
+    ctx.moveTo(0, metrics.baseline);
+    ctx.lineTo(width, metrics.baseline);
     ctx.stroke();
 
-    // Draw Ghosts
+    // Draw Objects
     ghosts.forEach(g => g.draw(ctx));
-
-    // Draw Tasks
     tasks.forEach(t => t.draw(ctx));
     
-    // Draw Accumulator Label
+    // Draw Label Footer inside Canvas
     ctx.fillStyle = COLORS.fg;
-    ctx.font = '24px Courier New';
+    ctx.font = `${metrics.fontSize * 1.2}px Courier New`;
     ctx.textAlign = 'right';
-    ctx.fillText(`TOTAL_WAIT: ${accumulator}`, width - 20, height - 20);
+    const margin = metrics.fontSize;
+    ctx.fillText(`TOTAL_WAIT: ${accumulator}`, width - margin, height - margin);
 }
 
 function wait(ms) {
