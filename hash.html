@@ -189,10 +189,10 @@
                     <p><strong>Example:</strong> <code>paragraph = ["apple", "banana", "cat", "apple"]</code>, <code>keywords = ["banana", "apple"]</code></p>
                     <div class="code-block" style="text-align: left;">
 1. Setup & Initialization
-   Initialize a "Global Minimum" tracker to infinity. Create a map to retrieve a keyword’s required order (Rank k). Create two arrays: one to track the text index where each keyword was last seen, and another that tracks the global chain length between all keywords identified so far.
+   Initialize a global minimum tracker to infinity. Create a hashmap to retrieve a keyword’s temporal order (Rank k). Create two arrays: one tracking the index where each keyword was last seen, and another tracking the global chain length between all keywords identified so far.
 
 2. Scan and Identify
-   Iterate through the text word by word. If the current word is not in your keyword list, skip it. If it is a keyword, look up its Rank 'k' (0 to m-1) using your map to determine its place in the sequence.
+   Iterate through the text word by word. If the current word is not in your hashmap, skip it. If it is a keyword, look up its Rank 'k' (0 to m-1) in the hashmap to determine its place in the sequence.
 
 3. Start Chain (First Keyword)
    If the current word is the first keyword in the sequence (Rank 0), set its current chain length to 1. This resets the tracking logic, marking the potential start of a new valid subarray.
@@ -201,10 +201,10 @@
    If the word has Rank k > 0, check if the preceding keyword (Rank k-1) has a valid chain. If yes, calculate the distance from the previous keyword's last known index to the current index, add it to the previous length, and save it as the new chain length.
 
 5. Update Position
-   Record the current text index into the latest_index array for the current keyword (Rank k). This ensures that future distance calculations always reference the most recently discovered instance of this word.
+   Record the current index into the latest_index array for keyword "x" (Rank k). This ensures that future distance calculations always reference the most recently discovered instance of this word.
 
 6. Check Completeness
-   If the current word is the final keyword in the list and completes a valid chain, compare the total chain length against your "Best Result." If this new subarray is shorter, update the global minimum.
+   If the current word is the final keyword in the list and completes a valid chain, compare the total chain length against the global minimum. If this new subarray is shorter, update the global minimum.
                     </div>
                 </div>
         </section>
