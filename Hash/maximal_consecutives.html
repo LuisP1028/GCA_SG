@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCS Ditherpunk Viz</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        canvas {
+            /* Crucial for the retro look */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="display"></canvas>
+
+<script>
+/**
+ * CONFIGURATION
+ */
+const INTERNAL_WIDTH = 480;  // Low res for dither effect
+const INTERNAL_HEIGHT = 270; 
+const TERMINAL_GREEN = [0, 255, 0];
+const BLACK = [0, 0, 0];
+const TOTAL_NODES = 30;
+const NODE_RADIUS = 8;
+
+/**
+ * UTILITIES
+ */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const lerp = (start, end, t) => start * (1 - t) + end * t;
+
+/**
+ * DITHER ENGINE
+ * Handles the Atkinson Dithering post-processing
+ */
+class DitherEngine {
+    constructor(width, height) {
+        this.w = width;
+        this.h = height;
+        // Offscreen buffer for grayscale drawing
+        this.bufferCanvas = document.createElement('canvas');
+        this.bufferCanvas.width = width;
+        this.bufferCanvas.height = height;
+        this.bCtx = this.bufferCanvas.getContext('2d', { willReadFrequently: true });
+    }
+
+    clear() {
+        this.bCtx.fillStyle = '#000000';
+        this.bCtx.fillRect(0, 0, this.w, this.h);
+    }
+
+    get context() {
+        return this.bCtx;
+    }
+
+    // Apply Atkinson Dithering
+    process() {
+        const imgData = this.bCtx.getImageData(0, 0, this.w, this.h);
+        const data = imgData.data;
+        const w = this.w;
+
+        for (let y = 0; y < this.h; y++) {
+            for (let x = 0; x < w; x++) {
+                const i = (y * w + x) * 4;
+                
+                // Convert to grayscale based on luminance
+                const oldPixel = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+                
+                // Threshold
+                const newPixel = oldPixel > 100 ? 255 : 0;
+                const error = (oldPixel - newPixel) / 8;
+
+                // Write color (Green or Black)
+                if (newPixel === 255) {
+                    data[i] = TERMINAL_GREEN[0];
+                    data[i+1] = TERMINAL_GREEN[1];
+                    data[i+2] = TERMINAL_GREEN[2];
+                } else {
+                    data[i] = BLACK[0];
+                    data[i+1] = BLACK[1];
+                    data[i+2] = BLACK[2];
+                }
+
+                // Distribute Error (Atkinson)
+                //       X   1   1 
+                //   1   1   1
+                //       1
+                
+                if (x + 1 < w)           this.addError(data, x + 1, y, error);
+                if (x + 2 < w)           this.addError(data, x + 2, y, error);
+                if (x - 1 > 0 && y + 1 < this.h) this.addError(data, x - 1, y + 1, error);
+                if (y + 1 < this.h)      this.addError(data, x, y + 1, error);
+                if (x + 1 < w && y + 1 < this.h) this.addError(data, x + 1, y + 1, error);
+                if (y + 2 < this.h)      this.addError(data, x, y + 2, error);
+            }
+        }
+        return imgData;
+    }
+
+    addError(data, x, y, err) {
+        const i = (y * this.w + x) * 4;
+        data[i] += err;
+        data[i+1] += err;
+        data[i+2] += err;
+    }
+}
+
+/**
+ * NODE CLASS
+ * Represents a number in the set
+ */
+class Node {
+    constructor(val) {
+        this.val = val;
+        // Random start pos in Zone A (Top 50%)
+        this.x = Math.random() * (INTERNAL_WIDTH - 40) + 20;
+        this.y = Math.random() * (INTERNAL_HEIGHT * 0.4) + 20;
+        
+        this.tx = this.x; // Target X
+        this.ty = this.y; // Target Y
+        
+        this.vx = (Math.random() - 0.5) * 0.5; // Brownian velocity
+        this.vy = (Math.random() - 0.5) * 0.5;
+        
+        this.state = 'POOL'; // POOL, SEED, CHAIN, DISCARD
+        this.highlight = 0; // Flash intensity
+    }
+
+    update() {
+        // Physics
+        if (this.state === 'POOL') {
+            // Brownian motion
+            this.x += this.vx;
+            this.y += this.vy;
+            
+            // Bounce off walls of Zone A
+            if (this.x < 10 || this.x > INTERNAL_WIDTH - 10) this.vx *= -1;
+            if (this.y < 10 || this.y > INTERNAL_HEIGHT * 0.5) this.vy *= -1;
+        } else {
+            // Move towards target (Lerp)
+            this.x = lerp(this.x, this.tx, 0.1);
+            this.y = lerp(this.y, this.ty, 0.1);
+        }
+
+        if (this.highlight > 0) this.highlight -= 5;
+    }
+
+    draw(ctx) {
+        if (this.state === 'DISCARD') return;
+
+        ctx.strokeStyle = '#FFF';
+        ctx.fillStyle = this.highlight > 0 ? '#FFF' : '#000';
+        ctx.lineWidth = 1;
+
+        // Draw Circle
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, NODE_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw Text
+        ctx.fillStyle = this.highlight > 0 ? '#000' : '#FFF';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.val, this.x, this.y + 1);
+    }
+}
+
+/**
+ * SIMULATION CONTROLLER
+ */
+class Simulation {
+    constructor() {
+        this.displayCanvas = document.getElementById('display');
+        this.displayCanvas.width = INTERNAL_WIDTH;
+        this.displayCanvas.height = INTERNAL_HEIGHT;
+        this.ctx = this.displayCanvas.getContext('2d');
+        
+        this.dither = new DitherEngine(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+        
+        this.nodes = [];
+        this.nodeMap = new Map();
+        this.maxLen = 0;
+        this.currentLen = 0;
+        this.status = "INITIALIZING SET...";
+        
+        this.ghostNode = null; // For displaying failed searches
+        this.laserLine = null; // For visualization lookups
+        
+        this.init();
+    }
+
+    init() {
+        // Generate Unique Random Numbers
+        const set = new Set();
+        while(set.size < TOTAL_NODES) {
+            set.add(Math.floor(Math.random() * 99));
+        }
+        
+        set.forEach(val => {
+            const n = new Node(val);
+            this.nodes.push(n);
+            this.nodeMap.set(val, n);
+        });
+
+        // Start Loop
+        this.loop();
+        // Start Algorithm
+        this.runAlgorithm();
+    }
+
+    // The Algorithmic Logic
+    async runAlgorithm() {
+        await sleep(1000);
+        this.status = "SET CREATED. READY.";
+        await sleep(1000);
+
+        // While Set is not empty (visually, we check our map)
+        while (this.nodeMap.size > 0) {
+            
+            // 1. PICK SEED
+            const availableVals = Array.from(this.nodeMap.keys());
+            const seedVal = availableVals[Math.floor(Math.random() * availableVals.length)];
+            const seedNode = this.nodeMap.get(seedVal);
+            
+            this.status = `SEED SELECTED: ${seedVal}`;
+            this.nodeMap.delete(seedVal); // Remove from set immediately
+            
+            // Move Seed to Center Track
+            seedNode.state = 'SEED';
+            seedNode.tx = INTERNAL_WIDTH / 2;
+            seedNode.ty = INTERNAL_HEIGHT * 0.65;
+            seedNode.highlight = 255;
+            
+            let chain = [seedNode];
+            await sleep(800);
+
+            // 2. EXPAND LEFT
+            let leftVal = seedVal - 1;
+            let searchingLeft = true;
+
+            while (searchingLeft) {
+                this.status = `CHECKING LEFT: ${leftVal}`;
+                
+                // Visual: Expectation
+                const leftPos = (INTERNAL_WIDTH / 2) - (chain.length * (NODE_RADIUS * 2.5));
+                
+                // Laser Effect
+                const anchor = chain[0];
+                this.laserLine = { x1: anchor.x, y1: anchor.y, x2: Math.random()*INTERNAL_WIDTH, y2: INTERNAL_HEIGHT*0.2, life: 10 };
+                await sleep(200);
+
+                if (this.nodeMap.has(leftVal)) {
+                    // Found!
+                    const foundNode = this.nodeMap.get(leftVal);
+                    this.nodeMap.delete(leftVal);
+                    
+                    foundNode.state = 'CHAIN';
+                    foundNode.highlight = 255;
+                    
+                    // Shift existing chain right slightly to accommodate
+                    chain.forEach(n => n.tx += (NODE_RADIUS));
+                    
+                    // Place new node
+                    foundNode.tx = chain[0].tx - (NODE_RADIUS * 2.5);
+                    foundNode.ty = INTERNAL_HEIGHT * 0.65;
+                    
+                    chain.unshift(foundNode);
+                    leftVal--;
+                    await sleep(400);
+                } else {
+                    // Not Found - Ghost effect
+                    this.ghostNode = { x: chain[0].x - (NODE_RADIUS * 2.5), y: INTERNAL_HEIGHT * 0.65, val: leftVal, life: 20 };
+                    searchingLeft = false;
+                    await sleep(400);
+                }
+            }
+
+            // 3. EXPAND RIGHT
+            let rightVal = seedVal + 1;
+            let searchingRight = true;
+
+            while (searchingRight) {
+                this.status = `CHECKING RIGHT: ${rightVal}`;
+                
+                const anchor = chain[chain.length-1];
+                this.laserLine = { x1: anchor.x, y1: anchor.y, x2: Math.random()*INTERNAL_WIDTH, y2: INTERNAL_HEIGHT*0.2, life: 10 };
+                await sleep(200);
+
+                if (this.nodeMap.has(rightVal)) {
+                    const foundNode = this.nodeMap.get(rightVal);
+                    this.nodeMap.delete(rightVal);
+                    
+                    foundNode.state = 'CHAIN';
+                    foundNode.highlight = 255;
+                    
+                    foundNode.tx = anchor.tx + (NODE_RADIUS * 2.5);
+                    foundNode.ty = INTERNAL_HEIGHT * 0.65;
+                    
+                    chain.push(foundNode);
+                    rightVal++;
+                    await sleep(400);
+                } else {
+                    this.ghostNode = { x: chain[chain.length-1].x + (NODE_RADIUS * 2.5), y: INTERNAL_HEIGHT * 0.65, val: rightVal, life: 20 };
+                    searchingRight = false;
+                    await sleep(400);
+                }
+            }
+
+            // 4. MEASURE
+            const length = chain.length;
+            this.currentLen = length;
+            this.status = `CHAIN COMPLETE. LENGTH: ${length}`;
+            
+            // Draw Bracket (Logical flag)
+            this.showBracket = { 
+                x: chain[0].x, 
+                w: chain[chain.length-1].x - chain[0].x,
+                y: chain[0].y - 20
+            };
+            
+            await sleep(1000);
+
+            if (length > this.maxLen) {
+                this.maxLen = length;
+                this.status = `NEW RECORD!`;
+                await sleep(800);
+            }
+
+            // 5. DISCARD
+            this.showBracket = null;
+            chain.forEach(n => {
+                n.state = 'DISCARD';
+                n.vy = 2; // Drop down
+            });
+            await sleep(500);
+            
+            // Remove discarded nodes from simulation array to save perf
+            this.nodes = this.nodes.filter(n => n.state !== 'DISCARD');
+        }
+
+        this.status = "ZONE A EMPTY. ALGORITHM FINISHED.";
+    }
+
+    loop() {
+        // 1. Draw to Buffer
+        const ctx = this.dither.context;
+        this.dither.clear();
+
+        // Draw UI Zones
+        ctx.fillStyle = "#222"; 
+        // Zone B Track
+        ctx.fillRect(0, INTERNAL_HEIGHT * 0.55, INTERNAL_WIDTH, INTERNAL_HEIGHT * 0.2);
+        
+        // Draw Nodes
+        this.nodes.forEach(n => {
+            n.update();
+            n.draw(ctx);
+        });
+
+        // Draw Ghost Node
+        if (this.ghostNode) {
+            ctx.strokeStyle = '#666';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.arc(this.ghostNode.x, this.ghostNode.y, NODE_RADIUS, 0, Math.PI*2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.font = '10px monospace';
+            ctx.fillStyle = '#666';
+            ctx.fillText(this.ghostNode.val, this.ghostNode.x, this.ghostNode.y+1);
+            
+            this.ghostNode.life--;
+            if (this.ghostNode.life <= 0) this.ghostNode = null;
+        }
+
+        // Draw Laser
+        if (this.laserLine) {
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(this.laserLine.x1, this.laserLine.y1);
+            ctx.lineTo(this.laserLine.x2, this.laserLine.y2); // Pointing to pool
+            ctx.stroke();
+            this.laserLine.life--;
+            if (this.laserLine.life <= 0) this.laserLine = null;
+        }
+
+        // Draw Bracket
+        if (this.showBracket) {
+            const b = this.showBracket;
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(b.x, b.y + 5);
+            ctx.lineTo(b.x, b.y);
+            ctx.lineTo(b.x + b.w, b.y);
+            ctx.lineTo(b.x + b.w, b.y + 5);
+            ctx.stroke();
+        }
+
+        // Draw HUD (Zone C)
+        ctx.fillStyle = '#FFF';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(this.status, 10, INTERNAL_HEIGHT - 10);
+        
+        ctx.textAlign = 'right';
+        ctx.fillText(`CURRENT: ${this.currentLen}`, INTERNAL_WIDTH - 10, INTERNAL_HEIGHT - 25);
+        ctx.fillText(`MAX RECORD: ${this.maxLen}`, INTERNAL_WIDTH - 10, INTERNAL_HEIGHT - 10);
+
+        // 2. Apply Dither & Render to Screen
+        const ditheredData = this.dither.process();
+        this.ctx.putImageData(ditheredData, 0, 0);
+
+        requestAnimationFrame(() => this.loop());
+    }
+}
+
+// Start
+window.onload = () => {
+    new Simulation();
+};
+
+</script>
+</body>
+</html>
