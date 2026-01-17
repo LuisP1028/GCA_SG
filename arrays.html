@@ -238,27 +238,27 @@ Analogy: Reading a Map
                     <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/Fisher_Yates.html'; document.querySelector('.retro-viewport').classList.add('active');">
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
-                    <p>Think of a VIP list with <strong>k</strong> spots. As the crowd (<strong>n</strong>) grows, entry becomes harder.</p>
-                    
-                        <li><strong>The Odds:</strong> For the n-th person, roll an n-sided die. If number ≤ k, they get in. (Chance = k/n).</li>
-                        <li><strong>The Swap:</strong> If they get in, randomly kick out a current VIP to maintain size k.</li>
-                        <li><strong>Early items enter easily but face many swap risks. Late items enter rarely but face few. These opposing forces balance out perfectly to k/n odds.</li>
-                    
+                    <p><strong>Consider a reservoir array with k slots.</strong> As the input stream (of size n) grows, retention becomes stricter.</p>
+                    <ul>
+                        <li><strong>The Logic:</strong> For the n-th element, generate a random integer between 1 and n. If the value is ≤ k, the element is stored. (Chance = k/n)</li>
+                        <li><strong>The Overwrite:</strong> If stored, it replaces an element at a random index to maintain capacity k.</li>
+                        <li>Early elements fill the buffer easily but face high overwrite risk. Late elements enter rarely but are rarely replaced. These opposing forces balance out perfectly to give each element a k/n probability of being in the final sample.</li>
+                    </ul>
                 </div>
 
                 <div class="subsection">
-                    <span class="subsection-title">Sample Offline Data (Fisher Yates)</span>
+                    <span class="subsection-title">Sample Offline Data (Fisher-Yates)</span>
                     <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Arrays/random_sample_no_replace.html'; document.querySelector('.retro-viewport').classList.add('active');">
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
-                    <p><strong>Logic:</strong> Partition the array into "Chosen" (Left) and "Pool" (Right).</p>
+                    <p><strong>Logic:</strong> Partition the array into "Selected" (Left) and "Unprocessed" (Right).</p>
                     <ol>
-                        <li>Place finger on index 0.</li>
-                        <li>Pick random index between finger and end.</li>
-                        <li>Swap the value at random index with finger.</li>
-                        <li>Advance finger. Repeat k times.</li>
+                        <li>Initialize pointer at index 0.</li>
+                        <li>Generate a random index between the pointer and the end.</li>
+                        <li>Swap the element at the random index with the element at the pointer.</li>
+                        <li>Increment pointer. Repeat k times.</li>
                     </ol>
-                    <p><em>Use Case:</em> Defense Ammunition Lot Acceptance (Testing without destroying inventory).</p>
+                    <p><strong>Use Case:</strong> Defense Ammunition Lot Acceptance (Testing without destroying inventory).</p>
                 </div>
 
             </div>
