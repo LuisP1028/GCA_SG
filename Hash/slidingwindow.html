@@ -1,9 +1,11 @@
+--- START OF FILE slidingwindow_responsive.html ---
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Protocol: SLIDING_WINDOW [MIN_SUBSTRING]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Protocol: SLIDING_WINDOW [RESPONSIVE]</title>
     
     <!-- Retro Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,9 +20,12 @@
             --gold: #FFCC00;
             --dim-green: rgba(51, 255, 0, 0.2);
             --dim-gold: rgba(255, 204, 0, 0.3);
-            --scanline-color: rgba(18, 16, 16, 0.5);
             --font-main: 'VT323', monospace;
-            --cell-size: 50px;
+            
+            /* Responsive Cell Size: Min 40px, Max 80px, Target 6vw */
+            --cell-size: clamp(2.5rem, 6vw, 5rem); 
+            --header-height: auto;
+            --footer-height: auto;
         }
 
         * { box-sizing: border-box; }
@@ -30,12 +35,13 @@
             background-color: var(--bg);
             color: var(--green);
             font-family: var(--font-main);
-            height: 100vh;
+            min-height: 100dvh; /* Dynamic viewport height for mobile */
+            height: 100dvh;
             overflow: hidden;
-            display: grid;
-            grid-template-rows: auto 1fr auto auto;
+            display: flex;
+            flex-direction: column;
             text-transform: uppercase;
-            font-size: 1.2rem;
+            font-size: clamp(1rem, 2vw, 1.4rem);
             cursor: crosshair;
         }
 
@@ -43,7 +49,8 @@
         .crt-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
             background-size: 100% 2px, 3px 100%;
             pointer-events: none;
             z-index: 999;
@@ -67,40 +74,36 @@
 
         /* --- UTILS --- */
         .glow-text { text-shadow: 0 0 5px var(--green); }
-        .glow-red { text-shadow: 0 0 5px var(--red); color: var(--red); }
         .glow-gold { text-shadow: 0 0 5px var(--gold); color: var(--gold); }
         
-        .dither-bg-green {
-            background-image: radial-gradient(var(--green) 20%, transparent 20%);
-            background-size: 4px 4px;
-        }
-        .dither-bg-gold {
-            background-image: radial-gradient(var(--gold) 20%, transparent 20%);
-            background-size: 4px 4px;
-        }
-
         /* --- LAYOUT --- */
         header {
-            padding: 20px;
+            padding: 1rem;
             border-bottom: 2px solid var(--green);
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
+            flex-shrink: 0;
         }
+
+        .title { white-space: nowrap; font-size: 1.2em; }
 
         .target-container {
             display: flex;
-            gap: 10px;
+            gap: 0.5rem;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .char-box {
-            width: 40px; height: 40px;
+            width: 2.2em; height: 2.2em;
             border: 2px solid var(--green);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.5rem;
+            font-size: 1.2em;
             position: relative;
         }
         .char-box.missing { border-color: var(--red); box-shadow: 0 0 5px var(--red); }
@@ -118,19 +121,20 @@
             display: flex;
             align-items: center;
             overflow-x: auto;
-            padding: 60px 20px;
-            border-bottom: 2px solid var(--green);
+            flex-grow: 1; /* Takes up remaining vertical space */
+            padding: 0 1rem;
             background: #000;
+            /* Momentum scrolling for mobile */
+            -webkit-overflow-scrolling: touch; 
+            scrollbar-width: thin;
+            scrollbar-color: var(--green) #000;
         }
         
-        /* Hide scrollbar */
-        .tape-container::-webkit-scrollbar { height: 8px; background: #000; }
-        .tape-container::-webkit-scrollbar-thumb { background: var(--green); }
-
         .tape-wrapper {
             display: flex;
             position: relative;
-            margin: 0 auto; /* Center initially */
+            margin: 0 auto;
+            padding: 3rem 0; /* Space for pointers */
         }
 
         .tape-cell {
@@ -140,7 +144,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.5rem;
+            font-size: 1.5em;
             flex-shrink: 0;
             position: relative;
             background: #000;
@@ -148,33 +152,32 @@
         }
 
         .tape-cell.active-green { border: 2px solid var(--green); box-shadow: inset 0 0 10px var(--dim-green); }
-        .tape-cell.active-gold { border: 2px solid var(--gold); }
 
         /* Pointers */
         .pointer {
             position: absolute;
             width: 0; height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
+            border-left: 0.6em solid transparent;
+            border-right: 0.6em solid transparent;
             z-index: 10;
             transition: left 0.2s cubic-bezier(0, 1, 0.5, 1);
         }
         .pointer-left {
-            border-bottom: 15px solid var(--red);
-            bottom: -25px;
+            border-bottom: 1em solid var(--red);
+            bottom: 1em; /* Relative to tape-wrapper padding */
             filter: drop-shadow(0 0 5px var(--red));
         }
         .pointer-right {
-            border-bottom: 15px solid var(--green);
-            bottom: -25px;
+            border-bottom: 1em solid var(--green);
+            bottom: 1em;
             filter: drop-shadow(0 0 5px var(--green));
         }
 
         /* Overlays */
         .window-overlay {
             position: absolute;
-            height: calc(100% + 10px);
-            top: -5px;
+            height: calc(100% - 2rem); /* Fit inside wrapper padding */
+            top: 1rem;
             background: var(--dim-green);
             border: 1px dashed var(--green);
             z-index: 1;
@@ -189,42 +192,45 @@
 
         .best-overlay {
             position: absolute;
-            height: calc(100% + 20px);
-            top: -10px;
+            height: calc(100% - 1rem);
+            top: 0.5rem;
             background: var(--dim-gold);
             border: 2px solid var(--gold);
             z-index: 0;
             transition: all 0.3s;
-            display: none; /* Hidden until found */
-        }
-        .best-overlay::after {
-            content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
-            background-image: radial-gradient(var(--gold) 15%, transparent 16%);
-            background-size: 3px 3px;
-            opacity: 0.3;
+            display: none;
         }
 
         /* --- STATS & SIDEBAR --- */
         .bottom-ui {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            height: 250px;
+            display: flex;
+            flex-wrap: wrap; /* Wraps on mobile */
+            border-top: 2px solid var(--green);
+            flex-shrink: 0;
+            max-height: 40vh; /* Prevent taking over screen */
+            overflow-y: auto;
         }
 
         .stats-panel {
+            flex: 2 1 300px; /* Grow 2x, shrink, min-width 300px */
             border-right: 2px solid var(--green);
-            padding: 20px;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 1rem;
+        }
+
+        /* Remove right border on mobile wrap */
+        @media (max-width: 768px) {
+            .stats-panel { border-right: none; border-bottom: 2px solid var(--green); }
         }
 
         .counter-box {
             border: 2px solid var(--red);
-            padding: 10px;
+            padding: 0.5rem;
             color: var(--red);
             text-align: center;
-            font-size: 1.5rem;
+            font-size: 1.2em;
             transition: all 0.2s;
         }
         .counter-box.complete {
@@ -238,17 +244,17 @@
 
         .hash-map {
             display: flex;
-            gap: 15px;
+            gap: 0.5rem;
             flex-wrap: wrap;
         }
 
         .hash-item {
             border: 1px solid #333;
-            padding: 5px 10px;
-            min-width: 60px;
+            padding: 0.2rem 0.5rem;
+            min-width: 3rem;
             text-align: center;
+            font-size: 1.1em;
         }
-        .hash-item span { font-size: 1.5rem; }
         .hash-item.updated {
             animation: glitch-scale 0.3s;
             border-color: var(--green);
@@ -263,29 +269,34 @@
         }
 
         .sidebar {
-            padding: 20px;
+            flex: 1 1 200px; /* Grow 1x, shrink, min-width 200px */
+            padding: 1rem;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 0.5rem;
+            background: #000;
         }
 
-        .leaderboard-title { text-decoration: underline; margin-bottom: 10px; }
         .best-display {
             border: 2px solid var(--gold);
-            padding: 15px;
+            padding: 1rem;
             color: var(--gold);
             text-shadow: 0 0 5px var(--gold);
             word-break: break-all;
+            font-size: 1em;
         }
 
         /* --- CONTROLS --- */
         .controls {
             border-top: 2px solid var(--green);
-            padding: 20px;
+            padding: 1rem;
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 1rem;
             background: #000;
+            flex-wrap: wrap; /* Buttons wrap on tiny screens */
+            flex-shrink: 0;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
         }
 
         button {
@@ -293,12 +304,14 @@
             border: 2px solid var(--green);
             color: var(--green);
             font-family: var(--font-main);
-            font-size: 1.2rem;
-            padding: 10px 20px;
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 0 0 5px var(--dim-green);
             transition: all 0.1s;
+            flex: 1 0 auto; /* Buttons scale nicely */
+            max-width: 150px;
         }
 
         button:hover { background: var(--green); color: black; }
@@ -315,7 +328,7 @@
         }
         line.connector {
             stroke: var(--green);
-            stroke-width: 1;
+            stroke-width: 2;
             stroke-dasharray: 4;
             animation: dash 0.5s linear infinite;
         }
@@ -332,7 +345,7 @@
     <header>
         <div class="title glow-text">>> SLIDING_WINDOW_PROTOCOL</div>
         <div class="target-container" id="targetContainer">
-            <span style="margin-right:10px">TARGET:</span>
+            <span style="margin-right:0.5rem">TARGET:</span>
             <!-- Target boxes generated by JS -->
         </div>
     </header>
@@ -352,10 +365,10 @@
     <div class="bottom-ui">
         <section class="stats-panel">
             <div id="counterBox" class="counter-box">
-                REMAINING TO COVER: <span id="remainVal">--</span>
+                REMAINING: <span id="remainVal">--</span>
             </div>
             <div>
-                <div style="margin-bottom:10px; color:#555;">>> MEMORY_DUMP (Window Counts)</div>
+                <div style="margin-bottom:0.5rem; color:#555; font-size: 0.9em;">>> MEMORY_DUMP (Counts)</div>
                 <div class="hash-map" id="hashMap">
                     <!-- Hash items generated by JS -->
                 </div>
@@ -363,7 +376,7 @@
         </section>
 
         <aside class="sidebar">
-            <div class="leaderboard-title glow-gold">BEST WINDOW SO FAR</div>
+            <div class="leaderboard-title glow-gold">BEST WINDOW</div>
             <div class="best-display" id="bestDisplay">
                 SEARCHING...
             </div>
@@ -417,6 +430,16 @@
             btnReset: document.getElementById('btnReset')
         };
 
+        // --- RESPONSIVE UTILS ---
+        function getCellSize() {
+            // Dynamically measure the size of a cell to handle responsiveness
+            const cell = document.querySelector('.tape-cell');
+            if (cell) {
+                return cell.getBoundingClientRect().width;
+            }
+            return 50; // Fallback
+        }
+
         // --- INITIALIZATION ---
         function init() {
             // Build Required Map
@@ -432,6 +455,16 @@
             resetState();
             
             state.initialized = true;
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                // Debounce slightly or just update immediately
+                requestAnimationFrame(() => {
+                    updatePointers();
+                    updateWindowOverlay();
+                    if(state.ans[0] !== -1) updateBestWindowUI();
+                });
+            });
         }
 
         function resetState() {
@@ -487,9 +520,9 @@
                 box.id = `target-${char}`;
                 box.innerText = char;
                 const sub = document.createElement('span');
-                sub.style.fontSize = '0.7rem';
+                sub.style.fontSize = '0.7em';
                 sub.style.position = 'absolute';
-                sub.style.bottom = '2px';
+                sub.style.bottom = '0';
                 sub.style.right = '2px';
                 sub.innerText = state.requiredCounts[char];
                 box.appendChild(sub);
@@ -498,9 +531,7 @@
         }
 
         function renderHashMap() {
-            // Only render items relevant to Target or items encountered
-            // Ideally, we just show target items initially, then add others as they appear
-            // For simplicity and aesthetic, let's keep the target items fixed and add dynamic ones
+            // Dynamic population
         }
 
         // --- CORE ALGORITHM STEP ---
@@ -593,34 +624,50 @@
         // --- UI UPDATERS ---
 
         function updatePointers() {
-            const cellSize = 50; // matches css
-            // Right pointer points to the *next* slot, so visually it sits on the right edge of previous
-            // But for this vis, let's point to the cell index.
-            // Requirement: Right pointer at bottom-right of cell (right-1)
-            // Left pointer at bottom-left of cell (left)
-            
+            const cellSize = getCellSize();
             const rIndex = state.right - 1; 
             const lIndex = state.left;
 
             // Constrain visual if initially 0
             const visualR = Math.max(0, rIndex);
             
+            // We need to account for pointer width to center it
+            // CSS: pointers are 0 width, but have border. 
+            // Left ptr: border-left 0.6em (~10-15px depending on screen). 
+            // Let's center based on cell center.
+            
+            const cellCenter = cellSize / 2;
+            // Pointer is centered at left: X. No offset needed because CSS arrow points up to X.
+            // Actually, CSS pointer has width 0. Left=0 puts it at left edge.
+            // To center on cell: left = index * cellSize + (cellSize/2) - (pointerWidth/2)
+            // But simplified: let's put it at cell boundary for sliding window logic
+            
+            // Standard sliding window vis: Left ptr at START of cell, Right ptr at END of cell
             els.ptrLeft.style.left = (lIndex * cellSize) + 'px';
-            els.ptrRight.style.left = (visualR * cellSize) + (cellSize - 10) + 'px'; // -10 to align arrow center
+            
+            // Right pointer usually sits 'after' the current window end, or ON the last element
+            // Here, state.right is exclusive index. visualR is inclusive index.
+            // Let's place it at the right edge of visualR cell.
+            els.ptrRight.style.left = (visualR * cellSize) + (cellSize) + 'px';
+            // Offset slightly back to align the arrow tip (approx 10px depending on scale)
+            // Since we went responsive, let's just aim for the gap line.
+            els.ptrRight.style.transform = `translateX(-50%)`;
+            els.ptrLeft.style.transform = `translateX(-50%)`;
 
-            // Auto scroll
+            // Auto scroll logic
             const containerWidth = els.scrollContainer.clientWidth;
             const scrollPos = els.scrollContainer.scrollLeft;
             const activePos = state.right * cellSize;
             
-            if (activePos > scrollPos + containerWidth - 100) {
-                els.scrollContainer.scrollTo({ left: activePos - containerWidth + 150, behavior: 'smooth' });
+            // Scroll if near edge
+            if (activePos > scrollPos + containerWidth - (cellSize * 2)) {
+                els.scrollContainer.scrollTo({ left: activePos - containerWidth + (cellSize * 3), behavior: 'smooth' });
             }
         }
 
         function updateWindowOverlay() {
             if (state.right === 0) return;
-            const cellSize = 50;
+            const cellSize = getCellSize();
             const width = (state.right - state.left) * cellSize;
             const left = state.left * cellSize;
             
@@ -631,7 +678,7 @@
 
         function updateBestWindowUI() {
             const [len, l, r] = state.ans;
-            const cellSize = 50;
+            const cellSize = getCellSize();
             const width = (r - l) * cellSize;
             const left = l * cellSize;
 
@@ -643,12 +690,10 @@
             els.bestDisplay.innerHTML = `"${str}" <br> LEN: ${len}`;
             els.bestDisplay.classList.add('glow-gold');
             
-            // Highlight cells in Best Window
             setTimeout(() => els.bestDisplay.classList.remove('glow-gold'), 500);
         }
 
         function updateHashMapUI(char) {
-            // Find or create box
             let box = document.getElementById(`hash-${char}`);
             if (!box) {
                 box = document.createElement('div');
@@ -661,9 +706,8 @@
             const countSpan = document.getElementById(`count-${char}`);
             countSpan.innerText = state.windowCounts[char];
             
-            // Glitch effect
             box.classList.remove('updated');
-            void box.offsetWidth; // trigger reflow
+            void box.offsetWidth; 
             box.classList.add('updated');
         }
 
@@ -691,16 +735,15 @@
             }
         }
 
-        // --- THE JUICE: CONNECTING LINES ---
+        // --- JUICE ---
         function drawConnection(cellElem, char) {
-            // Find the hash map entry
             let hashElem = document.getElementById(`hash-${char}`);
-            if (!hashElem) return; // Might be created next frame, skip visual for now
+            if (!hashElem) return;
 
             const r1 = cellElem.getBoundingClientRect();
             const r2 = hashElem.getBoundingClientRect();
-            const bodyRect = document.body.getBoundingClientRect();
 
+            // Calculate centers relative to viewport for SVG line
             const x1 = r1.left + (r1.width/2);
             const y1 = r1.bottom;
             const x2 = r2.left + (r2.width/2);
