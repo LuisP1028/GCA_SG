@@ -357,7 +357,7 @@ Analogy: Reading a Map
                         <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                     </button>
                     <p>The Maximum Difference problem finds the largest value of <code>A[j] - A[i]</code> in an array, where <code>j</code> must come after <code>i</code> (<code>j > i</code>). It's about finding the biggest rise from an earlier element to a later one.</p>
-                    <p><strong>Process:</strong> Single-pass greedy traversal. Track <code>min_seen</code> and <code>max_diff</code>. Update <code>min_seen</code> if current value is lower; update <code>max_diff</code> if (current - min_seen) is a new record.</p>
+                    <p><strong>Process:</strong> Single-pass greedy traversal. Treat the current number as the potential high value. Subtract <code>min_seen</code> (the lowest previous value) from it to find the current gap. Update <code>max_diff</code> if this gap is a new record. Then, update <code>min_seen</code> if the current value is lower to maximize future differences.</p>
                 </div>
 
                 <div class="subsection">
