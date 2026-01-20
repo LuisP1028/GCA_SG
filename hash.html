@@ -164,7 +164,8 @@
                             </svg>
                         </button>
                     </span>
-                    <p>When sliding the window and cutting it into chunks, it finds where all words occur together contiguously. They must form one solid block (no gaps), though the order inside that block does not matter.</p>
+                    <p>
+                        Decomposition turns a continuous string into fixed-length tokens. This treats the window as a collection of items, allowing frequency maps to verify that a specific multiset of words is present, regardless of their internal order.</p>
                     <p>Determine window size with: Word count x Word Length </p>
                     <p><strong>The Core Pattern:</strong> Fixed unit size → target multiset → sliding window of exact total size → Slice window into uniform unit, word length sized → compute observed multiset → check exact equality.</p>
                     <ol>
