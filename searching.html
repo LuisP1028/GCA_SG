@@ -178,19 +178,6 @@
                         </ul>
                     </div>
                 </div>
-                    <p>Standard binary search returns the moment it finds k. This version keeps going left to ensure it found the first k, not just any k.</p>
-                    <ul>
-                        <li>Initialize: Set bounds to cover the entire array. Set result = −𝟏 (indicating failure).</li>
-                        <li>Loop: While the window remains valid (left ≤ right): • Calculate the middle index: mid = (left + right) // 𝟐</li>
-                        <li>Decision Logic:
-                            <ul>
-                                <li>Case A (𝐀[𝐦𝐢𝐝] > 𝐤): The first occurrence must lie to the left. Discard the right half → right = mid − 𝟏</li>
-                                <li>Case B (𝐀[𝐦𝐢𝐝] < 𝐤): The first occurrence must lie to the right. Discard the left half → left = mid + 𝟏</li>
-                                <li>Case C (𝐀[𝐦𝐢𝐝] = 𝐤): (The key difference from standard binary search) • We have found an occurrence of 𝐤 • Update result = mid (this is the best candidate found so far) • CRITICAL: Do not stop here. Aggressively prune the right side: right = mid − 𝟏 (We continue searching leftward to find any earlier occurrence)</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
 
                 <div class="subsection">
                     <div class="subsection-title">
