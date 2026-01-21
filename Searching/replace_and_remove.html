@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ditherpunk Algorithm Visualization</title>
+    <title>Two-Pass Algorithm: Ditherpunk Viz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
         :root {
-            --bg-color: #050505;
-            --primary: #33ff33; /* Terminal Green */
-            --primary-dim: #1a801a;
-            --red: #ff3333;
-            --orange: #ffcc00;
-            --blue: #33ccff;
-            --bright-green: #ccffcc;
-            --scanline: rgba(0, 0, 0, 0.5);
+            --c-main: #00ff00;
+            --c-dim: #003300;
+            --c-bg: #050505;
+            --c-scanline: rgba(0, 0, 0, 0.5);
             --font-main: 'VT323', monospace;
+            --border-thick: clamp(2px, 0.4vmin, 4px);
+            --border-thin: clamp(1px, 0.2vmin, 2px);
+            --glow: 0 0 10px rgba(0, 255, 0, 0.4);
         }
 
         * {
@@ -27,669 +27,534 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-            color: var(--primary);
+            background-color: var(--c-bg);
+            color: var(--c-main);
             font-family: var(--font-main);
             height: 100vh;
             width: 100vw;
+            overflow: hidden; /* Prevent scroll, everything fits */
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* --- CRT / Dither Effects --- */
-        .crt-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 10;
-            background: 
-                /* Scanlines */
-                linear-gradient(
-                    to bottom,
-                    rgba(255,255,255,0),
-                    rgba(255,255,255,0) 50%,
-                    rgba(0,0,0,0.2) 50%,
-                    rgba(0,0,0,0.2)
-                ),
-                /* Vignette */
-                radial-gradient(
-                    circle,
-                    rgba(0,0,0,0) 60%,
-                    rgba(0,0,0,0.6) 100%
-                );
-            background-size: 100% 4px, 100% 100%;
-        }
-
-        .crt-overlay::after {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background: rgba(18, 16, 16, 0.1);
-            opacity: 0;
-            z-index: 2;
-            pointer-events: none;
-            animation: flicker 0.15s infinite;
-        }
-
-        @keyframes flicker {
-            0% { opacity: 0.02; }
-            50% { opacity: 0.05; }
-            100% { opacity: 0.02; }
-        }
-
-        /* --- Zones --- */
-        
-        /* Zone A: Header */
-        header {
-            flex: 0 0 15vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
             align-items: center;
-            border-bottom: 2px solid var(--primary-dim);
-            padding: 10px;
-            text-shadow: 0 0 8px var(--primary);
-            z-index: 5;
+            justify-content: center;
+        }
+
+        /* --- CRT EFFECTS --- */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        /* --- DITHER PATTERN (CSS GENERATED) --- */
+        .dither-bg {
+            background-image: radial-gradient(var(--c-dim) 15%, transparent 16%),
+                              radial-gradient(var(--c-dim) 15%, transparent 16%);
+            background-size: 4px 4px;
+            background-position: 0 0, 2px 2px;
+        }
+
+        /* --- LAYOUT CONTAINER --- */
+        .terminal-container {
+            width: 95%;
+            height: 95%;
+            max-width: 1600px;
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 2vmin;
+            border: var(--border-thick) solid var(--c-dim);
+            padding: 2vmin;
+            position: relative;
+        }
+
+        /* --- HUD / HEADER --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: var(--border-thin) solid var(--c-main);
+            padding-bottom: 1vmin;
         }
 
         h1 {
-            font-size: 2.5rem;
             margin: 0;
-            letter-spacing: 2px;
+            font-size: clamp(1.5rem, 5vmin, 4rem);
+            text-shadow: var(--glow);
             text-transform: uppercase;
+            line-height: 1;
         }
 
-        #instruction {
-            font-size: 1.5rem;
-            color: var(--blue);
-            margin-top: 10px;
-            min-height: 1.5rem;
+        .status-badge {
+            font-size: clamp(0.8rem, 3vmin, 2rem);
+            background: var(--c-main);
+            color: var(--c-bg);
+            padding: 0 1vmin;
+            font-weight: bold;
         }
 
-        /* Zone B: Stage */
-        #stage {
-            flex: 1;
-            position: relative;
-            background-image: 
-                radial-gradient(var(--primary-dim) 1px, transparent 0);
-            background-size: 4px 4px; /* Dithering pattern */
+        /* --- DASHBOARD --- */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2vmin;
+        }
+
+        .stat-box {
+            border: var(--border-thin) solid var(--c-dim);
+            padding: 1vmin;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
         }
 
-        canvas {
-            width: 100%;
-            height: 100%;
+        .stat-label {
+            font-size: clamp(0.7rem, 2vmin, 1.2rem);
+            opacity: 0.8;
         }
 
-        /* Zone C: Dashboard */
-        footer {
-            flex: 0 0 20vh;
-            border-top: 2px solid var(--primary-dim);
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            padding: 15px;
-            gap: 15px;
-            background: #000;
-            z-index: 5;
+        .stat-value {
+            font-size: clamp(1.5rem, 4vmin, 3rem);
+            font-weight: bold;
+            text-shadow: var(--glow);
         }
 
-        .dash-box {
-            border: 1px solid var(--primary);
+        /* --- TAPE VISUALIZATION --- */
+        .tape-stage {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 0 5px var(--primary-dim);
             position: relative;
-        }
-
-        .dash-box h3 {
-            margin: 0 0 10px 0;
-            font-size: 1.2rem;
-            background: var(--primary);
-            color: #000;
             width: 100%;
-            text-align: center;
+            overflow-x: auto; /* Safety scroll for extreme aspect ratios */
         }
 
-        .counter-val {
-            font-size: 2.5rem;
-            color: var(--orange);
-            text-shadow: 2px 2px 0px rgba(255, 204, 0, 0.3);
+        .tape-wrapper {
+            display: grid;
+            grid-template-rows: auto auto auto; /* Markers Top, Cells, Markers Bottom */
+            gap: 0.5vmin;
+            width: fit-content;
+            margin: 0 auto;
         }
 
-        .formula-text {
-            font-size: 1.1rem;
-            padding: 0 10px;
-            text-align: center;
+        .row-markers-top, .row-markers-bottom {
+            height: clamp(20px, 4vmin, 40px);
+            display: flex;
         }
+
+        .marker-cell {
+            width: clamp(30px, 8vw, 80px); /* Responsive cell size */
+            margin: 0 2px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(0.8rem, 2vmin, 1.5rem);
+            transition: all 0.2s steps(2);
+        }
+
+        /* Pointer Styles */
+        .ptr-read {
+            color: var(--c-main);
+            font-weight: bold;
+            text-shadow: var(--glow);
+            animation: pulse 1s infinite steps(2);
+        }
+        .ptr-write {
+            background-color: var(--c-main);
+            color: var(--c-bg);
+            font-weight: bold;
+        }
+
+        .row-cells {
+            display: flex;
+        }
+
+        .memory-cell {
+            width: clamp(30px, 8vw, 80px);
+            aspect-ratio: 1;
+            margin: 0 2px;
+            border: var(--border-thick) solid var(--c-main);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.5rem, 5vw, 4rem);
+            position: relative;
+            background-color: rgba(0, 20, 0, 0.8);
+            transition: border-color 0.2s;
+        }
+
+        .memory-cell.empty {
+            border-style: dashed;
+            color: var(--c-dim);
+        }
+
+        .memory-cell.highlight-read {
+            box-shadow: 0 0 15px var(--c-main) inset;
+        }
+
+        .memory-cell.highlight-write {
+            border-color: #fff;
+        }
+
+        .index-label {
+            font-size: clamp(0.5rem, 1.5vmin, 1rem);
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            opacity: 0.5;
+        }
+
+        /* --- LOG & CONTROLS --- */
+        .footer-panel {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 2vmin;
+            height: clamp(80px, 15vh, 150px);
+        }
+
+        .log-screen {
+            border: var(--border-thin) solid var(--c-main);
+            padding: 1vmin;
+            font-size: clamp(0.8rem, 2vmin, 1.2rem);
+            overflow-y: auto;
+            background: rgba(0, 20, 0, 0.5);
+            display: flex;
+            flex-direction: column-reverse; /* Newest at bottom */
+        }
+
+        .log-entry { margin-bottom: 4px; }
+        .log-entry::before { content: "> "; opacity: 0.7; }
 
         .controls {
             display: flex;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
+            gap: 1vmin;
+            min-width: clamp(100px, 20vw, 200px);
         }
 
         button {
             background: transparent;
-            border: 2px solid var(--primary);
-            color: var(--primary);
+            border: var(--border-thick) solid var(--c-main);
+            color: var(--c-main);
             font-family: var(--font-main);
-            font-size: 1.5rem;
-            padding: 10px 20px;
+            font-size: clamp(1rem, 2.5vmin, 1.5rem);
+            padding: 1vmin;
             cursor: pointer;
-            transition: all 0.2s;
             text-transform: uppercase;
-            box-shadow: 0 0 5px var(--primary);
+            transition: all 0.1s;
+            flex: 1;
         }
 
         button:hover {
-            background: var(--primary);
-            color: #000;
-            box-shadow: 0 0 15px var(--primary);
+            background: var(--c-main);
+            color: var(--c-bg);
         }
 
         button:disabled {
-            border-color: #333;
-            color: #333;
-            box-shadow: none;
+            border-color: var(--c-dim);
+            color: var(--c-dim);
             cursor: not-allowed;
+            background: transparent;
         }
 
-        /* Mobile Adjustments */
-        @media (max-width: 768px) {
-            h1 { font-size: 1.8rem; }
-            #instruction { font-size: 1rem; }
-            footer { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); height: 35vh; }
-            .dash-box { flex-direction: row; justify-content: space-between; padding: 0 20px; }
-            .dash-box h3 { width: auto; background: none; color: var(--primary); margin: 0; }
+        /* --- ANIMATIONS --- */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* --- RESPONSIVE ADJUSTMENTS --- */
+        @media (max-width: 600px) {
+            .terminal-container { padding: 1vmin; }
+            .footer-panel { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+            .controls { flex-direction: row; min-height: 50px; }
         }
     </style>
 </head>
 <body>
 
-    <div class="crt-overlay"></div>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
 
-    <!-- Zone A -->
-    <header>
-        <h1 id="phase-indicator">PHASE 1: FILTER</h1>
-        <div id="instruction">Initializing...</div>
-    </header>
+    <div class="terminal-container dither-bg">
+        <header>
+            <h1>REPLACE_AND_REMOVE</h1>
+            <div id="phase-badge" class="status-badge">IDLE</div>
+        </header>
 
-    <!-- Zone B -->
-    <div id="stage">
-        <canvas id="algoCanvas"></canvas>
+        <div class="dashboard">
+            <div class="stat-box">
+                <span class="stat-label">A_COUNT</span>
+                <span id="stat-acount" class="stat-value">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">VALID_LEN</span>
+                <span id="stat-valid" class="stat-value">-</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">FINAL_LEN</span>
+                <span id="stat-final" class="stat-value">-</span>
+            </div>
+        </div>
+
+        <div class="tape-stage">
+            <div class="tape-wrapper">
+                <!-- Top Pointers (Read) -->
+                <div id="markers-top" class="row-markers-top"></div>
+                
+                <!-- The Memory Cells -->
+                <div id="memory-row" class="row-cells"></div>
+                
+                <!-- Bottom Pointers (Write) -->
+                <div id="markers-bottom" class="row-markers-bottom"></div>
+            </div>
+        </div>
+
+        <div class="footer-panel">
+            <div id="log-display" class="log-screen">
+                <div class="log-entry">System ready. Initialize to begin.</div>
+            </div>
+            <div class="controls">
+                <button id="btn-init" onclick="viz.init()">INIT</button>
+                <button id="btn-step" onclick="viz.step()" disabled>STEP</button>
+                <button id="btn-auto" onclick="viz.toggleAuto()" disabled>AUTO</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Zone C -->
-    <footer>
-        <div class="dash-box">
-            <h3>'a' COUNT</h3>
-            <span id="a-count" class="counter-val">0</span>
-        </div>
-        <div class="dash-box">
-            <h3>LENGTH FORMULA</h3>
-            <span id="formula-display" class="formula-text">Len = Current + Count</span>
-        </div>
-        <div class="dash-box controls">
-            <button id="btn-start">START</button>
-            <button id="btn-reset">RESET</button>
-        </div>
-    </footer>
-
     <script>
-        /**
-         * DITHERPUNK ALGORITHM VISUALIZER
-         * Two-Pass Replace and Remove
-         */
-
-        // --- Config & State ---
-        const canvas = document.getElementById('algoCanvas');
-        const ctx = canvas.getContext('2d');
-        const phaseText = document.getElementById('phase-indicator');
-        const instrText = document.getElementById('instruction');
-        const countDisplay = document.getElementById('a-count');
-        const formulaDisplay = document.getElementById('formula-display');
-        const btnStart = document.getElementById('btn-start');
-        const btnReset = document.getElementById('btn-reset');
-
-        const COLORS = {
-            bg: '#050505',
-            main: '#33ff33',
-            red: '#ff3333',
-            orange: '#ffcc00',
-            blue: '#33ccff',
-            brightGreen: '#ccffcc',
-            dim: '#1a801a'
-        };
-
-        const INITIAL_DATA = ['a', 'c', 'b', 'a', 'c'];
-        const TOTAL_CAPACITY = 10; // Extra buffer
-        
-        let state = {
-            data: [],
-            readPtr: 0,
-            writePtr: 0,
-            aCount: 0,
-            phase: 'IDLE', // IDLE, PHASE1, TRANSITION, PHASE2, FINISHED
-            animating: false,
-            stepQueue: [],
-            currentStep: null,
-            time: 0,
-            pointers: { read: 0, write: 0 }, // Visual interpolated positions
-            particles: []
-        };
-
-        // --- Resize Logic ---
-        function resize() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
-            draw();
-        }
-        window.addEventListener('resize', resize);
-
-        // --- Initialization ---
-        function init() {
-            state.data = [...INITIAL_DATA, ...Array(TOTAL_CAPACITY - INITIAL_DATA.length).fill(null)];
-            state.readPtr = 0;
-            state.writePtr = 0;
-            state.aCount = 0;
-            state.phase = 'IDLE';
-            state.animating = false;
-            state.stepQueue = [];
-            state.currentStep = null;
-            state.pointers.read = 0;
-            state.pointers.write = 0;
-            state.particles = [];
-
-            phaseText.innerText = "READY";
-            phaseText.style.color = COLORS.main;
-            instrText.innerText = "Press START to begin sequence.";
-            countDisplay.innerText = "0";
-            formulaDisplay.innerText = "Waiting...";
-            
-            btnStart.disabled = false;
-            resize();
-        }
-
-        // --- Drawing Helpers ---
-        function drawCell(index, char, x, y, size, colorOverride = null, ghost = false) {
-            ctx.strokeStyle = ghost ? COLORS.dim : COLORS.main;
-            ctx.lineWidth = 2;
-            
-            if (colorOverride) {
-                ctx.fillStyle = colorOverride;
-                ctx.globalAlpha = 0.2;
-                ctx.fillRect(x, y, size, size);
-                ctx.globalAlpha = 1.0;
-                ctx.strokeStyle = colorOverride;
-            }
-
-            ctx.strokeRect(x, y, size, size);
-
-            if (char) {
-                ctx.fillStyle = ghost ? COLORS.dim : (colorOverride || COLORS.main);
-                ctx.font = `${size * 0.6}px VT323`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(char.toUpperCase(), x + size/2, y + size/2);
-            }
-            
-            // Index Number
-            ctx.fillStyle = COLORS.dim;
-            ctx.font = `${size * 0.25}px monospace`;
-            ctx.fillText(index, x + size/2, y + size + 15);
-        }
-
-        function drawPointer(indexVal, type, cellSize, startX, startY) {
-            const x = startX + indexVal * cellSize + (indexVal * 10); // 10 is gap
-            const isRead = type === 'read';
-            const color = isRead ? COLORS.blue : COLORS.main; // Write pointer uses main green usually
-            
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            
-            if (isRead) {
-                // Pointing Down
-                const y = startY - 20;
-                ctx.moveTo(x + cellSize/2, y + 10);
-                ctx.lineTo(x + cellSize/2 - 10, y - 10);
-                ctx.lineTo(x + cellSize/2 + 10, y - 10);
-            } else {
-                // Pointing Up
-                const y = startY + cellSize + 30; // Below index
-                ctx.moveTo(x + cellSize/2, y - 10);
-                ctx.lineTo(x + cellSize/2 - 10, y + 10);
-                ctx.lineTo(x + cellSize/2 + 10, y + 10);
-            }
-            ctx.fill();
-
-            // Label
-            ctx.font = "14px monospace";
-            ctx.fillText(isRead ? "R" : "W", x + cellSize/2, isRead ? startY - 35 : startY + cellSize + 55);
-        }
-
-        function drawParticles() {
-            state.particles.forEach((p, i) => {
-                ctx.fillStyle = COLORS.orange;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-                ctx.fill();
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
-                if(p.life <= 0) state.particles.splice(i, 1);
-            });
-        }
-
-        // --- Main Render Loop ---
-        function draw() {
-            // Clear
-            ctx.fillStyle = COLORS.bg;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            const cellCount = TOTAL_CAPACITY;
-            // Calculate layout
-            const padding = 20;
-            const availableWidth = canvas.width - (padding * 2);
-            const gap = 10;
-            const cellSize = Math.min(60, (availableWidth - (gap * (cellCount-1))) / cellCount);
-            
-            const totalTapeWidth = (cellSize * cellCount) + (gap * (cellCount - 1));
-            const startX = (canvas.width - totalTapeWidth) / 2;
-            const startY = canvas.height / 2 - cellSize / 2;
-
-            // Draw Cells
-            state.data.forEach((char, i) => {
-                let color = null;
+        class Visualizer {
+            constructor() {
+                // Config
+                this.initialData = ['a', 'b', 'a', 'c', null, null, null, null];
+                this.originalLen = 4; // Only first 4 are valid input
                 
-                // Highlight logic based on current active step
-                if (state.currentStep) {
-                    if (state.phase === 'PHASE1') {
-                        if (i === Math.floor(state.pointers.read) && state.currentStep.highlight === 'read') color = COLORS.blue;
-                        if (i === Math.floor(state.pointers.read) && state.currentStep.action === 'delete') color = COLORS.red;
-                        if (i === Math.floor(state.pointers.read) && state.currentStep.action === 'count') color = COLORS.orange;
-                    } else if (state.phase === 'PHASE2') {
-                        if (i === Math.floor(state.pointers.write) && state.currentStep.action === 'expand') color = COLORS.brightGreen;
+                // State
+                this.arr = [];
+                this.readPtr = 0;
+                this.writePtr = 0;
+                this.aCount = 0;
+                this.validLen = 0;
+                this.finalLen = 0;
+                this.phase = 'IDLE'; // IDLE, FILTER, TRANSITION, EXPAND, DONE
+                this.autoInterval = null;
+
+                // DOM Elements
+                this.elMemory = document.getElementById('memory-row');
+                this.elMarkersTop = document.getElementById('markers-top');
+                this.elMarkersBottom = document.getElementById('markers-bottom');
+                this.elPhase = document.getElementById('phase-badge');
+                this.elLog = document.getElementById('log-display');
+                
+                this.elStatA = document.getElementById('stat-acount');
+                this.elStatValid = document.getElementById('stat-valid');
+                this.elStatFinal = document.getElementById('stat-final');
+
+                this.btnInit = document.getElementById('btn-init');
+                this.btnStep = document.getElementById('btn-step');
+                this.btnAuto = document.getElementById('btn-auto');
+            }
+
+            log(msg) {
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.textContent = msg;
+                this.elLog.prepend(div);
+                if (this.elLog.children.length > 20) this.elLog.lastChild.remove();
+            }
+
+            updateUI() {
+                // Update Stats
+                this.elStatA.textContent = this.aCount;
+                this.elStatValid.textContent = this.phase === 'IDLE' ? '-' : (this.phase === 'FILTER' ? '...' : this.validLen);
+                this.elStatFinal.textContent = (this.phase === 'EXPAND' || this.phase === 'DONE') ? this.finalLen : '-';
+                this.elPhase.textContent = this.phase;
+
+                // Render Tape
+                this.elMemory.innerHTML = '';
+                this.elMarkersTop.innerHTML = '';
+                this.elMarkersBottom.innerHTML = '';
+
+                this.arr.forEach((val, idx) => {
+                    // Cell
+                    const cell = document.createElement('div');
+                    cell.className = `memory-cell ${val === null ? 'empty' : ''}`;
+                    cell.textContent = val === null ? '' : val;
+                    
+                    // Highlight logic
+                    if (this.phase !== 'IDLE' && this.phase !== 'DONE') {
+                        if (idx === this.readPtr) cell.classList.add('highlight-read');
+                        if (idx === this.writePtr) cell.classList.add('highlight-write');
                     }
                     
-                    if (state.phase === 'FINISHED') {
-                        if (i < state.data.indexOf(null)) color = COLORS.main;
+                    const idxLabel = document.createElement('span');
+                    idxLabel.className = 'index-label';
+                    idxLabel.textContent = idx;
+                    cell.appendChild(idxLabel);
+                    this.elMemory.appendChild(cell);
+
+                    // Top Marker (Read)
+                    const mTop = document.createElement('div');
+                    mTop.className = 'marker-cell';
+                    if (this.phase !== 'IDLE' && this.phase !== 'DONE' && idx === this.readPtr) {
+                        mTop.innerHTML = '<span class="ptr-read">▼R</span>';
                     }
-                }
+                    this.elMarkersTop.appendChild(mTop);
 
-                drawCell(i, char, startX + i*(cellSize+gap), startY, cellSize, color);
-            });
-
-            // Draw Pointers (Interpolated)
-            drawPointer(state.pointers.read, 'read', cellSize, startX, startY);
-            drawPointer(state.pointers.write, 'write', cellSize, startX, startY);
-
-            // Particles
-            drawParticles();
-
-            // Safety Buffer Highlighting (Transition Phase)
-            if (state.phase === 'TRANSITION') {
-                ctx.strokeStyle = COLORS.red;
-                ctx.setLineDash([5, 5]);
-                const buffStart = state.readPtr + 1; // End of actual data
-                const buffEnd = state.writePtr; // End of new capacity
-                
-                if (buffEnd > buffStart) {
-                    const x1 = startX + buffStart * (cellSize + gap);
-                    const width = (buffEnd - buffStart + 1) * (cellSize + gap) - gap;
-                    ctx.strokeRect(x1 - 5, startY - 5, width + 10, cellSize + 10);
-                    ctx.font = "12px monospace";
-                    ctx.fillStyle = COLORS.red;
-                    ctx.fillText("SAFETY BUFFER", x1 + width/2, startY - 15);
-                }
-                ctx.setLineDash([]);
-            }
-        }
-
-        // --- Logic & Animation Control ---
-
-        function createParticle(startX, startY, destElementId) {
-            // Simplified particle logic just for visual flair
-            // In a real scenario, we'd map DOM rect to Canvas coords, but here we just shoot up/down
-            state.particles.push({
-                x: startX,
-                y: startY,
-                vx: (Math.random() - 0.5) * 5,
-                vy: 5, // Fall down towards counter
-                life: 60
-            });
-        }
-
-        function queueStep(action, delay = 800, details = {}) {
-            state.stepQueue.push({ action, delay, ...details });
-        }
-
-        function lerp(start, end, amt) {
-            return (1 - amt) * start + amt * end;
-        }
-
-        function runLoop() {
-            if (!state.animating) return;
-
-            // Pointer Smoothing
-            state.pointers.read = lerp(state.pointers.read, state.readPtr, 0.1);
-            state.pointers.write = lerp(state.pointers.write, state.writePtr, 0.1);
-
-            // Animation Step Processor
-            if (!state.currentStep && state.stepQueue.length > 0) {
-                state.currentStep = state.stepQueue.shift();
-                
-                // Execute Logic for Step
-                const s = state.currentStep;
-                
-                if (s.msg) instrText.innerText = s.msg;
-                if (s.phaseLabel) phaseText.innerText = s.phaseLabel;
-
-                // Instant logic updates happen here, visual transition happens over delay
-                if (s.logic) s.logic();
-
-                setTimeout(() => {
-                    state.currentStep = null;
-                    if (state.stepQueue.length === 0 && state.phase === 'FINISHED') {
-                        state.animating = false;
-                        btnStart.disabled = false;
-                        btnStart.innerText = "RESTART";
-                        btnStart.onclick = init;
+                    // Bottom Marker (Write)
+                    const mBot = document.createElement('div');
+                    mBot.className = 'marker-cell';
+                    if (this.phase !== 'IDLE' && this.phase !== 'DONE' && idx === this.writePtr) {
+                        mBot.innerHTML = '<span class="ptr-write">▲W</span>';
                     }
-                }, s.delay);
+                    this.elMarkersBottom.appendChild(mBot);
+                });
+
+                // Button States
+                if (this.phase === 'DONE' || this.phase === 'IDLE') {
+                    this.btnStep.disabled = true;
+                    this.btnAuto.disabled = true;
+                    this.btnInit.disabled = false;
+                } else {
+                    this.btnStep.disabled = !!this.autoInterval;
+                    this.btnAuto.disabled = false;
+                    this.btnInit.disabled = !!this.autoInterval;
+                }
+                
+                if(this.autoInterval) this.btnAuto.textContent = "STOP";
+                else this.btnAuto.textContent = "AUTO";
             }
 
-            draw();
-            requestAnimationFrame(runLoop);
-        }
+            init() {
+                this.arr = [...this.initialData];
+                this.readPtr = 0;
+                this.writePtr = 0;
+                this.aCount = 0;
+                this.phase = 'FILTER';
+                this.log('Initialized. Array: ' + JSON.stringify(this.initialData).replace(/null/g, '_'));
+                this.log('Phase 1: Filter "b", Count "a".');
+                this.stopAuto();
+                this.updateUI();
+                this.btnStep.disabled = false;
+                this.btnAuto.disabled = false;
+            }
 
-        // --- Algorithm Script Generation ---
+            step() {
+                if (this.phase === 'FILTER') {
+                    this.stepFilter();
+                } else if (this.phase === 'TRANSITION') {
+                    this.stepTransition();
+                } else if (this.phase === 'EXPAND') {
+                    this.stepExpand();
+                }
+                this.updateUI();
+            }
 
-        function buildAlgorithmSteps() {
-            // 1. SETUP PHASE 1
-            queueStep('setup', 1000, { 
-                phaseLabel: "PHASE 1: FILTER & COUNT",
-                msg: "Scanning Left -> Right. Remove 'b', Count 'a'."
-            });
+            stepFilter() {
+                if (this.readPtr >= this.originalLen) {
+                    this.phase = 'TRANSITION';
+                    this.validLen = this.writePtr;
+                    this.log(`End of data reached. Valid Length: ${this.validLen}. 'a' Count: ${this.aCount}.`);
+                    return;
+                }
 
-            let r = 0;
-            let w = 0;
-            let count = 0;
-            const tempArr = [...INITIAL_DATA]; 
-            // We simulate logic to queue steps, but we must update state in the callback
-            
-            // PHASE 1 LOOP
-            while (r < INITIAL_DATA.length) {
-                const char = tempArr[r];
-                
+                const char = this.arr[this.readPtr];
+
                 if (char === 'b') {
-                    // Delete case
-                    queueStep('delete', 1200, {
-                        msg: `Index ${r}: Found 'b'. Deleting.`,
-                        action: 'delete',
-                        logic: () => {
-                            state.readPtr++; // Only increment read
-                        }
-                    });
+                    this.log(`Found 'b' at [${this.readPtr}]. Skipping.`);
+                    this.readPtr++;
                 } else if (char === 'a') {
-                    // Count case
-                    queueStep('count', 1200, {
-                        msg: `Index ${r}: Found 'a'. Increment Count & Copy.`,
-                        action: 'count',
-                        logic: () => {
-                            // Visual particle
-                            // (We approximate X pos based on ReadPtr for particle origin)
-                            state.aCount++;
-                            countDisplay.innerText = state.aCount;
-                            
-                            state.data[state.writePtr] = 'a';
-                            state.readPtr++;
-                            state.writePtr++;
-                        }
-                    });
-                    count++;
+                    this.log(`Found 'a' at [${this.readPtr}]. Counting & Copying to [${this.writePtr}].`);
+                    this.aCount++;
+                    this.arr[this.writePtr] = this.arr[this.readPtr];
+                    this.readPtr++;
+                    this.writePtr++;
                 } else {
-                    // Normal copy
-                    queueStep('copy', 800, {
-                        msg: `Index ${r}: Found '${char}'. Copying.`,
-                        action: 'copy',
-                        logic: () => {
-                            state.data[state.writePtr] = state.data[state.readPtr];
-                            state.readPtr++;
-                            state.writePtr++;
-                        }
-                    });
+                    this.log(`Found '${char}' at [${this.readPtr}]. Copying to [${this.writePtr}].`);
+                    this.arr[this.writePtr] = this.arr[this.readPtr];
+                    this.readPtr++;
+                    this.writePtr++;
                 }
-                
-                // Update simulation vars for the loop logic
-                if (char !== 'b') w++;
-                r++;
             }
 
-            // TRANSITION
-            const validDataLength = w;
-            const finalLength = validDataLength + count;
-            
-            queueStep('transition', 2000, {
-                phaseLabel: "TRANSITION",
-                msg: `Calc Length: ${validDataLength} + ${count}('a') = ${finalLength}`,
-                logic: () => {
-                    state.phase = 'TRANSITION';
-                    formulaDisplay.innerText = `Len = ${validDataLength} + ${count} = ${finalLength}`;
-                    // Setup pointers for backward pass
-                    // Read points to last valid char of compacted data
-                    state.readPtr = validDataLength - 1;
-                    // Write points to end of new theoretical length
-                    state.writePtr = finalLength - 1;
-                }
-            });
-
-            // PHASE 2 SETUP
-            queueStep('phase2-start', 1000, {
-                phaseLabel: "PHASE 2: BACKWARD EXPANSION",
-                msg: "Scanning Right -> Left. Replace 'a' with 'dd'.",
-                logic: () => {
-                    state.phase = 'PHASE2';
-                }
-            });
-
-            // PHASE 2 LOOP
-            // Simulation
-            let simRead = validDataLength - 1;
-            let simWrite = finalLength - 1;
-            // Need a temp copy of compacted state to know what we are reading
-            // We can reconstruct it or just peek at live state.data inside logic? 
-            // Better to rely on live state data in logic callbacks, 
-            // but we need to know HOW MANY steps to generate.
-            // Let's create a temp simulation array.
-            let simArr = [];
-            for(let i=0; i<validDataLength; i++) {
-                if(INITIAL_DATA[i] === 'b') continue; // Wait, initial data logic is tricky here.
-                // Let's just hardcode the logic based on result of Phase 1.
-                // Phase 1 Result of [a,c,b,a,c] -> [a,c,a,c]
-            }
-            // Actually, we can just look at what Phase 1 produced in our simulation vars:
-            // The simulation produced w=4. The array effectively has valid data at 0..3
-            // Valid data is: a, c, a, c.
-            
-            // We need to iterate backwards based on the known compacted data.
-            // We can just query the DOM/State data in real-time? No, must queue steps.
-            // Let's reconstruct the Phase 1 output array for simulation:
-            const phase1Output = INITIAL_DATA.filter(c => c !== 'b');
-            
-            for (let i = phase1Output.length - 1; i >= 0; i--) {
-                const char = phase1Output[i];
+            stepTransition() {
+                this.finalLen = this.validLen + this.aCount;
+                this.log(`Calculating Size: ${this.validLen} + ${this.aCount} = ${this.finalLen}.`);
                 
+                // Set pointers for reverse iteration
+                this.readPtr = this.validLen - 1;
+                this.writePtr = this.finalLen - 1;
+                
+                this.phase = 'EXPAND';
+                this.log(`Pointers relocated. Read: [${this.readPtr}], Write: [${this.writePtr}].`);
+                this.log('Phase 2: Expand Reverse. Replace "a" with "dd".');
+            }
+
+            stepExpand() {
+                if (this.readPtr < 0) {
+                    this.phase = 'DONE';
+                    this.log('Algorithm Complete. Final Array: ' + JSON.stringify(this.arr.filter(c => c !== null)));
+                    this.stopAuto();
+                    return;
+                }
+
+                const char = this.arr[this.readPtr];
+
                 if (char === 'a') {
-                    queueStep('expand', 1500, {
-                        msg: `Read 'a': Replace with 'dd' at ${simWrite}, ${simWrite-1}`,
-                        action: 'expand',
-                        logic: () => {
-                            state.data[state.writePtr] = 'd';
-                            state.data[state.writePtr - 1] = 'd';
-                            state.readPtr--;
-                            state.writePtr -= 2;
-                        }
-                    });
-                    simWrite -= 2;
+                    this.log(`Read 'a' at [${this.readPtr}]. Expanding to "dd" at [${this.writePtr}, ${this.writePtr-1}].`);
+                    this.arr[this.writePtr] = 'd';
+                    this.writePtr--;
+                    this.arr[this.writePtr] = 'd';
+                    this.writePtr--;
+                    this.readPtr--;
                 } else {
-                    queueStep('move', 800, {
-                        msg: `Read '${char}': Move to ${simWrite}`,
-                        action: 'move',
-                        logic: () => {
-                            state.data[state.writePtr] = state.data[state.readPtr];
-                            state.readPtr--;
-                            state.writePtr--;
-                        }
-                    });
-                    simWrite--;
+                    this.log(`Read '${char}' at [${this.readPtr}]. Copying to [${this.writePtr}].`);
+                    this.arr[this.writePtr] = char;
+                    this.writePtr--;
+                    this.readPtr--;
                 }
             }
 
-            // FINISH
-            queueStep('finish', 1000, {
-                phaseLabel: "SEQUENCE COMPLETE",
-                msg: "Final Result: " + "ddcddc".toUpperCase(),
-                logic: () => {
-                    state.phase = 'FINISHED';
-                    // Reset pointers for aesthetics
-                    state.readPtr = 0;
-                    state.writePtr = 0;
+            toggleAuto() {
+                if (this.autoInterval) {
+                    this.stopAuto();
+                } else {
+                    this.autoInterval = setInterval(() => {
+                        if (this.phase === 'DONE') this.stopAuto();
+                        else this.step();
+                    }, 800);
+                    this.updateUI();
                 }
-            });
+            }
+
+            stopAuto() {
+                clearInterval(this.autoInterval);
+                this.autoInterval = null;
+                this.updateUI();
+            }
         }
 
-        // --- Controls ---
-        btnStart.addEventListener('click', () => {
-            if(state.animating) return;
-            state.animating = true;
-            btnStart.disabled = true;
-            state.phase = 'PHASE1';
-            buildAlgorithmSteps();
-            runLoop();
-        });
-
-        btnReset.addEventListener('click', () => {
-            state.animating = false; // Stop loop
-            init(); // Reset state
-            draw(); // Draw clean state
-        });
-
-        // Start
-        init();
-
+        const viz = new Visualizer();
+        viz.updateUI(); // Initial render
     </script>
 </body>
 </html>
