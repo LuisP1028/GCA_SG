@@ -275,7 +275,7 @@
                     <p>Find the smallest position gap between any two identical elements.</p>
                     <p><strong>Logic:</strong></p>
                     <ul>
-                        <li><strong>1. Setup Variables:</strong> Initialize an empty hash map to store numbers and their indices. Create a variable named min_dist and set it to the largest possible number (infinity) to track the best result.</li>
+                        <li><strong>1. Setup Variables:</strong> Initialize an empty hash map to store numbers and their indices. Create a variable named min_dist and set it to the largest possible number (infinity) to track which duplicate has the smallest position gap.</li>
                         <li><strong>2. Start Iteration:</strong> Begin a loop that goes through the array one element at a time. Keep track of both the current number (value) and its specific location (index) in the list.</li>
                         <li><strong>3. Check for History:</strong> At each step, check if the current number already exists as a key in your hash map. If it exists, it means you have seen this number before, identifying a duplicate pair.</li>
                         <li><strong>4. Calculate the Gap:</strong> If the number is in the map, subtract the index stored in the map (the previous location) from the current index. This calculation gives you the distance between the two duplicates.</li>

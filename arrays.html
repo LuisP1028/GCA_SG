@@ -298,7 +298,7 @@ Analogy: Reading a Map
                     <p>Shuffle a list of items (A) according to specific instructions (P) without using an in-memory buffer.</p>
                     <p><strong>Cyclic Permutation:</strong> A chain of moves that loops back to the start (e.g., Position 0 &rarr; 2 &rarr; 1 &rarr; 0). All permutations are made of these disjoint cycles.</p>
                     <p><strong>In-Place:</strong> Modifying the input structure directly without using significant extra memory (O(1) space).</p>
-                    <p><strong>Anchor (i):</strong> The main loop index moves sequentially (0, 1, 2…) through the list. It acts as a "holding buffer" for displaced items to ensure every position is processed. We cycle elements through <em>i</em> until the specific cycle closes.</p>
+                    <p><strong>Anchor (i):</strong> The main loop index moves sequentially (0, 1, 2…) through the list. It acts as a "holding buffer" for displaced items to ensure every position is processed. We cycle elements through <em>i</em> until the specific cycle closes. The anchor only moves when the element at the anchor is the correct element.</p>
                     <p><strong>Cycle Pointer (next):</strong> A variable that jumps non-sequentially around the array. It follows the chain of instructions, tracing the specific path of a loop until it returns to the start.</p>
                     <p><strong>Sentinel:</strong> Use a sentinel to mark visited spots by subtracting the array length from the index value. Since array indices are non-negative, this allows state tracking without extra storage.</p>
                 </div>
