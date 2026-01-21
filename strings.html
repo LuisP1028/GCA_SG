@@ -176,7 +176,35 @@
                     <p><strong>Step 7: Termination</strong><br>
                     If the pointers meet or cross without ever triggering a mismatch, the string is verified as a palindrome. Return True.</p>
                 </div>
-
+        
+                <div class="subsection">
+                    <div class="subsection-title">
+                        ANAGRAMMATIC STRINGS
+                        <button class="eye-btn" onclick="document.querySelector('.retro-viewport iframe').src='Searching/anagram.html'; document.querySelector('.retro-viewport').classList.add('active');">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <p>Two sequences of characters that differ in arrangement but contain the exact same letters in identical quantities.</p>
+                    <p><strong>THE HOW:</strong></p>
+                    <p><strong>Step 1: Sanitization and Normalization</strong><br>
+                    Strip both input strings of any non-alphanumeric characters (such as spaces, punctuation, or symbols) and convert all remaining letters to a uniform case to ensure consistency.</p>
+                    <p><strong>Step 2: Length Verification</strong><br>
+                    Compare the lengths of the two processed strings. If the total character counts differ, a valid rearrangement is impossible; return False immediately.</p>
+                    <p><strong>Step 3: Initialization</strong><br>
+                    Create a frequency map (or hash table) to serve as a ledger. This structure will track the precise inventory of characters available in the first string.</p>
+                    <p><strong>Step 4: The Inventory Loop</strong><br>
+                    Iterate through the first string one character at a time. For each letter encountered, increment its value in the frequency map to establish the required "ingredients."</p>
+                    <p><strong>Step 5: The Cancellation Loop</strong><br>
+                    Iterate through the second string. For each character found, look it up in the map and decrement its count, effectively "using up" the stored ingredient.</p>
+                    <p><strong>Step 6: Balance Check</strong><br>
+                    During the cancellation process, if a character is not found in the map or its count drops below zero, the match is invalid; return False.</p>
+                    <p><strong>Step 7: Termination</strong><br>
+                    If the loop completes successfully without hitting a deficit or missing character, the strings are confirmed as anagrams. Return True.</p>
+                </div>
+        
             </div>
         </details>
 

@@ -152,17 +152,17 @@
                 <p>It uses a self-referential function that includes a distinct stopping point and a process that shrinks the problem, ensuring it eventually solves itself.</p>
                 
                 <div class="subsection">
-                    <div class="subsection-title">1. The Termination Condition (The Base Case)</div>
+                    <div class="subsection-title">1. The Base Case</div>
                     <p>This acts as the algorithm’s anchor, preventing infinite loops. It defines the simplest solvable state—like an empty list or single value—offering an immediate, undeniable answer that stops the chain of calls.</p>
                 </div>
         
                 <div class="subsection">
-                    <div class="subsection-title">2. The Decomposition (The Recursive Step)</div>
+                    <div class="subsection-title">2. The Recursive Step</div>
                     <p>This reduces the problem's size to ensure progress. By isolating one element and calling the function on the remainder, you rely on the "inductive hypothesis": trusting the self-reference to correctly solve the strictly smaller sub-problem.</p>
                 </div>
         
                 <div class="subsection">
-                    <div class="subsection-title">3. The Local Computation (The Atomic Unit)</div>
+                    <div class="subsection-title">3. The Atomic Unit</div>
                     <p>This is the discrete work performed within the current step. It applies immediate logic—like a comparison or math operation—to the single element you isolated, handling the "now" independent of the future recursive results.</p>
                 </div>
         
