@@ -3,141 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ALGO_VIS // STOCK_DP_V2_RESPONSIVE</title>
+    <title>DITHER_PUNK // ALGO_VIS</title>
     <style>
-        /* --- IMPORTS & VARS --- */
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
+        /* --- CORE VARIABLES --- */
         :root {
-            --bg-color: #000000;
-            --term-green: #00FF00;
-            --term-dim: #003300;
-            --term-dark: #001100;
-            --scan-line: rgba(18, 16, 16, 0.5);
+            /* Default: PROFIT MODE (Green) */
+            --bg-color: #050505;
+            --primary: #00FF33;
+            --secondary: #004411;
+            --dim: #002205;
+            --scanline: rgba(0, 20, 0, 0.5);
             
-            /* Responsive Typography */
-            --font-sm: clamp(12px, 1.5vh, 14px);
-            --font-md: clamp(14px, 2vh, 18px);
-            --font-lg: clamp(18px, 3vh, 24px);
-            
-            /* Spacing */
-            --gap: clamp(5px, 1vh, 15px);
-            --pad: clamp(10px, 2vw, 20px);
+            --font-main: 'Courier New', Courier, monospace;
         }
 
-        /* --- GLOBAL LAYOUT --- */
+        /* AMBER MODE (Cost Reduction) - Applied via body class */
+        body.mode-cost {
+            --primary: #FF5500;
+            --secondary: #551100;
+            --dim: #220500;
+            --scanline: rgba(20, 5, 0, 0.5);
+        }
+
+        /* --- GLOBAL RESET & LAYOUT --- */
         body, html {
             margin: 0;
             padding: 0;
-            height: 100%;
             width: 100%;
+            height: 100%;
             background-color: var(--bg-color);
-            color: var(--term-green);
-            font-family: 'VT323', monospace;
+            color: var(--primary);
+            font-family: var(--font-main);
             overflow: hidden;
-            user-select: none; /* Prevent text selection on touch */
-        }
-
-        #terminal-container {
             display: flex;
             flex-direction: column;
-            height: 100dvh; /* Dynamic viewport height for mobile bars */
-            width: 100vw;
-            padding: var(--pad);
-            box-sizing: border-box;
-            position: relative;
-            z-index: 1;
-            gap: var(--gap);
+            user-select: none;
         }
 
-        /* --- CRT EFFECTS --- */
+        /* --- CRT OVERLAY EFFECTS --- */
         .crt-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
             pointer-events: none;
-            z-index: 100;
-            background: 
-                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-                radial-gradient(circle at center, transparent 60%, black 100%);
-            background-size: 100% 4px, 100% 100%;
-            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+            z-index: 999;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
         }
-
+        
+        /* Slight flicker animation */
         @keyframes flicker {
-            0% { opacity: 0.97; }
-            50% { opacity: 0.95; }
+            0% { opacity: 0.98; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.98; }
             100% { opacity: 0.98; }
         }
-
-        #terminal-container {
-            animation: flicker 0.15s infinite;
+        #ui-layer {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+            animation: flicker 0.2s infinite;
         }
 
-        /* --- UI ELEMENTS --- */
+        /* --- UI COMPONENTS --- */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 2px solid var(--term-green);
-            padding-bottom: 5px;
-            text-shadow: 0 0 5px var(--term-green);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: clamp(16px, 2.5vh, 24px);
+            margin: 0;
             text-transform: uppercase;
-            font-size: var(--font-md);
-            flex-shrink: 0;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--primary);
         }
 
-        #system-log {
-            color: var(--term-green);
-            background: var(--term-dark);
-            padding: 5px 10px;
-            font-size: var(--font-sm);
-            border-left: 4px solid var(--term-green);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            flex-shrink: 0;
+        select {
+            background: var(--bg-color);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            font-family: var(--font-main);
+            font-size: 14px;
+            padding: 4px;
+            text-transform: uppercase;
+            cursor: pointer;
+            outline: none;
+            box-shadow: 0 0 5px var(--secondary);
         }
 
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: var(--font-lg);
-            flex-shrink: 0;
-            flex-wrap: wrap; /* Wrap on tiny screens */
-            gap: 10px;
+        select:hover {
+            background: var(--secondary);
         }
 
-        /* --- CANVAS PANELS --- */
-        .panel {
-            flex: 1; /* Grow to fill space */
+        /* --- PANEL GRID --- */
+        .panel-container {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            border: 1px solid var(--term-dim);
-            background: var(--term-dark);
-            box-shadow: 0 0 10px var(--term-dim);
-            min-height: 0; /* Important for nested flex scroll/resize */
-            overflow: hidden;
+            gap: 10px;
+            min-height: 0; /* Important for flex child scrolling */
         }
 
-        .panel-label {
-            background: var(--bg-color);
-            color: var(--term-green);
+        .panel {
+            flex: 1;
+            border: 1px solid var(--secondary);
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 0;
+        }
+
+        .panel-header {
+            background: var(--secondary);
+            color: var(--bg-color);
             padding: 2px 5px;
-            font-size: var(--font-sm);
-            border-bottom: 1px solid var(--term-dim);
-            flex-shrink: 0;
-            opacity: 0.9;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
         }
 
         .canvas-wrapper {
             flex: 1;
-            position: relative;
             width: 100%;
             height: 100%;
+            position: relative;
         }
 
         canvas {
@@ -146,611 +155,546 @@
             height: 100%;
         }
 
-        /* --- UTILS --- */
-        .blink { animation: blinker 1s linear infinite; }
+        /* --- FOOTER STATUS --- */
+        footer {
+            margin-top: 10px;
+            border-top: 2px solid var(--primary);
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(14px, 2vh, 18px);
+            font-weight: bold;
+            flex-shrink: 0;
+            text-shadow: 0 0 4px var(--primary);
+        }
+
+        .blink { animation: blinker 1s step-end infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
 
-        /* Mobile Adjustments */
-        @media (max-width: 600px) {
-            header span:nth-child(2) { display: none; } /* Hide OS name on mobile */
-        }
     </style>
 </head>
 <body>
 
     <div class="crt-overlay"></div>
 
-    <div id="terminal-container">
+    <div id="ui-layer">
         <header>
-            <span>PROTOCOL: MAX_PROFIT_2_TRANS</span>
-            <span>OS: DITHER_OS v1.1-R</span>
-            <span id="clock">00:00:00</span>
+            <h1>// BI_DIRECT_DP_VIS_v1.0</h1>
+            <select id="mode-select">
+                <option value="PROFIT">PROTOCOL: MAX_PROFIT</option>
+                <option value="COST">PROTOCOL: COST_REDUC</option>
+            </select>
         </header>
 
-        <div id="system-log">SYSTEM_LOG: INITIALIZING...</div>
+        <div class="panel-container">
+            <!-- PANEL A: INPUT -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>A :: INPUT_SERIES</span>
+                    <span id="lbl-scan">SCANNING...</span>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="cvsA"></canvas>
+                </div>
+            </div>
 
-        <!-- PANEL A -->
-        <div class="panel">
-            <div class="panel-label">A: MARKET_DATA // PRICE[t]</div>
-            <div class="canvas-wrapper">
-                <canvas id="canvasA"></canvas>
+            <!-- PANEL B: DUAL SWEEP -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>B :: DP_SWEEP [L / R]</span>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="cvsB"></canvas>
+                </div>
+            </div>
+
+            <!-- PANEL C: AGGREGATE -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>C :: SYNTHESIS [TOTAL]</span>
+                    <span class="blink" id="lbl-status">CALCULATING</span>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="cvsC"></canvas>
+                </div>
             </div>
         </div>
 
-        <!-- PANEL B -->
-        <div class="panel">
-            <div class="panel-label">B: DUAL_SWEEP // L_OPT vs R_OPT</div>
-            <div class="canvas-wrapper">
-                <canvas id="canvasB"></canvas>
-            </div>
-        </div>
-
-        <!-- PANEL C -->
-        <div class="panel">
-            <div class="panel-label">C: TOTAL_YIELD // MAX(L+R)</div>
-            <div class="canvas-wrapper">
-                <canvas id="canvasC"></canvas>
-            </div>
-        </div>
-
-        <div class="status-bar">
-            <span id="readout-left">L: $00</span>
-            <span id="readout-right">R: $00</span>
-            <span id="readout-total" style="font-weight:bold; text-shadow: 0 0 8px var(--term-green);">TOT: $00</span>
-        </div>
+        <footer>
+            <span>L: <span id="val-l">00</span></span>
+            <span>R: <span id="val-r">00</span></span>
+            <span>TOTAL: <span id="val-t">00</span></span>
+        </footer>
     </div>
 
-    <script>
-        /**
-         * ------------------------------------------------------------------
-         * CONFIGURATION & DATA
-         * ------------------------------------------------------------------
-         */
-        const COLORS = {
-            bright: '#00FF00',
-            dim: '#004400',
-            dark: '#002200',
-            bg: '#000000',
-            alert: '#AAFF00'
-        };
+<script>
+/**
+ * ============================================================================
+ * ENGINE: DITHER_PUNK_VISUALIZER
+ * ============================================================================
+ */
 
-        const prices = [10, 22, 5, 75, 65, 80, 2, 12, 5, 20, 100, 80, 40, 60, 10, 50, 90, 85, 105, 10, 30];
-        const n = prices.length;
+// --- CONFIG & STATE ---
+const CONFIG = {
+    dataCount: 40,
+    speed: 1, // Frames per step
+};
 
-        // DP State
-        let leftProfit = new Array(n).fill(0);
-        let rightProfit = new Array(n).fill(0);
-        let totalProfit = new Array(n).fill(0);
-        let dpr = 1; // Device Pixel Ratio
+// Raw data generation (Deterministic pseudo-random)
+function generateData() {
+    let arr = [];
+    let val = 50;
+    for (let i = 0; i < CONFIG.dataCount; i++) {
+        // Create jagged, realistic market movements
+        let change = (Math.random() - 0.5) * 30;
+        val += change;
+        if (val < 5) val = 5;
+        if (val > 100) val = 100;
+        arr.push(Math.floor(val));
+    }
+    return arr;
+}
 
-        // Precompute Algorithm
-        function calculateDP() {
-            let minPrice = prices[0];
-            for (let i = 1; i < n; i++) {
-                minPrice = Math.min(minPrice, prices[i]);
-                leftProfit[i] = Math.max(leftProfit[i - 1], prices[i] - minPrice);
-            }
+// Current App State
+let STATE = {
+    mode: 'PROFIT', // 'PROFIT' or 'COST'
+    phase: 0,       // 0:Idle, 1:LeftScan, 2:RightScan, 3:Combine, 4:Interactive
+    progress: 0,    // Animation ticker
+    cursor: -1,     // Mouse hover index
+    data: generateData(),
+    dpLeft: [],
+    dpRight: [],
+    dpTotal: [],
+    maxIdx: 0,
+    colors: {}      // Updated on resize/init
+};
 
-            let maxPrice = prices[n - 1];
-            for (let i = n - 2; i >= 0; i--) {
-                maxPrice = Math.max(maxPrice, prices[i]);
-                rightProfit[i] = Math.max(rightProfit[i + 1], maxPrice - prices[i]);
-            }
+// --- DOM REFS ---
+const els = {
+    sel: document.getElementById('mode-select'),
+    cvsA: document.getElementById('cvsA'),
+    cvsB: document.getElementById('cvsB'),
+    cvsC: document.getElementById('cvsC'),
+    lblScan: document.getElementById('lbl-scan'),
+    lblStatus: document.getElementById('lbl-status'),
+    valL: document.getElementById('val-l'),
+    valR: document.getElementById('val-r'),
+    valT: document.getElementById('val-t'),
+    body: document.body
+};
 
-            let maxTotal = 0;
-            let maxIndex = 0;
-            for (let i = 0; i < n; i++) {
-                totalProfit[i] = leftProfit[i] + rightProfit[i];
-                if (totalProfit[i] > maxTotal) {
-                    maxTotal = totalProfit[i];
-                    maxIndex = i;
-                }
-            }
-            return { maxTotal, maxIndex };
-        }
+const ctxs = {
+    A: els.cvsA.getContext('2d'),
+    B: els.cvsB.getContext('2d'),
+    C: els.cvsC.getContext('2d'),
+};
 
-        const globalOptimum = calculateDP();
+// --- ALGORITHMS ---
 
-        // App State
-        const STATE = {
-            PHASE: 0, 
-            SCANNER_INDEX: 0,
-            FWD_PROGRESS: 0,
-            BWD_PROGRESS: n - 1,
-            SWEEP_PROGRESS: 0,
-            GLOBAL_MAX_IDX: globalOptimum.maxIndex
-        };
+function runAlgorithms() {
+    const n = STATE.data.length;
+    STATE.dpLeft = new Array(n).fill(0);
+    STATE.dpRight = new Array(n).fill(0);
+    STATE.dpTotal = new Array(n).fill(0);
 
-        // DOM Refs
-        const cvsA = document.getElementById('canvasA');
-        const ctxA = cvsA.getContext('2d');
-        const cvsB = document.getElementById('canvasB');
-        const ctxB = cvsB.getContext('2d');
-        const cvsC = document.getElementById('canvasC');
-        const ctxC = cvsC.getContext('2d');
-
-        const elLog = document.getElementById('system-log');
-        const elLeft = document.getElementById('readout-left');
-        const elRight = document.getElementById('readout-right');
-        const elTotal = document.getElementById('readout-total');
-
-        /**
-         * ------------------------------------------------------------------
-         * RESPONSIVE CANVAS HANDLING
-         * ------------------------------------------------------------------
-         */
+    if (STATE.mode === 'PROFIT') {
+        // Max Profit: Buy Low, Sell High
         
-        function resizeCanvas(canvas) {
-            // Get size of the wrapper div
-            const parent = canvas.parentElement;
-            const rect = parent.getBoundingClientRect();
-            dpr = window.devicePixelRatio || 1;
-
-            // Set display size (css pixels)
-            canvas.style.width = `${rect.width}px`;
-            canvas.style.height = `${rect.height}px`;
-
-            // Set actual memory size (scaled for retina)
-            canvas.width = Math.floor(rect.width * dpr);
-            canvas.height = Math.floor(rect.height * dpr);
+        // 1. Left Pass (Min so far)
+        let minPrice = STATE.data[0];
+        for (let i = 1; i < n; i++) {
+            minPrice = Math.min(minPrice, STATE.data[i]);
+            STATE.dpLeft[i] = Math.max(STATE.dpLeft[i-1], STATE.data[i] - minPrice);
         }
 
-        function resizeAll() {
-            resizeCanvas(cvsA);
-            resizeCanvas(cvsB);
-            resizeCanvas(cvsC);
-            // Force redraw on resize
-            if(STATE.PHASE === 4) {
-                renderFrame();
-            }
+        // 2. Right Pass (Max future)
+        let maxPrice = STATE.data[n-1];
+        for (let i = n-2; i >= 0; i--) {
+            maxPrice = Math.max(maxPrice, STATE.data[i]);
+            STATE.dpRight[i] = Math.max(STATE.dpRight[i+1], maxPrice - STATE.data[i]);
         }
 
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(resizeAll, 100);
-        });
+    } else {
+        // Cost Reduction: Start High, End Low
+        // Think of it as "Shorting" or "Max Drop"
         
-        // Initial setup
-        resizeAll();
-
-        /**
-         * ------------------------------------------------------------------
-         * DRAWING HELPERS (SCALED)
-         * ------------------------------------------------------------------
-         */
-
-        // Coordinate Mapping
-        function getX(index, width) {
-            const padding = 20 * dpr;
-            const effectiveWidth = width - (padding * 2);
-            return (index / (n - 1)) * effectiveWidth + padding;
+        // 1. Left Pass (Max so far -> Current)
+        let maxPrice = STATE.data[0];
+        for (let i = 1; i < n; i++) {
+            maxPrice = Math.max(maxPrice, STATE.data[i]);
+            STATE.dpLeft[i] = Math.max(STATE.dpLeft[i-1], maxPrice - STATE.data[i]);
         }
 
-        function getY(value, height, maxVal) {
-            const padding = 10 * dpr;
-            const effectiveHeight = height - (padding * 2);
-            const norm = value / (maxVal * 1.1); 
-            return height - (norm * effectiveHeight) - padding;
+        // 2. Right Pass (Current -> Min future)
+        let minPrice = STATE.data[n-1];
+        for (let i = n-2; i >= 0; i--) {
+            minPrice = Math.min(minPrice, STATE.data[i]);
+            STATE.dpRight[i] = Math.max(STATE.dpRight[i+1], STATE.data[i] - minPrice);
         }
+    }
 
-        function createHatchPattern(ctx) {
-            const size = 4 * dpr;
-            const patternCanvas = document.createElement('canvas');
-            patternCanvas.width = size;
-            patternCanvas.height = size;
-            const pCtx = patternCanvas.getContext('2d');
-            
-            pCtx.fillStyle = COLORS.dim;
-            pCtx.fillRect(0,0,size,size);
-            pCtx.fillStyle = COLORS.bright;
-            // Scale pixel drawing
-            pCtx.fillRect(0, 0, dpr, dpr);
-            pCtx.fillRect(size/2, size/2, dpr, dpr);
-            return ctx.createPattern(patternCanvas, 'repeat');
+    // Combine
+    let globalMax = -1;
+    STATE.maxIdx = 0;
+    for(let i=0; i<n; i++){
+        STATE.dpTotal[i] = STATE.dpLeft[i] + STATE.dpRight[i];
+        if(STATE.dpTotal[i] > globalMax) {
+            globalMax = STATE.dpTotal[i];
+            STATE.maxIdx = i;
         }
+    }
+}
 
-        function getTradeDetails(k) {
-            // Re-simulate to find indices for visual dots
-            let t1_buy = -1, t1_sell = -1, bestProf = 0;
-            let curMin = prices[0], curMinIdx = 0;
-            for(let i=0; i<=k; i++) {
-                if(prices[i] < curMin) { curMin = prices[i]; curMinIdx = i; }
-                if(prices[i] - curMin > bestProf) {
-                    bestProf = prices[i] - curMin;
-                    t1_buy = curMinIdx;
-                    t1_sell = i;
-                }
-            }
-            if(t1_buy === -1 && k > 0) { t1_buy=0; t1_sell=0; }
+// --- GRAPHICS & UTILS ---
 
-            let t2_buy = -1, t2_sell = -1;
-            // Simple approach for suffix: find first pair matching rightProfit
-            let minSuffix = prices[k], minSuffixIdx = k;
-            for(let i=k; i<n; i++) {
-                if(prices[i] < minSuffix) { minSuffix = prices[i]; minSuffixIdx = i; }
-                if(prices[i] - minSuffix === rightProfit[k]) {
-                     t2_buy = minSuffixIdx;
-                     t2_sell = i;
-                     break;
-                }
-            }
-            if (rightProfit[k] === 0) { t2_buy = k; t2_sell = k; }
-            return { t1_buy, t1_sell, t2_buy, t2_sell };
-        }
+function getCSSVar(name) {
+    return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
 
-        /**
-         * ------------------------------------------------------------------
-         * DRAWING ROUTINES
-         * ------------------------------------------------------------------
-         */
+function updateColors() {
+    STATE.colors = {
+        primary: getCSSVar('--primary'),
+        secondary: getCSSVar('--secondary'),
+        dim: getCSSVar('--dim'),
+        bg: getCSSVar('--bg-color')
+    };
+}
 
-        function drawGrid(ctx, w, h) {
-            ctx.strokeStyle = COLORS.dim;
-            ctx.lineWidth = 1 * dpr;
-            ctx.setLineDash([2 * dpr, 4 * dpr]);
-            
-            for(let i=1; i<5; i++) {
-                let y = (h / 5) * i;
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(w, y);
-                ctx.stroke();
-            }
-            ctx.setLineDash([]);
-        }
+// Custom Dither Pattern Generator
+function createDitherPattern(ctx) {
+    // Create a 2x2 pattern
+    const patCanvas = document.createElement('canvas');
+    patCanvas.width = 4;
+    patCanvas.height = 4;
+    const pCtx = patCanvas.getContext('2d');
+    
+    pCtx.fillStyle = STATE.colors.dim;
+    pCtx.fillRect(0,0,4,4);
+    
+    pCtx.fillStyle = STATE.colors.primary;
+    // Checkerboard pixels
+    pCtx.fillRect(0,0,1,1);
+    pCtx.fillRect(2,2,1,1);
+    
+    return ctx.createPattern(patCanvas, 'repeat');
+}
 
-        function drawPanelA(scannerIdx) {
-            const w = cvsA.width;
-            const h = cvsA.height;
-            const maxVal = Math.max(...prices);
-            
-            ctxA.clearRect(0, 0, w, h);
-            drawGrid(ctxA, w, h);
+function resizeCanvas(canvas) {
+    const parent = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = parent.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    
+    return { w: rect.width, h: rect.height };
+}
 
-            // Past
-            ctxA.beginPath();
-            ctxA.strokeStyle = COLORS.bright;
-            ctxA.lineWidth = 2 * dpr;
-            ctxA.moveTo(getX(0, w), getY(prices[0], h, maxVal));
-            for (let i = 0; i <= scannerIdx; i++) {
-                ctxA.lineTo(getX(i, w), getY(prices[i], h, maxVal));
-            }
-            ctxA.stroke();
+// Coordinate Mappers
+const getX = (i, w) => (i / (CONFIG.dataCount - 1)) * w;
+// Normalized Y
+const getY = (val, h, max) => h - ((val / (max * 1.2)) * (h - 20)) - 10; 
 
-            // Fill Past
-            ctxA.lineTo(getX(scannerIdx, w), h);
-            ctxA.lineTo(getX(0, w), h);
-            ctxA.fillStyle = 'rgba(0, 255, 0, 0.1)';
-            ctxA.fill();
+function drawGrid(ctx, w, h) {
+    ctx.strokeStyle = STATE.colors.secondary;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    // Vertical lines
+    for(let i=0; i<w; i+=40) {
+        ctx.moveTo(i, 0); ctx.lineTo(i, h);
+    }
+    // Horizontal lines
+    for(let i=0; i<h; i+=40) {
+        ctx.moveTo(0, i); ctx.lineTo(w, i);
+    }
+    ctx.stroke();
+}
 
-            // Future
-            if (scannerIdx < n - 1) {
-                ctxA.beginPath();
-                ctxA.strokeStyle = COLORS.dim;
-                ctxA.setLineDash([2 * dpr, 2 * dpr]);
-                ctxA.moveTo(getX(scannerIdx, w), getY(prices[scannerIdx], h, maxVal));
-                for (let i = scannerIdx + 1; i < n; i++) {
-                    ctxA.lineTo(getX(i, w), getY(prices[i], h, maxVal));
-                }
-                ctxA.stroke();
-                ctxA.setLineDash([]);
-                
-                // Pattern Fill
-                ctxA.lineTo(getX(n-1, w), h);
-                ctxA.lineTo(getX(scannerIdx, w), h);
-                ctxA.fillStyle = createHatchPattern(ctxA);
-                ctxA.fill();
-            }
+// --- RENDERING PIPELINE ---
 
-            // Scanner Line
-            const scanX = getX(scannerIdx, w);
-            ctxA.beginPath();
-            ctxA.strokeStyle = COLORS.bright;
-            ctxA.lineWidth = 1 * dpr;
-            ctxA.setLineDash([4 * dpr, 4 * dpr]);
-            ctxA.moveTo(scanX, 0);
-            ctxA.lineTo(scanX, h);
-            ctxA.stroke();
-            ctxA.setLineDash([]);
+function render() {
+    updateColors(); // Ensure colors match CSS if class changed
+    
+    const dimsA = resizeCanvas(els.cvsA);
+    const dimsB = resizeCanvas(els.cvsB);
+    const dimsC = resizeCanvas(els.cvsC);
+    
+    const maxVal = Math.max(...STATE.data);
+    const maxDP = Math.max(...STATE.dpTotal); // Use total max for scaling DP charts
 
-            // Interactive Dots
-            if (STATE.PHASE === 4) {
-                const trades = getTradeDetails(scannerIdx);
-                const drawDot = (idx, type) => {
-                    const xx = getX(idx, w);
-                    const yy = getY(prices[idx], h, maxVal);
-                    ctxA.fillStyle = type === 'buy' ? '#000' : COLORS.alert;
-                    ctxA.strokeStyle = COLORS.alert;
-                    ctxA.lineWidth = 1 * dpr;
-                    ctxA.beginPath();
-                    ctxA.arc(xx, yy, 4 * dpr, 0, Math.PI*2);
-                    ctxA.fill();
-                    ctxA.stroke();
-                    
-                    ctxA.fillStyle = COLORS.alert;
-                    ctxA.font = `${12 * dpr}px VT323`;
-                    ctxA.fillText(type.toUpperCase(), xx - (10 * dpr), yy - (10 * dpr));
-                };
+    // --- PANEL A: INPUT ---
+    const ctxA = ctxs.A;
+    ctxA.clearRect(0,0,dimsA.w, dimsA.h);
+    drawGrid(ctxA, dimsA.w, dimsA.h);
+    
+    // Draw Main Line
+    ctxA.beginPath();
+    ctxA.strokeStyle = STATE.colors.primary;
+    ctxA.lineWidth = 2;
+    STATE.data.forEach((val, i) => {
+        const x = getX(i, dimsA.w);
+        const y = getY(val, dimsA.h, maxVal);
+        if(i===0) ctxA.moveTo(x,y);
+        else ctxA.lineTo(x,y);
+    });
+    ctxA.stroke();
 
-                if (prices[trades.t1_sell] > prices[trades.t1_buy]) {
-                    drawDot(trades.t1_buy, 'buy');
-                    drawDot(trades.t1_sell, 'sell');
-                }
-                if (prices[trades.t2_sell] > prices[trades.t2_buy]) {
-                    drawDot(trades.t2_buy, 'buy');
-                    drawDot(trades.t2_sell, 'sell');
-                }
-            }
-        }
+    // Fill under line with dither
+    ctxA.lineTo(dimsA.w, dimsA.h);
+    ctxA.lineTo(0, dimsA.h);
+    ctxA.fillStyle = createDitherPattern(ctxA);
+    ctxA.globalAlpha = 0.5;
+    ctxA.fill();
+    ctxA.globalAlpha = 1.0;
 
-        function drawPanelB(scannerIdx, drawMaxL, drawMaxR) {
-            const w = cvsB.width;
-            const h = cvsB.height;
-            const maxVal = Math.max(...totalProfit);
-            
-            ctxB.clearRect(0, 0, w, h);
-            drawGrid(ctxB, w, h);
+    // Scanline / Cursor logic
+    let activeIdx = -1;
+    if(STATE.phase < 4) activeIdx = STATE.progress;
+    if(STATE.phase === 4) activeIdx = STATE.cursor;
 
-            // Left Profit
-            if (drawMaxL > -1) {
-                ctxB.beginPath();
-                ctxB.strokeStyle = COLORS.bright;
-                ctxB.lineWidth = 2 * dpr;
-                ctxB.moveTo(getX(0, w), getY(leftProfit[0], h, maxVal));
-                let limit = Math.min(drawMaxL, n-1);
-                for(let i=0; i<= limit; i++) {
-                    ctxB.lineTo(getX(i, w), getY(leftProfit[i], h, maxVal));
-                }
-                ctxB.stroke();
-            }
-
-            // Right Profit
-            if (drawMaxR < n) {
-                ctxB.beginPath();
-                ctxB.strokeStyle = COLORS.dim;
-                ctxB.lineWidth = 2 * dpr;
-                ctxB.moveTo(getX(n-1, w), getY(rightProfit[n-1], h, maxVal));
-                let limit = Math.max(drawMaxR, 0);
-                for(let i=n-2; i>= limit; i--) {
-                    ctxB.lineTo(getX(i, w), getY(rightProfit[i], h, maxVal));
-                }
-                ctxB.stroke();
-            }
-
-            if (STATE.PHASE >= 3) {
-                const x = getX(scannerIdx, w);
-                const size = 6 * dpr;
-                
-                let yL = getY(leftProfit[scannerIdx], h, maxVal);
-                ctxB.fillStyle = COLORS.bright;
-                ctxB.fillRect(x - size/2, yL - size/2, size, size);
-
-                let yR = getY(rightProfit[scannerIdx], h, maxVal);
-                ctxB.fillStyle = COLORS.dim;
-                ctxB.fillRect(x - size/2, yR - size/2, size, size);
-                
-                ctxB.beginPath();
-                ctxB.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-                ctxB.lineWidth = 1 * dpr;
-                ctxB.moveTo(x, 0);
-                ctxB.lineTo(x, h);
-                ctxB.stroke();
-            }
-        }
-
-        function drawPanelC(scannerIdx, drawLimit) {
-            const w = cvsC.width;
-            const h = cvsC.height;
-            const maxVal = globalOptimum.maxTotal;
-
-            ctxC.clearRect(0, 0, w, h);
-            drawGrid(ctxC, w, h);
-
-            if (drawLimit > -1) {
-                ctxC.beginPath();
-                ctxC.strokeStyle = COLORS.alert;
-                ctxC.lineWidth = 3 * dpr;
-                ctxC.shadowBlur = 10 * dpr;
-                ctxC.shadowColor = COLORS.bright;
-                
-                ctxC.moveTo(getX(0, w), getY(totalProfit[0], h, maxVal));
-                for(let i=0; i<= Math.min(drawLimit, n-1); i++) {
-                    ctxC.lineTo(getX(i, w), getY(totalProfit[i], h, maxVal));
-                }
-                ctxC.stroke();
-                ctxC.shadowBlur = 0;
-            }
-
-            // Target
-            if (STATE.PHASE === 4 || (STATE.PHASE === 3 && scannerIdx === n-1)) {
-                const bestX = getX(globalOptimum.maxIndex, w);
-                const bestY = getY(globalOptimum.maxTotal, h, maxVal);
-                const r = 10 * dpr;
-                const rLine = 15 * dpr;
-
-                ctxC.strokeStyle = COLORS.bright;
-                ctxC.lineWidth = 1 * dpr;
-                ctxC.beginPath();
-                ctxC.arc(bestX, bestY, r, 0, Math.PI*2);
-                ctxC.moveTo(bestX - rLine, bestY);
-                ctxC.lineTo(bestX + rLine, bestY);
-                ctxC.moveTo(bestX, bestY - rLine);
-                ctxC.lineTo(bestX, bestY + rLine);
-                ctxC.stroke();
-
-                ctxC.fillStyle = COLORS.bright;
-                ctxC.font = `${14 * dpr}px VT323`;
-                ctxC.fillText("OPT_MAX", bestX + (12 * dpr), bestY - (12 * dpr));
-            }
-            
-            if (STATE.PHASE >= 3) {
-                const curX = getX(scannerIdx, w);
-                const curY = getY(totalProfit[scannerIdx], h, maxVal);
-                const size = 4 * dpr;
-                
-                ctxC.fillStyle = COLORS.alert;
-                ctxC.fillRect(curX-(size/2), curY-(size/2), size, size);
-                
-                ctxC.beginPath();
-                ctxC.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-                ctxC.lineWidth = 1 * dpr;
-                ctxC.moveTo(curX, 0);
-                ctxC.lineTo(curX, h);
-                ctxC.stroke();
-            }
-        }
-
-        /**
-         * ------------------------------------------------------------------
-         * LOGIC & ANIMATION
-         * ------------------------------------------------------------------
-         */
-
-        let lastTime = 0;
-        const SPEED_DRAW = 30;
-
-        function updateUI(idx) {
-            elLeft.innerText = `L: $${leftProfit[idx]}`;
-            elRight.innerText = `R: $${rightProfit[idx]}`;
-            elTotal.innerText = `TOT: $${totalProfit[idx]}`;
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString();
-        }
-
-        function renderFrame() {
-            // Helper to render current state based on phase vars
-            // Used for resize events in interactive mode
-             switch (STATE.PHASE) {
-                case 1: 
-                    drawPanelA(STATE.FWD_PROGRESS);
-                    drawPanelB(STATE.FWD_PROGRESS, STATE.FWD_PROGRESS, n);
-                    break;
-                case 2:
-                    drawPanelA(n-1);
-                    drawPanelB(n, n, STATE.BWD_PROGRESS);
-                    break;
-                case 3:
-                    drawPanelA(STATE.SWEEP_PROGRESS);
-                    drawPanelB(STATE.SWEEP_PROGRESS, n, 0);
-                    drawPanelC(STATE.SWEEP_PROGRESS, STATE.SWEEP_PROGRESS);
-                    break;
-                case 4:
-                    drawPanelA(STATE.SCANNER_INDEX);
-                    drawPanelB(STATE.SCANNER_INDEX, n, 0);
-                    drawPanelC(STATE.SCANNER_INDEX, n);
-                    break;
-            }
-        }
-
-        function animate(timestamp) {
-            if (!lastTime) lastTime = timestamp;
-            const delta = timestamp - lastTime;
-
-            if (delta > SPEED_DRAW) {
-                lastTime = timestamp;
-
-                switch (STATE.PHASE) {
-                    case 0: // Init
-                        STATE.PHASE = 1;
-                        elLog.innerText = "SYS: ANALYZING_PREFIX (DP_LEFT)...";
-                        break;
-
-                    case 1: // Forward
-                        if (STATE.FWD_PROGRESS < n) {
-                            STATE.FWD_PROGRESS++;
-                            drawPanelA(STATE.FWD_PROGRESS);
-                            drawPanelB(STATE.FWD_PROGRESS, STATE.FWD_PROGRESS, n);
-                        } else {
-                            STATE.PHASE = 2;
-                            elLog.innerText = "SYS: ANALYZING_SUFFIX (DP_RIGHT)...";
-                        }
-                        break;
-
-                    case 2: // Backward
-                        if (STATE.BWD_PROGRESS >= 0) {
-                            STATE.BWD_PROGRESS--;
-                            drawPanelA(n-1);
-                            drawPanelB(n, n, STATE.BWD_PROGRESS);
-                        } else {
-                            STATE.PHASE = 3;
-                            elLog.innerText = "SYS: AGGREGATING YIELD...";
-                            STATE.SWEEP_PROGRESS = 0;
-                        }
-                        break;
-
-                    case 3: // Sweep
-                        if (STATE.SWEEP_PROGRESS < n) {
-                            let i = STATE.SWEEP_PROGRESS;
-                            drawPanelA(i);
-                            drawPanelB(i, n, 0);
-                            drawPanelC(i, i);
-                            updateUI(i);
-                            STATE.SWEEP_PROGRESS++;
-                        } else {
-                            STATE.PHASE = 4;
-                            elLog.innerText = "SYS: TARGET_LOCKED. [INTERACTIVE]";
-                            elLog.classList.add('blink');
-                            STATE.SCANNER_INDEX = globalOptimum.maxIndex;
-                            updateUI(STATE.SCANNER_INDEX);
-                            drawPanelA(STATE.SCANNER_INDEX);
-                            drawPanelB(STATE.SCANNER_INDEX, n, 0);
-                            drawPanelC(STATE.SCANNER_INDEX, n);
-                        }
-                        break;
-
-                    case 4: // Interactive
-                        updateUI(STATE.SCANNER_INDEX);
-                        break;
-                }
-            }
-            requestAnimationFrame(animate);
-        }
-
-        /**
-         * ------------------------------------------------------------------
-         * INPUT HANDLING (MOUSE & TOUCH)
-         * ------------------------------------------------------------------
-         */
-        const container = document.getElementById('terminal-container');
+    // Draw Scanline
+    if (activeIdx >= 0) {
+        const x = getX(activeIdx, dimsA.w);
+        ctxA.strokeStyle = STATE.colors.primary;
+        ctxA.setLineDash([2, 4]);
+        ctxA.beginPath();
+        ctxA.moveTo(x, 0); ctxA.lineTo(x, dimsA.h);
+        ctxA.stroke();
+        ctxA.setLineDash([]);
         
-        function handleInput(clientX) {
-            if (STATE.PHASE !== 4) return;
-            
-            // Map X coordinate to index based on Canvas A rect
-            const rect = cvsA.getBoundingClientRect();
-            
-            // Boundary checks
-            if (clientX < rect.left || clientX > rect.right) return;
+        // Highlight point
+        const y = getY(STATE.data[activeIdx], dimsA.h, maxVal);
+        ctxA.fillStyle = STATE.colors.bg;
+        ctxA.fillRect(x-4, y-4, 8, 8);
+        ctxA.strokeRect(x-4, y-4, 8, 8);
+    }
 
-            const x = clientX - rect.left;
-            const padding = 20; // CSS pixels padding estimation
-            const w = rect.width - (padding * 2);
-            
-            let idx = Math.floor(((x - padding) / w) * (n - 1));
-            
-            // Clamp
-            if (idx < 0) idx = 0;
-            if (idx >= n) idx = n - 1;
+    // --- PANEL B: DP SWEEP ---
+    const ctxB = ctxs.B;
+    ctxB.clearRect(0,0,dimsB.w, dimsB.h);
+    drawGrid(ctxB, dimsB.w, dimsB.h);
 
-            if (idx !== STATE.SCANNER_INDEX) {
-                STATE.SCANNER_INDEX = idx;
-                renderFrame();
+    // Left Scan (Solid)
+    const drawCurve = (ctx, arr, limit, color, dir) => {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        
+        let start = (dir === 'fwd') ? 0 : arr.length-1;
+        let end = limit;
+        
+        // Determine draw range based on phase
+        if (dir === 'fwd') {
+             // Draw from 0 to limit
+             for(let i=0; i<= Math.min(limit, arr.length-1); i++) {
+                 let x = getX(i, dimsB.w);
+                 let y = getY(arr[i], dimsB.h, maxDP);
+                 if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+             }
+        } else {
+            // Draw from end down to limit
+            for(let i=arr.length-1; i>= Math.max(limit, 0); i--) {
+                 let x = getX(i, dimsB.w);
+                 let y = getY(arr[i], dimsB.h, maxDP);
+                 if(i===arr.length-1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
             }
         }
+        ctx.stroke();
+    };
 
-        container.addEventListener('mousemove', (e) => handleInput(e.clientX));
-        container.addEventListener('touchmove', (e) => {
-            if (e.touches.length > 0) {
-                // Prevent scrolling while scrubbing
-                e.preventDefault(); 
-                handleInput(e.touches[0].clientX);
-            }
-        }, { passive: false });
+    // Logic for partial drawing based on phase
+    let limL = -1, limR = CONFIG.dataCount;
+    
+    if (STATE.phase === 1) limL = STATE.progress;
+    else if (STATE.phase > 1) limL = CONFIG.dataCount - 1;
+    
+    if (STATE.phase === 2) limR = STATE.progress;
+    else if (STATE.phase > 2) limR = 0;
 
-        // Start
-        requestAnimationFrame(animate);
+    if (limL > -1) drawCurve(ctxB, STATE.dpLeft, limL, STATE.colors.primary, 'fwd');
+    if (limR < CONFIG.dataCount) drawCurve(ctxB, STATE.dpRight, limR, STATE.colors.secondary, 'bwd');
+    
+    // Cursor Intersect on Panel B
+    if (STATE.phase === 4 && STATE.cursor >= 0) {
+        const x = getX(STATE.cursor, dimsB.w);
+        ctxB.strokeStyle = STATE.colors.primary;
+        ctxB.setLineDash([2,2]);
+        ctxB.beginPath(); ctxB.moveTo(x,0); ctxB.lineTo(x, dimsB.h); ctxB.stroke();
+        
+        // Dots
+        let yL = getY(STATE.dpLeft[STATE.cursor], dimsB.h, maxDP);
+        let yR = getY(STATE.dpRight[STATE.cursor], dimsB.h, maxDP);
+        
+        ctxB.fillStyle = STATE.colors.primary;
+        ctxB.fillRect(x-2, yL-2, 4, 4);
+        ctxB.fillStyle = STATE.colors.secondary; // Dimmer for Right
+        ctxB.fillRect(x-2, yR-2, 4, 4);
+    }
 
-    </script>
+
+    // --- PANEL C: SYNTHESIS ---
+    const ctxC = ctxs.C;
+    ctxC.clearRect(0,0,dimsC.w, dimsC.h);
+    drawGrid(ctxC, dimsC.w, dimsC.h);
+
+    if (STATE.phase >= 3) {
+        let limT = (STATE.phase === 3) ? STATE.progress : CONFIG.dataCount-1;
+        
+        ctxC.beginPath();
+        ctxC.strokeStyle = STATE.colors.primary;
+        ctxC.lineWidth = 3;
+        
+        for(let i=0; i<=limT; i++) {
+            let x = getX(i, dimsC.w);
+            let y = getY(STATE.dpTotal[i], dimsC.h, maxDP);
+            if(i===0) ctxC.moveTo(x,y); else ctxC.lineTo(x,y);
+        }
+        ctxC.stroke();
+        
+        // Fill
+        ctxC.lineTo(getX(limT, dimsC.w), dimsC.h);
+        ctxC.lineTo(0, dimsC.h);
+        ctxC.fillStyle = createDitherPattern(ctxC);
+        ctxC.fill();
+
+        // Target Global Max (in Phase 4 or if reached)
+        if (STATE.phase === 4 || (STATE.phase === 3 && limT === CONFIG.dataCount-1)) {
+            const xMax = getX(STATE.maxIdx, dimsC.w);
+            const yMax = getY(STATE.dpTotal[STATE.maxIdx], dimsC.h, maxDP);
+            
+            // Draw Crosshair
+            ctxC.strokeStyle = STATE.colors.primary;
+            ctxC.lineWidth = 1;
+            ctxC.setLineDash([]);
+            ctxC.beginPath();
+            ctxC.arc(xMax, yMax, 10, 0, Math.PI*2);
+            ctxC.moveTo(xMax-15, yMax); ctxC.lineTo(xMax+15, yMax);
+            ctxC.moveTo(xMax, yMax-15); ctxC.lineTo(xMax, yMax+15);
+            ctxC.stroke();
+            
+            ctxC.font = '12px Courier New';
+            ctxC.fillStyle = STATE.colors.primary;
+            ctxC.fillText('OPT_MAX', xMax + 10, yMax - 10);
+        }
+    }
+}
+
+// --- CONTROLLER ---
+
+function reset() {
+    STATE.phase = 0;
+    STATE.progress = 0;
+    STATE.cursor = 0;
+    els.lblStatus.innerText = "INITIALIZING...";
+    els.lblStatus.classList.remove('blink');
+    runAlgorithms();
+    STATE.cursor = STATE.maxIdx; // Default cursor to max
+    animate();
+}
+
+function updateFooter(idx) {
+    els.valL.innerText = STATE.dpLeft[idx];
+    els.valR.innerText = STATE.dpRight[idx];
+    els.valT.innerText = STATE.dpTotal[idx];
+}
+
+let animFrame;
+function animate() {
+    // Animation Logic
+    if (STATE.phase === 0) {
+        STATE.phase = 1;
+        els.lblStatus.innerText = ">> SCAN_LEFT [FWD]";
+    } else if (STATE.phase === 1) {
+        // Left Scan
+        if (STATE.progress < CONFIG.dataCount - 1) {
+            STATE.progress++;
+            updateFooter(STATE.progress);
+        } else {
+            STATE.phase = 2;
+            STATE.progress = CONFIG.dataCount - 1;
+            els.lblStatus.innerText = "<< SCAN_RIGHT [BWD]";
+        }
+    } else if (STATE.phase === 2) {
+        // Right Scan
+        if (STATE.progress > 0) {
+            STATE.progress--;
+            updateFooter(STATE.progress);
+        } else {
+            STATE.phase = 3;
+            STATE.progress = 0;
+            els.lblStatus.innerText = ">> SYNTHESIZING...";
+        }
+    } else if (STATE.phase === 3) {
+        // Total Scan
+        if (STATE.progress < CONFIG.dataCount - 1) {
+            STATE.progress++;
+            updateFooter(STATE.progress);
+        } else {
+            STATE.phase = 4;
+            STATE.cursor = STATE.maxIdx;
+            els.lblStatus.innerText = "TARGET ACQUIRED. [INTERACTIVE]";
+            els.lblStatus.classList.add('blink');
+        }
+    }
+    
+    render();
+    
+    if (STATE.phase < 4) {
+        // Slow down animation loop slightly for retro feel
+        setTimeout(() => {
+            animFrame = requestAnimationFrame(animate);
+        }, 20);
+    }
+}
+
+// --- INTERACTION ---
+
+els.sel.addEventListener('change', (e) => {
+    STATE.mode = e.target.value;
+    if (STATE.mode === 'COST') {
+        els.body.classList.add('mode-cost');
+    } else {
+        els.body.classList.remove('mode-cost');
+    }
+    cancelAnimationFrame(animFrame);
+    STATE.data = generateData(); // New random data on switch
+    reset();
+});
+
+// Window Resize
+window.addEventListener('resize', () => {
+    render();
+});
+
+// Mouse / Touch Move
+const handleInput = (clientX) => {
+    if (STATE.phase !== 4) return;
+    const rect = els.cvsA.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const w = rect.width;
+    
+    let idx = Math.floor((x / w) * (CONFIG.dataCount - 1));
+    idx = Math.max(0, Math.min(idx, CONFIG.dataCount - 1));
+    
+    if (idx !== STATE.cursor) {
+        STATE.cursor = idx;
+        updateFooter(idx);
+        render();
+    }
+};
+
+window.addEventListener('mousemove', e => handleInput(e.clientX));
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    handleInput(e.touches[0].clientX);
+}, {passive: false});
+
+// --- BOOT ---
+reset();
+
+</script>
 </body>
 </html>

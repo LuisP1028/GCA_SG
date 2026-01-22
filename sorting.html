@@ -237,11 +237,14 @@
                     </span>
                 
                     <p><strong>Standardize:</strong> Convert all inputs into objects that track the numeric value and the "closed/open" status.</p>
+        
+                    <p>A <strong>Closed</strong> start “<strong>[x</strong>” includes <strong>x</strong>.<br>
+                    An <strong>Open</strong> start “<strong>(x</strong>” excludes <strong>x</strong>, effectively starting after <strong>x</strong>.</p>
                 
                     <p><strong>Sort:</strong> Arrange the intervals chronologically.</p>
                     <ul>
                         <li><strong>Primary Sort:</strong> Sort all intervals by their Left Endpoint value (ascending).</li>
-                        <li><strong>Secondary Sort:</strong> If start times are equal, put <em>Closed</em> left endpoints before <em>Open</em> right endpoints. This ensures we catch overlaps immediately.</li>
+                        <li><strong>Secondary Sort:</strong> If start times are equal, put <em>Closed</em> left endpoints before <em>Open</em> left endpoints. This ensures we catch overlaps immediately.</li>
                     </ul>
                 
                     <p><strong>Sweep and Merge:</strong> Once sorted, we perform a sweep through the list. We maintain one <em>Active Interval</em> and compare it against the <em>Next Interval</em>.</p>
@@ -252,6 +255,8 @@
                         <li><strong>Merge:</strong> If they touch or overlap, absorb Next. Extend the current interval's right endpoint to whichever value is higher (new interval, or old). If the values are equal, keep the Closed endpoint to ensure the number is included.</li>
                     </ul>
                 </div>
+            </div>
+        </details>
 
                 <div class="subsection">
                     <span class="subsection-title">
