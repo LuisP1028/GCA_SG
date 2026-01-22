@@ -3,13 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ordered Sequential Covering Flow // DITHERPUNK</title>
+    <title>Protocol: CHAIN_SCANNER // RESPONSIVE</title>
     <style>
         :root {
-            --bg: #000000;
-            --fg: #39FF14; /* Neon Green */
-            --accent: #FFB000; /* Amber for special events */
-            --font-main: 'Courier New', Courier, monospace;
+            /* Palette */
+            --bg: #050505;
+            --fg: #00FF00;
+            --dim: #004400;
+            --highlight: #CCFF00;
+            --err: #FF0033;
+            --win: #D0F;
+            
+            /* Typography */
+            --font-stack: 'Courier New', Courier, monospace;
+            --text-base: clamp(15px, 1.5vw, 16px);
+            --text-lg: clamp(16px, 2.5vw, 24px);
+            
+            /* Spacing */
+            --gap-sm: 0.5rem;
+            --gap-md: 1rem;
             --border-width: 2px;
         }
 
@@ -18,628 +30,636 @@
             user-select: none;
         }
 
-        body {
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: var(--bg);
             color: var(--fg);
-            font-family: var(--font-main);
-            margin: 0;
-            padding: 20px;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            font-family: var(--font-stack);
+            font-size: var(--text-base);
+            overflow: hidden; /* Prevent body scroll, let app handle it */
         }
 
-        /* --- DITHER PATTERNS & TEXTURES --- */
-        
-        /* Simulates a dim gray using a checkerboard of black and green */
-        .dither-dim {
-            background-image: repeating-conic-gradient(var(--fg) 0% 25%, transparent 0% 50%);
-            background-size: 2px 2px;
-            color: var(--bg);
-        }
-
-        /* Diagonal striping for backgrounds */
-        .dither-bg {
-            background-image: repeating-linear-gradient(45deg, var(--fg) 25%, transparent 25%, transparent 50%, var(--fg) 50%, var(--fg) 75%, transparent 75%, transparent 100%);
-            background-size: 4px 4px;
-        }
-
-        /* Error/Broken pattern */
-        .dither-error {
-            background-image: repeating-linear-gradient(135deg, var(--fg) 0px, var(--fg) 2px, transparent 2px, transparent 6px);
-            background-size: 8px 8px;
-        }
-
-        /* --- LAYOUT ZONES --- */
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            height: 100%;
-            max-width: 1000px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        h1 {
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            border-bottom: var(--border-width) solid var(--fg);
-            margin: 0;
-            padding-bottom: 5px;
-            letter-spacing: 2px;
-        }
-
-        /* ZONE A: THE STREAM */
-        #zone-a {
-            flex: 2;
-            border: var(--border-width) solid var(--fg);
-            position: relative;
-            overflow-x: auto;
-            overflow-y: hidden;
-            display: flex;
-            align-items: center;
-            background: var(--bg);
-            /* Custom Scrollbar styling */
-            scrollbar-width: thin;
-            scrollbar-color: var(--fg) var(--bg);
-        }
-        
-        #stream-content {
-            display: flex;
-            padding: 0 50vw 0 20px; /* Padding to allow scrolling */
-            align-items: center;
-            position: relative;
-            min-height: 150px;
-        }
-
-        /* SVG Overlay Layer */
-        #svg-layer {
-            position: absolute;
+        /* --- BACKGROUND FX --- */
+        #dither-canvas {
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 0;
+            opacity: 0.12;
             pointer-events: none;
-            z-index: 10;
         }
 
-        .word-block {
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 999;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.25) 50%,
+                rgba(0,0,0,0.25)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        /* --- MAIN LAYOUT --- */
+        #app {
+            position: relative;
+            z-index: 1;
             display: flex;
             flex-direction: column;
+            height: 100vh; /* Full viewport height */
+            width: 100vw;
+            padding: clamp(10px, 2vw, 20px);
+            gap: var(--gap-md);
+            max-width: 2560px; /* Cap width on ultrawide for readability */
+            margin: 0 auto;
+        }
+
+        /* --- 1. HEADER --- */
+        header {
+            flex: 0 0 auto; /* Don't shrink */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
             align-items: center;
-            margin-right: 25px;
-            position: relative;
-            z-index: 5;
-            transition: none; /* No smooth transition for retro feel */
+            border-bottom: var(--border-width) solid var(--fg);
+            padding-bottom: var(--gap-sm);
+            gap: var(--gap-sm);
         }
 
-        .word-index {
-            font-size: 0.7rem;
-            margin-bottom: 4px;
-            opacity: 1;
-        }
-
-        .word-text {
-            border: 1px solid var(--fg);
-            padding: 8px 12px;
-            font-weight: bold;
-            background: var(--bg);
-        }
-
-        /* Keyword Tint (Dithered) */
-        .is-keyword .word-text {
-            background-image: radial-gradient(var(--fg) 10%, transparent 10%);
-            background-size: 3px 3px;
-        }
-
-        /* Active Scanner */
-        .word-block.active .word-text {
-            background: var(--fg);
-            color: var(--bg);
-            box-shadow: 4px 4px 0 var(--accent);
-        }
-
-        /* Global Best Range Highlight */
-        .word-block.gold-border .word-text {
-            border: 2px solid var(--accent);
-            box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-        }
-
-        /* ZONE B: TRACKER */
-        #zone-b {
-            flex: 1;
-            border: var(--border-width) solid var(--fg);
-            padding: 10px;
-            overflow: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: center;
-        }
-
-        th, td {
-            border: 1px solid var(--fg);
-            padding: 8px;
-        }
-
-        th {
-            background: var(--fg);
-            color: var(--bg);
+        h1 {
+            margin: 0;
+            font-size: var(--text-lg);
+            text-shadow: 0 0 5px var(--fg);
             text-transform: uppercase;
+            letter-spacing: 2px;
+            white-space: nowrap;
         }
 
-        .cell-flash {
-            background: var(--fg) !important;
-            color: var(--bg) !important;
-        }
-
-        .cell-error {
-            background-image: repeating-linear-gradient(45deg, var(--fg) 0, var(--fg) 1px, transparent 1px, transparent 4px);
-            color: var(--fg);
-        }
-
-        /* ZONE C: RESULT */
-        #zone-c {
-            flex: 0 0 80px;
-            border: var(--border-width) solid var(--fg);
+        .controls {
             display: flex;
+            gap: var(--gap-sm);
             align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        .result-label {
-            margin-right: 20px;
-            font-size: 1rem;
-        }
-
-        #global-min-display {
-            color: var(--accent);
-            text-shadow: 2px 2px 0 var(--fg);
-        }
-
-        /* CONTROL PANEL */
-        #controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            border: var(--border-width) solid var(--fg);
-            padding: 10px;
+            flex-wrap: wrap;
         }
 
         button {
             background: var(--bg);
             color: var(--fg);
-            border: 1px solid var(--fg);
-            padding: 10px 20px;
-            font-family: var(--font-main);
-            text-transform: uppercase;
-            cursor: pointer;
-            box-shadow: 2px 2px 0 var(--fg);
-        }
-
-        button:active {
-            transform: translate(2px, 2px);
-            box-shadow: none;
-        }
-
-        button:disabled {
-            border-style: dashed;
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
-        .slider-container {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-left: 20px;
-        }
-
-        input[type=range] {
-            width: 100%;
-            accent-color: var(--fg);
-        }
-
-        /* NARRATOR BOX */
-        #narrator {
-            height: 60px;
             border: var(--border-width) solid var(--fg);
-            padding: 10px;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .cursor-blink::after {
-            content: "█";
-            animation: blink 1s step-end infinite;
+            padding: 0.5rem 1rem;
+            font-family: var(--font-stack);
+            font-weight: bold;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.1s;
         }
 
-        @keyframes blink {
-            50% { opacity: 0; }
+        button:hover {
+            background: var(--fg);
+            color: var(--bg);
+            box-shadow: 0 0 10px var(--fg);
+        }
+
+        label { font-size: 0.8em; font-weight: bold;}
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: var(--dim);
+            height: 6px;
+            width: 80px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: var(--fg);
+            cursor: pointer;
+        }
+
+        /* --- 2. TEXT ZONE (Flexible) --- */
+        #zone-text {
+            flex: 1 1 auto; /* Grow to fill space */
+            border: var(--border-width) solid var(--fg);
+            padding: var(--gap-md);
+            overflow-y: auto; /* Internal Scroll */
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 0.5em 0.8em;
+            background: rgba(0, 20, 0, 0.6);
+            line-height: 1.6;
+            font-size: 1.1em;
+        }
+
+        .word-node {
+            position: relative;
+            padding: 0.1em 0.3em;
+            transition: background 0.1s;
+        }
+
+        .word-node small {
+            position: absolute;
+            top: -0.8em;
+            left: 0;
+            font-size: 0.6em;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* STATES */
+        .cursor-active {
+            background: var(--fg);
+            color: var(--bg);
+            box-shadow: 0 0 15px var(--fg);
+            z-index: 10;
+        }
+        .is-keyword {
+            border-bottom: 2px solid var(--highlight);
+            color: var(--highlight);
+            font-weight: bold;
+        }
+        .winning-span {
+            background: rgba(208, 0, 255, 0.2);
+            border: 1px solid var(--win);
+            color: #fff;
+            text-shadow: 0 0 5px var(--win);
+        }
+
+        /* --- 3. DASHBOARD (Responsive Grid) --- */
+        #zone-dashboard {
+            flex: 0 0 auto; /* Content based height, but creates the "middle" section */
+            display: grid;
+            /* Mobile: Stacked | Desktop: Side-by-Side */
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: var(--gap-md);
+            border: var(--border-width) solid var(--fg);
+            padding: var(--gap-md);
+            background: rgba(0,0,0,0.85);
+            min-height: 20vh;
+        }
+
+        /* Target List */
+        .target-list {
+            border: 1px dashed var(--dim);
+            padding: var(--gap-sm);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .target-header {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            text-decoration: underline;
+        }
+        .target-item { opacity: 0.5; margin-bottom: 0.25rem; }
+        .target-item.active-target { opacity: 1; color: var(--highlight); text-shadow: 0 0 5px var(--highlight); }
+
+        /* The Table */
+        .matrix-container {
+            overflow-x: auto; /* Allow table to scroll horizontally on very small screens */
+            border: 1px solid var(--dim);
+            padding: var(--gap-sm);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 300px; /* Ensure columns don't collapse too much */
+        }
+
+        .data-table th, .data-table td {
+            text-align: left;
+            padding: 0.5em;
+            border-bottom: 1px solid var(--dim);
+        }
+
+        .data-table th {
+            color: var(--fg);
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+            background: rgba(0, 50, 0, 0.3);
+        }
+
+        .row-updated { animation: flashRow 0.5s ease-out; }
+        @keyframes flashRow {
+            0% { background: var(--fg); color: var(--bg); }
+            100% { background: transparent; color: var(--fg); }
+        }
+
+        /* --- 4. CONSOLE (Bottom Fixed Height) --- */
+        #zone-console {
+            flex: 0 0 15vh; /* Fixed percentage of height */
+            min-height: 100px;
+            max-height: 200px;
+            border: var(--border-width) solid var(--fg);
+            padding: var(--gap-sm);
+            display: flex;
+            flex-direction: column;
+            font-size: 0.85em;
+            background: #000;
+        }
+
+        .console-header {
+            flex: 0 0 auto;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--dim);
+            padding-bottom: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .global-min-box {
+            font-weight: bold;
+            color: var(--highlight);
+        }
+
+        #log-feed {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .log-entry { word-wrap: break-word; }
+        .log-entry::before { content: '>> '; opacity: 0.5;}
+        .log-success { color: var(--highlight); }
+        .log-fail { color: var(--err); }
+        .log-win { color: var(--win); font-weight: bold; }
+
+        /* --- MEDIA QUERIES for Edge Cases --- */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2rem; }
+            .controls label { display: none; } /* Hide label to save space */
+            #zone-dashboard { grid-template-columns: 1fr; } /* Force stack */
+            .target-list { display: none; } /* Hide target list on strict mobile to prioritize table */
         }
 
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <!-- VISUAL NOISE LAYERS -->
+    <canvas id="dither-canvas"></canvas>
+    <div class="scanlines"></div>
+
+    <div id="app">
+        
+        <!-- 1. Header -->
         <header>
-            <h1>Ordered Sequential Covering Flow</h1>
+            <h1>Ordered Subarray Scanner</h1>
+            <div class="controls">
+                <label for="speed-slider">SPEED</label>
+                <input type="range" id="speed-slider" min="50" max="1000" value="200">
+                <button id="btn-toggle">START</button>
+                <button id="btn-reset">RESET</button>
+            </div>
         </header>
 
-        <!-- ZONE A: The Stream -->
-        <div id="zone-a">
-            <div id="stream-content">
-                <svg id="svg-layer"></svg>
-                <!-- Words injected by JS -->
+        <!-- 2. Text Stream -->
+        <div id="zone-text" aria-label="Text Stream">
+            <!-- Words injected via JS -->
+        </div>
+
+        <!-- 3. Dashboard -->
+        <div id="zone-dashboard">
+            <!-- Left: Target List -->
+            <div class="target-list" id="target-list-display">
+                <div class="target-header">TARGET SEQ:</div>
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Right: The Matrix Table -->
+            <div class="matrix-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Keyword</th>
+                            <th>Last Index</th>
+                            <th>Chain Length</th>
+                        </tr>
+                    </thead>
+                    <tbody id="state-table-body">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- ZONE B: The Tracker -->
-        <div id="zone-b">
-            <table id="tracker-table">
-                <thead>
-                    <tr id="tracker-header">
-                        <th>Metric</th>
-                        <!-- Keyword headers injected by JS -->
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr id="row-idx">
-                        <td>Latest Index</td>
-                    </tr>
-                    <tr id="row-len">
-                        <td>Chain Length</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- ZONE C: Result -->
-        <div id="zone-c">
-            <span class="result-label">GLOBAL MINIMUM FOUND:</span>
-            <span id="global-min-display">∞</span>
-        </div>
-
-        <!-- Controls -->
-        <div id="controls">
-            <button id="btn-play">Play</button>
-            <button id="btn-pause">Pause</button>
-            <button id="btn-step">Step</button>
-            <div class="slider-container">
-                <label>SPEED</label>
-                <input type="range" id="speed-slider" min="100" max="2000" step="100" value="1000">
+        <!-- 4. System Console -->
+        <div id="zone-console">
+            <div class="console-header">
+                <span>SYSTEM LOG</span>
+                <span class="global-min-box">MIN SUBARRAY: <span id="global-min-val">∞</span></span>
             </div>
-            <button id="btn-reset">Reset</button>
+            <div id="log-feed"></div>
         </div>
 
-        <!-- Narrator -->
-        <div id="narrator">
-            <span id="narrator-text" class="cursor-blink">System Ready. Awaiting Command...</span>
-        </div>
     </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const inputText = "the big black cat sat on the warm mat and the cat sat with a hat";
-    const keywords = ["cat", "sat", "mat"];
-    const words = inputText.split(" ");
-    
-    // --- STATE ---
-    let currentIndex = 0;
+    /**
+     * CONFIGURATION & DATA
+     */
+    const RAW_TEXT = "The code breaker attempted to crack the cipher. The first code was simple, but the second code was complex. Finally, the master breaker cracked the cipher.";
+    const KEYWORDS = ["code", "breaker", "cipher"];
+    const WORDS = RAW_TEXT.split(' ');
+
+    // DOM Elements
+    const elZoneText = document.getElementById('zone-text');
+    const elTableBody = document.getElementById('state-table-body');
+    const elTargetList = document.getElementById('target-list-display');
+    const elLog = document.getElementById('log-feed');
+    const elGlobalMin = document.getElementById('global-min-val');
+    const btnToggle = document.getElementById('btn-toggle');
+    const btnReset = document.getElementById('btn-reset');
+    const sliderSpeed = document.getElementById('speed-slider');
+
+    // State
     let isRunning = false;
     let timer = null;
-    let speed = 1000; // ms
-    
-    // Algorithm State
-    let latestOccurrence = new Array(keywords.length).fill(-1);
-    let shortestLengthUpTo = new Array(keywords.length).fill(Infinity);
+    let currentIndex = 0;
     let globalMin = Infinity;
-    let globalMinRange = null; // {start, end}
+    let winningRange = null;
 
-    // --- DOM ELEMENTS ---
-    const streamContent = document.getElementById('stream-content');
-    const svgLayer = document.getElementById('svg-layer');
-    const trackerHeader = document.getElementById('tracker-header');
-    const rowIdx = document.getElementById('row-idx');
-    const rowLen = document.getElementById('row-len');
-    const globalMinDisplay = document.getElementById('global-min-display');
-    const narratorText = document.getElementById('narrator-text');
-    
-    const btnPlay = document.getElementById('btn-play');
-    const btnPause = document.getElementById('btn-pause');
-    const btnStep = document.getElementById('btn-step');
-    const btnReset = document.getElementById('btn-reset');
-    const slider = document.getElementById('speed-slider');
+    // Algorithm State
+    let lastIndices = new Array(KEYWORDS.length).fill(-1);
+    let chainLengths = new Array(KEYWORDS.length).fill(0);
 
-    // --- INITIALIZATION ---
-
+    /**
+     * INITIALIZATION
+     */
     function init() {
-        // 1. Render Stream
-        streamContent.innerHTML = '<svg id="svg-layer"></svg>'; // Reset content keeping SVG
-        words.forEach((word, index) => {
-            const block = document.createElement('div');
-            block.className = 'word-block';
-            block.id = `word-${index}`;
-            
-            const isKw = keywords.includes(word);
-            if(isKw) block.classList.add('is-keyword');
-
-            block.innerHTML = `
-                <div class="word-index">${index}</div>
-                <div class="word-text">${word}</div>
-            `;
-            streamContent.appendChild(block);
+        // 1. Render Text
+        elZoneText.innerHTML = '';
+        WORDS.forEach((word, idx) => {
+            const span = document.createElement('span');
+            span.className = 'word-node';
+            span.id = `w-${idx}`;
+            span.innerHTML = `${word}<small>${idx}</small>`; // Added index number
+            elZoneText.appendChild(span);
         });
 
-        // 2. Render Tracker Table
-        // Clear existing keyword cells (keep first "Metric" cell)
-        while(trackerHeader.children.length > 1) trackerHeader.removeChild(trackerHeader.lastChild);
-        while(rowIdx.children.length > 1) rowIdx.removeChild(rowIdx.lastChild);
-        while(rowLen.children.length > 1) rowLen.removeChild(rowLen.lastChild);
+        // 2. Render Targets
+        // Keep header
+        const header = elTargetList.firstElementChild;
+        elTargetList.innerHTML = '';
+        elTargetList.appendChild(header);
 
-        keywords.forEach((kw, k) => {
-            // Header
-            const th = document.createElement('th');
-            th.innerText = kw;
-            trackerHeader.appendChild(th);
-
-            // Row 1 (Index)
-            const tdIdx = document.createElement('td');
-            tdIdx.id = `cell-idx-${k}`;
-            tdIdx.innerText = '-';
-            rowIdx.appendChild(tdIdx);
-
-            // Row 2 (Length)
-            const tdLen = document.createElement('td');
-            tdLen.id = `cell-len-${k}`;
-            tdLen.innerText = '∞';
-            rowLen.appendChild(tdLen);
+        KEYWORDS.forEach((kw, i) => {
+            const div = document.createElement('div');
+            div.className = 'target-item';
+            div.id = `target-${i}`;
+            div.textContent = `[${i}] ${kw.toUpperCase()}`;
+            elTargetList.appendChild(div);
         });
 
-        // 3. Reset State
+        // 3. Render Table
+        renderTable();
+        
+        // 4. Reset Globals
         currentIndex = 0;
-        latestOccurrence.fill(-1);
-        shortestLengthUpTo.fill(Infinity);
         globalMin = Infinity;
-        globalMinRange = null;
-        globalMinDisplay.innerText = "∞";
-        narrate("System Initialized. Ready to scan.");
-        updateSVGDimensions();
-    }
-
-    // --- UTILITIES ---
-
-    function narrate(text) {
-        narratorText.innerText = text;
-    }
-
-    function updateSVGDimensions() {
-        const svg = document.getElementById('svg-layer');
-        svg.setAttribute('width', streamContent.scrollWidth);
-        svg.setAttribute('height', streamContent.scrollHeight);
-    }
-
-    function scrollStream(index) {
-        const el = document.getElementById(`word-${index}`);
-        if(el) {
-            el.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
-        }
-    }
-
-    function drawConnection(fromIndex, toIndex, isError) {
-        const svg = document.getElementById('svg-layer');
-        updateSVGDimensions();
-
-        const fromEl = document.getElementById(`word-${fromIndex}`).querySelector('.word-text');
-        const toEl = document.getElementById(`word-${toIndex}`).querySelector('.word-text');
-
-        // Calculate positions relative to the container
-        const containerRect = streamContent.getBoundingClientRect();
-        const fromRect = fromEl.getBoundingClientRect();
-        const toRect = toEl.getBoundingClientRect();
-
-        const x1 = (fromRect.left - containerRect.left) + fromRect.width / 2;
-        const y1 = (fromRect.top - containerRect.top) + fromRect.height; // bottom of box
-        const x2 = (toRect.left - containerRect.left) + toRect.width / 2;
-        const y2 = (toRect.top - containerRect.top) + toRect.height; 
-
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        winningRange = null;
+        lastIndices.fill(-1);
+        chainLengths.fill(0);
+        elGlobalMin.textContent = "∞";
+        elLog.innerHTML = ''; 
+        log("System Ready. Waiting for input.");
         
-        // Arc math
-        const controlY = y1 + 60; // Curve depth
-        const d = `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${controlY} ${x2} ${y2}`;
-
-        path.setAttribute("d", d);
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", isError ? "var(--accent)" : "var(--fg)");
-        path.setAttribute("stroke-width", "2");
-        path.setAttribute("stroke-dasharray", isError ? "4 2" : "none");
-        
-        // Remove old temporary paths
-        const oldPaths = svg.querySelectorAll('.temp-path');
-        oldPaths.forEach(p => p.remove());
-
-        path.classList.add('temp-path');
-        svg.appendChild(path);
+        // Ensure dither is sized correctly
+        drawDither();
     }
 
-    function flashCell(id, isError = false) {
-        const cell = document.getElementById(id);
-        if(cell) {
-            // Remove classes to re-trigger
-            cell.classList.remove('cell-flash', 'cell-error');
-            void cell.offsetWidth; // Force reflow
-            if (isError) cell.classList.add('cell-error');
-            else cell.classList.add('cell-flash');
-            
-            setTimeout(() => {
-                cell.classList.remove('cell-flash');
-                if(!isError) cell.classList.remove('cell-error'); // Keep error persistent until next update if needed? No, prompt says flash.
-            }, 500);
-        }
+    function renderTable() {
+        elTableBody.innerHTML = '';
+        KEYWORDS.forEach((kw, k) => {
+            const tr = document.createElement('tr');
+            tr.id = `row-${k}`;
+            tr.innerHTML = `
+                <td>${k}</td>
+                <td>${kw.toUpperCase()}</td>
+                <td id="cell-idx-${k}" style="font-family: monospace">-</td>
+                <td id="cell-len-${k}" style="font-family: monospace">-</td>
+            `;
+            elTableBody.appendChild(tr);
+        });
     }
 
-    function highlightRange(start, end, isBest) {
-        // Clear previous golds
-        document.querySelectorAll('.gold-border').forEach(el => el.classList.remove('gold-border'));
-        
-        for(let i = start; i <= end; i++) {
-            const el = document.getElementById(`word-${i}`);
-            if(isBest) el.classList.add('gold-border');
-        }
-    }
-
-    // --- CORE LOGIC ---
-
+    /**
+     * CORE LOGIC
+     */
     function step() {
-        if (currentIndex >= words.length) {
-            narrate("Sequence Complete.");
+        if (currentIndex >= WORDS.length) {
             stop();
+            log("End of stream reached.", "log-success");
             return;
         }
 
-        // 1. UI: Move Scanner
-        document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
-        const currentBlock = document.getElementById(`word-${currentIndex}`);
-        currentBlock.classList.add('active');
-        scrollStream(currentIndex);
+        // 1. Visual Cursor
+        if (currentIndex > 0) {
+            const prev = document.getElementById(`w-${currentIndex-1}`);
+            if(prev) prev.classList.remove('cursor-active');
+        }
+        const currentEl = document.getElementById(`w-${currentIndex}`);
+        currentEl.classList.add('cursor-active');
+        
+        // Smart Scroll (Only scroll if out of view)
+        const rect = currentEl.getBoundingClientRect();
+        const containerRect = elZoneText.getBoundingClientRect();
+        if (rect.bottom > containerRect.bottom || rect.top < containerRect.top) {
+            currentEl.scrollIntoView({behavior: "smooth", block: "center"});
+        }
 
-        const currentWord = words[currentIndex];
-        const k = keywords.indexOf(currentWord);
+        // 2. Normalize word
+        const rawWord = WORDS[currentIndex];
+        const cleanWord = rawWord.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").toLowerCase();
 
-        if (k === -1) {
-            // Non-keyword
-            narrate(`Scanning index ${currentIndex}: "${currentWord}"...`);
-        } else {
-            // Is Keyword
-            latestOccurrence[k] = currentIndex;
-            
-            // Update Tracker UI (Index)
-            const idxCellId = `cell-idx-${k}`;
-            const idxCell = document.getElementById(idxCellId);
-            idxCell.innerText = currentIndex;
-            flashCell(idxCellId);
+        // 3. Check Keyword
+        const keywordRank = KEYWORDS.indexOf(cleanWord);
 
-            if (k === 0) {
-                // First keyword in chain
-                shortestLengthUpTo[0] = 1;
-                
-                // Update Tracker UI (Length)
-                const lenCellId = `cell-len-${0}`;
-                const lenCell = document.getElementById(lenCellId);
-                lenCell.innerText = "1";
-                flashCell(lenCellId);
-
-                narrate(`Found START anchor "${currentWord}". Chain init.`);
-            } else {
-                // Subsequent keyword
-                const prevIndex = latestOccurrence[k-1];
-                
-                if (prevIndex === -1) {
-                    // Broken Chain
-                    narrate(`Found "${currentWord}", but previous link missing. Chain broken.`);
-                    flashCell(`cell-len-${k}`, true); // Red/Error flash
-                    shortestLengthUpTo[k] = Infinity;
-                    document.getElementById(`cell-len-${k}`).innerText = "∞";
-                } else {
-                    // Valid Chain Link
-                    const dist = currentIndex - prevIndex;
-                    const newLength = dist + shortestLengthUpTo[k-1];
-                    shortestLengthUpTo[k] = newLength;
-
-                    // Update Tracker UI (Length)
-                    const lenCellId = `cell-len-${k}`;
-                    const lenCell = document.getElementById(lenCellId);
-                    lenCell.innerText = newLength;
-                    flashCell(lenCellId);
-
-                    // Visual Arc
-                    drawConnection(prevIndex, currentIndex, false);
-
-                    narrate(`Linked "${currentWord}" to "${keywords[k-1]}". Dist: ${dist}, Total: ${newLength}.`);
-
-                    // Check Result if it's the last keyword
-                    if (k === keywords.length - 1) {
-                        if (newLength < globalMin) {
-                            globalMin = newLength;
-                            globalMinDisplay.innerText = globalMin;
-                            
-                            // Calculate range start
-                            // To find the exact start index of this chain, we'd need to backtrack. 
-                            // But for this simplified vis, we know the chain ends here and length is newLength.
-                            // However, strictly finding the start index requires storing parent pointers.
-                            // Simplified approach for Vis: Draw box around relevant area visually?
-                            // Or just highlight from current back to k-2 back to k-1...
-                            
-                            // Let's approximate the range visuals by highlighting from the first keyword's latest occurrence
-                            // Note: This works for Ordered Sequential Covering.
-                            let rangeStart = latestOccurrence[0];
-                            highlightRange(rangeStart, currentIndex, true);
-                            narrate(`NEW GLOBAL MINIMUM: ${globalMin}! Range highlighted.`);
-                        } else {
-                            narrate(`Chain Complete (Len: ${newLength}). Not better than ${globalMin}.`);
-                        }
-                    }
-                }
-            }
+        if (keywordRank !== -1) {
+            currentEl.classList.add('is-keyword');
+            handleKeyword(keywordRank, currentIndex);
         }
 
         currentIndex++;
     }
 
-    // --- CONTROLLER ---
+    function handleKeyword(rank, idx) {
+        log(`Found '${KEYWORDS[rank]}' (Rank ${rank}) at index ${idx}`);
+        
+        // Flash Dashboard Row
+        const row = document.getElementById(`row-${rank}`);
+        row.classList.remove('row-updated');
+        void row.offsetWidth; 
+        row.classList.add('row-updated');
 
+        // Update Target List Highlight
+        document.querySelectorAll('.target-item').forEach(el => el.classList.remove('active-target'));
+        document.getElementById(`target-${rank}`).classList.add('active-target');
+
+        // Logic
+        if (rank === 0) {
+            chainLengths[0] = 1;
+            lastIndices[0] = idx;
+            updateCell(0, idx, 1);
+            log(`-> Rank 0 reset.`, 'log-success');
+        } else {
+            const prevLen = chainLengths[rank - 1];
+            
+            if (prevLen > 0) {
+                const prevIdx = lastIndices[rank - 1];
+                const distance = idx - prevIdx; 
+                const newLen = prevLen + distance;
+
+                chainLengths[rank] = newLen;
+                lastIndices[rank] = idx;
+                
+                updateCell(rank, idx, newLen);
+                log(`-> Linked Rank ${rank-1} to ${rank}. Length: ${newLen}`, 'log-success');
+                
+                highlightConnection(prevIdx, idx);
+
+                if (rank === KEYWORDS.length - 1) {
+                    checkWin(newLen, idx);
+                }
+
+            } else {
+                log(`-> Broken Chain. Rank ${rank-1} invalid.`, 'log-fail');
+                chainLengths[rank] = 0;
+                lastIndices[rank] = -1;
+                updateCell(rank, '-', '-');
+            }
+        }
+    }
+
+    function checkWin(totalLen, endIdx) {
+        if (totalLen < globalMin) {
+            globalMin = totalLen;
+            elGlobalMin.textContent = globalMin;
+            
+            // Formula: Start = End - Length + 1
+            const startIdx = endIdx - totalLen + 1;
+            winningRange = { start: startIdx, end: endIdx };
+            
+            log(`*** NEW RECORD: ${totalLen} ***`, 'log-win');
+            updateWinningVisuals();
+        } else {
+            log(`Complete but longer (${totalLen}).`);
+        }
+    }
+
+    function updateCell(rank, idxVal, lenVal) {
+        document.getElementById(`cell-idx-${rank}`).textContent = idxVal;
+        document.getElementById(`cell-len-${rank}`).textContent = lenVal;
+    }
+
+    function highlightConnection(start, end) {
+        for(let i=start+1; i<end; i++) {
+             const el = document.getElementById(`w-${i}`);
+             // Subtle visual trail
+             el.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
+             setTimeout(() => el.style.backgroundColor = '', 200);
+        }
+    }
+
+    function updateWinningVisuals() {
+        document.querySelectorAll('.winning-span').forEach(el => el.classList.remove('winning-span'));
+        if(winningRange) {
+            for(let i=winningRange.start; i<=winningRange.end; i++) {
+                document.getElementById(`w-${i}`).classList.add('winning-span');
+            }
+        }
+    }
+
+    function log(msg, type='') {
+        const div = document.createElement('div');
+        div.className = `log-entry ${type}`;
+        div.textContent = msg;
+        elLog.appendChild(div);
+        elLog.scrollTop = elLog.scrollHeight;
+    }
+
+    // Canvas Dither
+    function drawDither() {
+        const canvas = document.getElementById('dither-canvas');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        const idata = ctx.createImageData(w, h);
+        const buffer32 = new Uint32Array(idata.data.buffer);
+        const len = buffer32.length;
+
+        for (let i = 0; i < len; i++) {
+            if (Math.random() < 0.15) {
+                // Green pixel 0xff00ff00 (Little Endian: A B G R)
+                buffer32[i] = 0xff00ff00; 
+            }
+        }
+        ctx.putImageData(idata, 0, 0);
+    }
+
+    // Loops & Controls
     function start() {
         if(isRunning) return;
         isRunning = true;
-        btnPlay.disabled = true;
-        btnPause.disabled = false;
-        btnStep.disabled = true;
-        
-        timer = setInterval(step, 2100 - speed); // Invert logic for slider
+        btnToggle.textContent = "PAUSE";
+        const loop = () => {
+            if(!isRunning) return;
+            step();
+            const delay = parseInt(sliderSpeed.value);
+            timer = setTimeout(loop, delay);
+        };
+        loop();
     }
 
     function stop() {
         isRunning = false;
-        clearInterval(timer);
-        btnPlay.disabled = false;
-        btnPause.disabled = true;
-        btnStep.disabled = false;
+        btnToggle.textContent = "RESUME";
+        clearTimeout(timer);
     }
 
-    // Event Listeners
-    btnPlay.addEventListener('click', start);
-    btnPause.addEventListener('click', stop);
-    btnStep.addEventListener('click', () => {
-        stop();
-        step();
-    });
-    btnReset.addEventListener('click', () => {
-        stop();
-        init();
-    });
-    
-    slider.addEventListener('input', (e) => {
-        speed = parseInt(e.target.value);
-        if(isRunning) {
-            stop();
-            start();
-        }
-    });
+    function toggle() {
+        if(isRunning) stop();
+        else start();
+    }
 
-    // Handle resize for SVG lines
+    function reset() {
+        stop();
+        document.querySelectorAll('.word-node').forEach(el => {
+            el.className = 'word-node';
+            el.style.backgroundColor = '';
+        });
+        btnToggle.textContent = "START";
+        init();
+    }
+
+    // Listeners
+    btnToggle.addEventListener('click', toggle);
+    btnReset.addEventListener('click', reset);
     window.addEventListener('resize', () => {
-        updateSVGDimensions();
+        drawDither();
     });
 
     // Boot
