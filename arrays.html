@@ -384,7 +384,7 @@ Analogy: Reading a Map
                                 <li>Otherwise, skip (it's a duplicate)</li>
                             
                         </li>
-                        <li>At the end, <code>write_index</code> is the new length of the array with uniques only.</li>
+                        <li>Return <code>write_index</code> as the new length. The valid array is now just the first <code>write_index</code> elements; the old duplicates remaining after that point are simply ignored.</li>
                     </ol>
                   
                     
