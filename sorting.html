@@ -166,13 +166,13 @@
                         <li><strong>Offset Map:</strong> A map tracking the current write index for each Key group.</li>
                         <li><strong>In-Place Permutation:</strong> Rearranging elements within the original memory allocation, minimizing auxiliary space.</li>
                         <li><strong>Cyclic Sort / Routing:</strong> The logic of identifying where an element belongs, swapping it there, and dealing with the element that was displaced.</li>
-                        <li><strong>Interactions between maps and pointers: 
+                        <li><strong>Interactions between maps and pointers:</strong> 
                             The Frequency Map is used once initially to calculate partition sizes. These sums determine the starting indices for the Offset Map.
                             The Offset Map functions as dynamic write pointers. During the routing loop, the algorithm reads the item at the current index and queries the Offset Map to find its correct destination. Upon placing an item (via swap or match), you increment that group's value in the Offset Map. This advances the pointer to the next free slot.</li>
                     </ul>
                     <ol>
                         <li><strong>Step 1: The Frequency Counter.</strong> Iterate through the array once to build the Frequency Map. Calculate the exact size of every group to virtually "reserve"a partition.</li>
-                        <li><strong>Step 2: The Offset Map</strong> Convert counts into absolute Start Indices to create starting indices for each partition, giving write heads context.</li>
+                        <li><strong>Step 2: The Offset Map</strong> Convert counts into starting indices for each partition, giving write heads context.</li>
                         <li><strong>Step 3: The Routing Loop.</strong> Iterate while the Offset Map is not empty.
                             <ul>
                                 <li><strong>Select a Source:</strong> Pick a group from the map and look at its current Write Head index.</li>
