@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Part III: Sorting // Study Guide</title>
 <style>
-    /* 
-       --- STYLE CONFIGURATION --- 
+    /* --- STYLE CONFIGURATION --- 
        (Identical to Main Shell)
     */
     :root {
@@ -144,12 +143,8 @@
 <div class="container">
     <h1>Part III: Sorting</h1>
 
-    <!-- MAIN CONTENT BUCKET -->
     <div class="part-content">
         
-        <!-- ============================================== -->
-        <!-- SECTION 1: PARTITIONING & GROUPING -->
-        <!-- ============================================== -->
         <details class="section">
             <summary>1. Partitioning & Grouping</summary>
             <div class="section-content">
@@ -218,9 +213,6 @@
             </div>
         </details>
 
-        <!-- ============================================== -->
-        <!-- SECTION 2: INTERVAL MANAGEMENT -->
-        <!-- ============================================== -->
         <details class="section">
             <summary>2. Interval Management</summary>
             <div class="section-content">
@@ -255,8 +247,6 @@
                         <li><strong>Merge:</strong> If they touch or overlap, absorb Next. Extend the current interval's right endpoint to whichever value is higher (new interval, or old). If the values are equal, keep the Closed endpoint to ensure the number is included.</li>
                     </ul>
                 </div>
-            </div>
-        </details>
 
                 <div class="subsection">
                     <span class="subsection-title">
@@ -268,11 +258,7 @@
                             </svg>
                         </button>
                     </span>
-                
                     
-                    
-                </div>
-                
                     <p><strong>Phase 1: Skip Non-Overlapping (Left)</strong></p>
                     <p>Iterate through the existing intervals.</p>
                     <ul>
@@ -326,12 +312,10 @@
                     </ul>
                     <p><strong>The Result:</strong> The highest value this counter ever attained is the answer. It represents the peak number of events that were simultaneously active at any single point in time.</p>
                 </div>
+            
             </div>
         </details>
 
-        <!-- ============================================== -->
-        <!-- SECTION 3: MERGING & CONSTRUCTIVE -->
-        <!-- ============================================== -->
         <details class="section">
             <summary>3. Merging & Constructive</summary>
             <div class="section-content">
@@ -445,9 +429,6 @@
                     <p><em>Use Case: Infrastructure resource allocation (e.g., cutting stock). It helps optimize limited discrete resources to cover continuous ranges of demand sizes efficiently, minimizing gaps or waste.</em></p>
                 </div>
 
-        <!-- ============================================== -->
-        <!-- SECTION 4: SORTING THEORY -->
-        <!-- ============================================== -->
         <details class="section">
             <summary>4. Sorting Theory</summary>
             <div class="section-content">
